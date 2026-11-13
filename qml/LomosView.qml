@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Effects
 import app.musicplayer
 
 // Vista "Lomos": estantería en la que el elemento elegido se ve de frente y el resto
@@ -19,13 +20,23 @@ FocusScope {
     readonly property var currentItem: items.length ? items[Math.min(index, items.length - 1)] : null
 
     // Geometría de la estantería, proporcional al espacio disponible.
-    readonly property real side: Math.min(280, height * 0.38, width * 0.25)
+    readonly property real side: Math.min(280, height * 0.36, width * 0.22)
     readonly property real centerSide: side * 1.28
     readonly property real spineWidth: side * 0.107
     readonly property real strip: centerSide * 0.045
     readonly property real groupGap: side * 0.157
     readonly property real centerX: width / 2
     readonly property real centerY: 64 + centerSide / 2
+    readonly property real floorY: centerY + side / 2
+
+    // Cajas que caben a cada lado sin salirse del escenario.
+    readonly property int perSide: {
+        const room = width / 2 - centerSide / 2 - groupGap - 24
+        let k = 0
+        while (k < 8 && reach(k + 1) <= room)
+            ++k
+        return k
+    }
 
     signal activated(var item)
 
@@ -87,52 +98,103 @@ FocusScope {
         }
     }
 
-    Repeater {
-        model: root.items
+    // Reflejo en el suelo: la franja inferior de la estantería, volteada y fundida a transparente.
+    Item {
+        id: fade
+        width: root.width
+        height: root.side * 0.45
+        visible: false
+        layer.enabled: true
 
-        Item {
-            id: box
-            required property var modelData
-            required property int index
+        Rectangle {
+            anchors.fill: parent
+            gradient: Gradient {
+                GradientStop { position: 0.3; color: "transparent" }
+                GradientStop { position: 1; color: "black" }
+            }
+        }
+    }
 
-            readonly property int offset: index - root.index
-            readonly property int k: Math.abs(offset)
-            readonly property bool center: offset === 0
-            readonly property bool rightSide: offset > 0
-            readonly property var look: Catalog.cover(modelData.art)
+    ShaderEffectSource {
+        id: mirror
+        width: root.width
+        height: root.side * 0.45
+        y: root.floorY + 4
+        opacity: 0.3
+        sourceItem: shelf
+        sourceRect: Qt.rect(0, root.floorY - height, width, height)
+        transform: Scale {
+            origin.y: mirror.height / 2
+            yScale: -1
+        }
+        layer.enabled: true
+        layer.effect: MultiEffect {
+            maskEnabled: true
+            maskSource: fade
+            // Umbral 0.5 con dispersión 1 hace que la máscara siga el degradado
+            // en vez de recortar en seco.
+            maskThresholdMin: 0.5
+            maskSpreadAtMin: 1
+        }
+    }
 
-            property real coverSide: center ? root.centerSide : root.side
-            property real spine: center ? root.strip : root.spineWidth
-            property real angle: center ? 0 : (rightSide ? 60 : -60)
+    Item {
+        id: shelf
+        anchors.fill: parent
 
-            width: spine + coverSide
-            height: coverSide
-            x: center ? root.centerX - root.centerSide / 2 - root.strip
-                      : rightSide ? root.centerX + root.centerSide / 2 + root.groupGap + root.reach(k) - width
-                                  : root.centerX - root.centerSide / 2 - root.strip - root.groupGap - root.reach(k)
-            y: root.centerY - coverSide / 2
-            z: 100 - k
-            opacity: k <= 7 ? 1 : 0
-            visible: opacity > 0
-
-            Behavior on x { NumberAnimation { duration: Theme.animMove; easing.type: Easing.OutCubic } }
-            Behavior on coverSide { NumberAnimation { duration: Theme.animMove; easing.type: Easing.OutCubic } }
-            Behavior on spine { NumberAnimation { duration: Theme.animMove; easing.type: Easing.OutCubic } }
-            Behavior on angle { NumberAnimation { duration: Theme.animMove; easing.type: Easing.OutCubic } }
-            Behavior on opacity { NumberAnimation { duration: Theme.animFast } }
-
-            Accessible.role: Accessible.Button
-            Accessible.name: modelData.title + ", " + modelData.subtitle
+        Repeater {
+            model: root.items
 
             Item {
-                id: visual
-                anchors.fill: parent
+                id: box
+                required property var modelData
+                required property int index
+
+                readonly property int offset: index - root.index
+                readonly property int k: Math.abs(offset)
+                readonly property bool center: offset === 0
+                readonly property bool rightSide: offset > 0
+                // Solo las cajas cercanas descargan carátula y calculan su color.
+                readonly property bool near: k <= root.perSide + 1
+
+                property real coverSide: center ? root.centerSide : root.side
+                property real spine: center ? root.strip : root.spineWidth
+                // En Qt un ángulo positivo aleja lo que queda a la derecha del eje.
+                property real angle: center ? 0 : (rightSide ? -60 : 60)
+
+                width: spine + coverSide
+                height: coverSide
+                x: center ? root.centerX - root.centerSide / 2 - root.strip
+                          : rightSide ? root.centerX + root.centerSide / 2 + root.groupGap + root.reach(k) - width
+                                      : root.centerX - root.centerSide / 2 - root.strip - root.groupGap - root.reach(k)
+                y: root.centerY - coverSide / 2
+                z: 100 - k
+                opacity: k <= root.perSide ? 1 : 0
+                visible: opacity > 0
+
+                Behavior on x { NumberAnimation { duration: Theme.animMove; easing.type: Easing.OutCubic } }
+                Behavior on coverSide { NumberAnimation { duration: Theme.animMove; easing.type: Easing.OutCubic } }
+                Behavior on spine { NumberAnimation { duration: Theme.animMove; easing.type: Easing.OutCubic } }
+                Behavior on angle { NumberAnimation { duration: Theme.animMove; easing.type: Easing.OutCubic } }
+                Behavior on opacity { NumberAnimation { duration: Theme.animFast } }
+
+                Accessible.role: Accessible.Button
+                Accessible.name: modelData.title + ", " + modelData.subtitle
+
+                // Queda tapada por el lomo, que se dibuja encima.
+                TintProbe {
+                    id: probe
+                    x: box.rightSide ? box.coverSide : 0
+                    thumb: box.near ? box.modelData.thumb : ""
+                }
 
                 Cover {
                     x: box.rightSide ? 0 : box.spine
                     width: box.coverSide
                     height: box.coverSide
-                    art: box.modelData.art
+                    thumb: box.modelData.thumb
+                    pixels: 544
+                    load: box.near
 
                     transform: Rotation {
                         origin.x: box.rightSide ? box.coverSide : 0
@@ -153,7 +215,7 @@ FocusScope {
                     x: box.rightSide ? box.coverSide : 0
                     width: box.spine
                     height: parent.height
-                    color: box.look.spine
+                    color: Qt.darker(probe.tint, 1.25)
 
                     Rectangle {
                         anchors.fill: parent
@@ -172,61 +234,36 @@ FocusScope {
                         rotation: 90
                         opacity: box.center ? 0 : 1
                         text: box.modelData.title
-                        color: box.look.ink
-                        font.pixelSize: Math.max(9, root.spineWidth * 0.38)
+                        color: Theme.text
+                        font.pixelSize: Math.max(9, Math.round(root.spineWidth * 0.38))
                         font.weight: Font.DemiBold
                         font.letterSpacing: 0.4
                         verticalAlignment: Text.AlignVCenter
                         elide: Text.ElideRight
                     }
                 }
-            }
 
-            // Reflejo en el suelo: la misma textura, volteada y atenuada.
-            ShaderEffectSource {
-                sourceItem: visual
-                width: box.width
-                height: box.height
-                y: box.height + 6
-                opacity: 0.2
-                transform: Scale {
-                    origin.y: box.height / 2
-                    yScale: -1
+                HoverHandler {
+                    cursorShape: Qt.PointingHandCursor
+                    onHoveredChanged: if (hovered) Player.prefetchItem(JSON.stringify(box.modelData))
+                }
+
+                TapHandler {
+                    onTapped: {
+                        if (box.center)
+                            root.activated(box.modelData)
+                        else
+                            root.index = box.index
+                        root.forceActiveFocus()
+                    }
                 }
             }
-
-            HoverHandler { cursorShape: Qt.PointingHandCursor }
-
-            TapHandler {
-                onTapped: {
-                    if (box.center)
-                        root.activated(box.modelData)
-                    else
-                        root.index = box.index
-                    root.forceActiveFocus()
-                }
-            }
-        }
-    }
-
-    // Funde los reflejos con el suelo.
-    Rectangle {
-        x: 0
-        y: root.centerY + root.centerSide / 2 + 6
-        z: 150
-        width: parent.width
-        height: Math.max(0, parent.height - y)
-        gradient: Gradient {
-            GradientStop { position: 0; color: Qt.rgba(0.03, 0.035, 0.05, 0.25) }
-            GradientStop { position: 0.55; color: Qt.rgba(0.03, 0.035, 0.05, 0.96) }
-            GradientStop { position: 1; color: Qt.rgba(0.03, 0.035, 0.05, 0) }
         }
     }
 
     Column {
-        z: 200
         anchors.horizontalCenter: parent.horizontalCenter
-        y: root.centerY + root.centerSide / 2 + 30
+        y: root.centerY + root.centerSide / 2 + 26
         width: parent.width - 80
         spacing: 6
 

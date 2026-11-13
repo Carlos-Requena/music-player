@@ -1,0 +1,18 @@
+{
+  "nombre": "Grafito",
+  "descripcion": "Sobrio y neutro: poco color de fondo y esquinas rectas.",
+  "colores": {
+    "fondo": "#121212",
+    "texto": "#EDEDED",
+    "textoSecundario": "#B3EDEDED",
+    "textoTenue": "#80EDEDED",
+    "vidrio": "#0FFFFFFF",
+    "vidrioDenso": "#E6181818",
+    "bordeVidrio": "#1AFFFFFF",
+    "control": "#14FFFFFF",
+    "controlActivo": "#29FFFFFF",
+    "acento": "#E0E0E0"
+  },
+  "radio": 6,
+  "ambiente": 0.3
+}

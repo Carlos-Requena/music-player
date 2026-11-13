@@ -15,10 +15,19 @@ Item {
     readonly property real progress: Catalog.lineProgress(current, position)
     readonly property Item currentLine: {
         void repeater.count
-        return repeater.itemAt(current)
+        return current >= 0 ? repeater.itemAt(current) : null
     }
 
     clip: true
+
+    Text {
+        visible: root.lines.length === 0 && Player.title !== ""
+        width: parent.width
+        text: "Sin letra sincronizada para esta canción."
+        color: Theme.textFaint
+        font.pixelSize: 15
+        wrapMode: Text.WordWrap
+    }
 
     Column {
         id: column
@@ -46,7 +55,10 @@ Item {
                 visible: distance >= -2 && distance <= 5
                 opacity: active ? 1 : (distance < 0 ? 0.62 + 0.18 * distance : Math.max(0.3, 0.74 - 0.11 * distance))
 
-                layer.enabled: visible && !active
+                layer.enabled: visible && !active && Theme.blur
+                // En píxeles físicos: el tamaño lógico es media resolución en pantallas Retina.
+                layer.textureSize: Qt.size(Math.ceil(width), Math.ceil(height))
+                layer.smooth: true
                 layer.effect: MultiEffect {
                     blurEnabled: true
                     blurMax: 8

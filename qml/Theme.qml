@@ -1,20 +1,43 @@
 pragma Singleton
 import QtQuick
+import app.musicplayer
 
-// Tokens visuales del skin por defecto ("Vidrio"). Un skin futuro sustituye este archivo.
+// Tokens visuales. Los colores, el radio y la intensidad del modo ambiente salen de la skin
+// activa (`AppSettings.skinData`, JSON); lo que falte toma el valor de la skin Vidrio.
 QtObject {
-    readonly property color ground: "#0A0C11"
-    readonly property color text: "#FFFFFF"
-    readonly property color textMuted: Qt.rgba(1, 1, 1, 0.74)
-    readonly property color textFaint: Qt.rgba(1, 1, 1, 0.5)
-    readonly property color glass: Qt.rgba(1, 1, 1, 0.07)
-    readonly property color glassStrong: Qt.rgba(0.07, 0.08, 0.11, 0.58)
-    readonly property color glassBorder: Qt.rgba(1, 1, 1, 0.12)
-    readonly property color control: Qt.rgba(1, 1, 1, 0.10)
-    readonly property color controlActive: Qt.rgba(1, 1, 1, 0.18)
-    readonly property color accent: "#FFB070"
+    id: theme
 
-    readonly property int radius: 20
+    readonly property var skin: {
+        try {
+            return AppSettings.skinData === "" ? {} : JSON.parse(AppSettings.skinData)
+        } catch (error) {
+            return {}
+        }
+    }
+    readonly property var colors: skin.colores || {}
+
+    function pick(key, fallback) {
+        return colors[key] !== undefined ? colors[key] : fallback
+    }
+
+    readonly property color ground: pick("fondo", "#0A0C11")
+    readonly property color text: pick("texto", "#FFFFFF")
+    readonly property color textMuted: pick("textoSecundario", "#BDFFFFFF")
+    readonly property color textFaint: pick("textoTenue", "#80FFFFFF")
+    readonly property color glass: pick("vidrio", "#12FFFFFF")
+    readonly property color glassStrong: pick("vidrioDenso", "#94121419")
+    readonly property color glassBorder: pick("bordeVidrio", "#1FFFFFFF")
+    readonly property color control: pick("control", "#1AFFFFFF")
+    readonly property color controlActive: pick("controlActivo", "#2EFFFFFF")
+    readonly property color accent: pick("acento", "#FFB070")
+
+    // Opciones de disposición que afectan al aspecto (Opciones › Disposición).
+    readonly property int revision: AppSettings.revision
+    readonly property bool blur: { void revision; return AppSettings.opcion("desenfoque") !== "no" }
+    readonly property bool ambientOn: { void revision; return AppSettings.opcion("ambiente") !== "no" }
+    readonly property real ambient: ambientOn ? (skin.ambiente !== undefined ? skin.ambiente : 1) : 0
+
+    readonly property int radius: skin.radio !== undefined ? skin.radio : 20
     readonly property int gap: 12
     readonly property int hit: 44
     readonly property int animFast: 160
@@ -30,6 +53,13 @@ QtObject {
     readonly property string iconHeart: "M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"
     readonly property string iconLyrics: "M4 5h16v11H9l-5 4z M8 9h8 M8 12h5"
     readonly property string iconVolume: "M4 9.5h3l5-4v13l-5-4H4z M16 9a4 4 0 0 1 0 6"
+    readonly property string iconQueue: "M4 7h16 M4 12h16 M4 17h10"
+    readonly property string iconAccount: "M16 8a4 4 0 1 1-8 0a4 4 0 0 1 8 0z M4 21c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5"
+    readonly property string iconBack: "M15 5l-7 7 7 7"
+    readonly property string iconShuffle: "M3 7h3.5c2 0 3.2 1 4.3 2.6l2.4 4.8c1.1 1.6 2.3 2.6 4.3 2.6H21 M3 17h3.5c1.3 0 2.3-.4 3.1-1.2 M21 7h-3.5c-1.3 0-2.3.4-3.1 1.2 M18 4l3 3-3 3 M18 14l3 3-3 3"
+    readonly property string iconInspect: "M4 5h11v14H4z M15 7l4 1v8l-4 1 M7 9h5 M7 12h5"
+    readonly property string iconMini: "M3 5h18v14H3z M12 12h7v5h-7z"
+    readonly property string iconExpand: "M14 4h6v6 M10 20H4v-6 M20 4l-7 7 M4 20l7-7"
     readonly property string iconClose: "M6 6l12 12 M18 6L6 18"
     readonly property string iconLomos: "M4 5v14 M8 5v14 M11 5h9v14h-9z"
     readonly property string iconCubeta: "M4 9h16v11H4z M6 6h12 M8 3h8"

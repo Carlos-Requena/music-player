@@ -1,0 +1,18 @@
+{
+  "nombre": "Medianoche",
+  "descripcion": "Azul profundo, acento frío y vidrio más denso.",
+  "colores": {
+    "fondo": "#060914",
+    "texto": "#F2F5FF",
+    "textoSecundario": "#B8C3DEFF",
+    "textoTenue": "#8093A3C7",
+    "vidrio": "#1A8FA6FF",
+    "vidrioDenso": "#B00B1024",
+    "bordeVidrio": "#2E9DB4FF",
+    "control": "#1F9DB4FF",
+    "controlActivo": "#38A6BCFF",
+    "acento": "#7AA2FF"
+  },
+  "radio": 14,
+  "ambiente": 0.8
+}

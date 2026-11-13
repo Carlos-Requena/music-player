@@ -1,0 +1,18 @@
+{
+  "nombre": "Vidrio",
+  "descripcion": "Paneles translúcidos sobre el color de la carátula.",
+  "colores": {
+    "fondo": "#0A0C11",
+    "texto": "#FFFFFF",
+    "textoSecundario": "#BDFFFFFF",
+    "textoTenue": "#80FFFFFF",
+    "vidrio": "#12FFFFFF",
+    "vidrioDenso": "#94121419",
+    "bordeVidrio": "#1FFFFFFF",
+    "control": "#1AFFFFFF",
+    "controlActivo": "#2EFFFFFF",
+    "acento": "#FFB070"
+  },
+  "radio": 20,
+  "ambiente": 1.0
+}

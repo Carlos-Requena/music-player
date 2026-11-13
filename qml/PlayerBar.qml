@@ -8,6 +8,7 @@ Glass {
     property bool compact: false
     property bool lyricsOn: true
     signal lyricsToggled()
+    signal miniRequested()
 
     tint: Theme.glassStrong
     radius: compact ? height / 2 : 22
@@ -23,7 +24,8 @@ Glass {
         Cover {
             width: 56
             height: 56
-            art: Player.cover
+            thumb: Player.thumb
+            pixels: 120
         }
 
         Column {
@@ -33,7 +35,7 @@ Glass {
 
             Text {
                 width: parent.width
-                text: Player.title
+                text: Player.title !== "" ? Player.title : "Nada sonando"
                 color: Theme.text
                 font.pixelSize: 14
                 font.weight: Font.DemiBold
@@ -42,8 +44,8 @@ Glass {
 
             Text {
                 width: parent.width
-                text: Player.artist
-                color: Theme.textMuted
+                text: Player.error !== "" ? Player.error : (Player.loading ? "Cargando…" : Player.artist)
+                color: Player.error !== "" ? Theme.accent : Theme.textMuted
                 font.pixelSize: 13
                 elide: Text.ElideRight
             }
@@ -75,6 +77,15 @@ Glass {
                 filled: true
                 active: true
                 onClicked: Player.toggle()
+
+                // Late mientras la pista se está resolviendo.
+                SequentialAnimation on opacity {
+                    running: Player.loading
+                    loops: Animation.Infinite
+                    alwaysRunToEnd: true
+                    NumberAnimation { to: 0.45; duration: 500; easing.type: Easing.InOutSine }
+                    NumberAnimation { to: 1; duration: 500; easing.type: Easing.InOutSine }
+                }
             }
 
             IconButton {
@@ -92,7 +103,6 @@ Glass {
             spacing: 10
 
             Text {
-                id: elapsed
                 anchors.verticalCenter: parent.verticalCenter
                 width: 34
                 horizontalAlignment: Text.AlignRight
@@ -101,49 +111,12 @@ Glass {
                 font.pixelSize: 12
             }
 
-            Item {
-                id: track
+            Slider {
                 anchors.verticalCenter: parent.verticalCenter
                 width: parent.width - 2 * (34 + 10)
-                height: 20
-
-                Accessible.role: Accessible.Slider
-                Accessible.name: "Posición"
-
-                Rectangle {
-                    anchors.verticalCenter: parent.verticalCenter
-                    width: parent.width
-                    height: 4
-                    radius: 2
-                    color: Qt.rgba(1, 1, 1, 0.22)
-
-                    Rectangle {
-                        width: Player.duration > 0 ? parent.width * Player.position / Player.duration : 0
-                        height: parent.height
-                        radius: 2
-                        color: Theme.accent
-                    }
-                }
-
-                Rectangle {
-                    x: (Player.duration > 0 ? track.width * Player.position / Player.duration : 0) - 6
-                    anchors.verticalCenter: parent.verticalCenter
-                    width: 12
-                    height: 12
-                    radius: 6
-                    color: Theme.text
-                }
-
-                MouseArea {
-                    anchors.fill: parent
-                    anchors.margins: -8
-                    cursorShape: Qt.PointingHandCursor
-                    function seek(mouse) {
-                        Player.seek(Math.max(0, Math.min(1, (mouse.x - 8) / track.width)) * Player.duration)
-                    }
-                    onPressed: mouse => seek(mouse)
-                    onPositionChanged: mouse => seek(mouse)
-                }
+                label: "Posición"
+                value: Player.duration > 0 ? Player.position / Player.duration : 0
+                onMoved: value => Player.seek(value * Player.duration)
             }
 
             Text {
@@ -159,16 +132,37 @@ Glass {
     Row {
         id: extras
         anchors.right: parent.right
-        anchors.rightMargin: 14
+        anchors.rightMargin: 18
         anchors.verticalCenter: parent.verticalCenter
-        spacing: 4
+        spacing: 8
+
+        IconButton {
+            icon: Theme.iconMini
+            label: "Mini reproductor"
+            onClicked: root.miniRequested()
+        }
 
         IconButton {
             icon: Theme.iconLyrics
-            label: "Letra"
+            label: "Panel de letra y cola"
             solid: root.lyricsOn
             visible: !root.compact
             onClicked: root.lyricsToggled()
+        }
+
+        Icon {
+            anchors.verticalCenter: parent.verticalCenter
+            path: Theme.iconVolume
+            color: Theme.textMuted
+        }
+
+        Slider {
+            anchors.verticalCenter: parent.verticalCenter
+            width: root.compact ? 72 : 96
+            label: "Volumen"
+            fill: Theme.text
+            value: Player.volume / 100
+            onMoved: value => Player.changeVolume(value * 100)
         }
     }
 }

@@ -1,0 +1,18 @@
+{
+  "nombre": "Neón",
+  "descripcion": "Noche de club: magenta intenso y modo ambiente al máximo.",
+  "colores": {
+    "fondo": "#0B0710",
+    "texto": "#FFFFFF",
+    "textoSecundario": "#C8F3D9FF",
+    "textoTenue": "#85E3C2F5",
+    "vidrio": "#1AFF4FD8",
+    "vidrioDenso": "#9E14081A",
+    "bordeVidrio": "#40FF4FD8",
+    "control": "#1FFF4FD8",
+    "controlActivo": "#3DFF4FD8",
+    "acento": "#FF4FD8"
+  },
+  "radio": 26,
+  "ambiente": 1.3
+}

@@ -60,7 +60,9 @@ FocusScope {
             readonly property int depth: index - root.index
             readonly property real shrink: Math.pow(0.94, Math.max(0, depth))
 
-            art: modelData.art
+            thumb: modelData.thumb
+            pixels: 544
+            load: depth >= -1 && depth <= 5
             width: root.side * shrink
             height: width
             x: root.stackX - width / 2

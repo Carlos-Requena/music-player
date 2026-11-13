@@ -25,7 +25,7 @@ Glass {
                 required property var modelData
                 readonly property bool active: modelData.id === root.current
 
-                width: label.implicitWidth + 32
+                width: label.implicitWidth + 26
                 height: Theme.hit
                 activeFocusOnTab: true
 

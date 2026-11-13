@@ -17,7 +17,7 @@ Item {
         id: grab
         anchors.fill: parent
         visible: false
-        live: root.visible
+        live: root.visible && Theme.blur
         sourceItem: root.backdrop
         sourceRect: {
             if (!root.backdrop)
@@ -44,7 +44,7 @@ Item {
 
     MultiEffect {
         anchors.fill: parent
-        visible: root.backdrop !== null
+        visible: root.backdrop !== null && Theme.blur
         source: grab
         blurEnabled: true
         blur: root.blur

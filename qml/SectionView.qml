@@ -10,9 +10,15 @@ FocusScope {
 
     readonly property var zonas: Catalog.zonas(section)
     readonly property var currentItem: loader.item ? loader.item.currentItem : null
-    readonly property var focusedArt: currentItem ? currentItem.art : 0
+    readonly property string focusedThumb: currentItem ? currentItem.thumb : ""
 
     signal activated(var item)
+
+    // Lleva la vista al elemento `n` (solo las vistas lineales tienen índice).
+    function jump(n) {
+        if (loader.item && loader.item.index !== undefined)
+            loader.item.index = n
+    }
 
     Loader {
         id: loader

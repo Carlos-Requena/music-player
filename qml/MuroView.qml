@@ -6,7 +6,12 @@ FocusScope {
     id: root
 
     property var zonas: []
-    property int cols: 6
+    // Opciones › Disposición › Carátulas del Muro.
+    property int cols: {
+        void AppSettings.revision
+        const size = AppSettings.opcion("caratulas")
+        return size === "pequenas" ? 8 : size === "grandes" ? 4 : 6
+    }
     property int row: 0
     property int col: 0
 
@@ -96,7 +101,7 @@ FocusScope {
                     required property var modelData
                     required property int index
 
-                    spacing: 8
+                    spacing: 12
                     z: index === root.row ? 2 : 1
 
                     Text {
@@ -126,8 +131,7 @@ FocusScope {
                                 width: root.tile
                                 height: root.tile
                                 z: current ? 3 : 1
-                                scale: current ? 1.16 : 1
-                                transformOrigin: Item.Top
+                                scale: current ? 1.12 : 1
 
                                 Accessible.role: Accessible.Button
                                 Accessible.name: modelData.title + ", " + modelData.subtitle
@@ -136,7 +140,10 @@ FocusScope {
 
                                 Cover {
                                     anchors.fill: parent
-                                    art: cell.modelData.art
+                                    thumb: cell.modelData.thumb
+                                    // Solo descargan y ocupan memoria las filas a la vista o cerca.
+                                    load: rowItem.y + rowItem.height > flick.contentY - root.tile * 2
+                                          && rowItem.y < flick.contentY + flick.height + root.tile * 2
                                 }
 
                                 Rectangle {
@@ -148,7 +155,7 @@ FocusScope {
 
                                 Rectangle {
                                     anchors.fill: parent
-                                    anchors.margins: -5
+                                    anchors.margins: -4
                                     radius: 4
                                     color: "transparent"
                                     border.width: 3
@@ -156,7 +163,10 @@ FocusScope {
                                     visible: cell.current
                                 }
 
-                                HoverHandler { cursorShape: Qt.PointingHandCursor }
+                                HoverHandler {
+                    cursorShape: Qt.PointingHandCursor
+                    onHoveredChanged: if (hovered) Player.prefetchItem(JSON.stringify(cell.modelData))
+                }
 
                                 TapHandler {
                                     onTapped: {
