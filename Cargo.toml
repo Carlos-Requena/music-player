@@ -1,0 +1,21 @@
+[package]
+name = "musicplayer"
+version = "0.1.0"
+edition = "2021"
+description = "Cliente de escritorio ligero para YouTube Music (Qt 6 / QML + Rust)"
+
+[dependencies]
+cxx = "1.0.95"
+cxx-qt = "0.10"
+cxx-qt-lib = { version = "0.10", features = ["qt_gui", "qt_qml"] }
+dirs = "6"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[build-dependencies]
+cxx-qt-build = { version = "0.10", features = ["link_qt_object_files"] }
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+strip = true
