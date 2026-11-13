@@ -73,8 +73,6 @@ const DEFAULT_VIEWS: &[(&str, &str)] = &[
     ("explorar", "muro"),
     ("playlists", "lomos"),
     ("albumes", "lomos"),
-    ("artistas", "muro"),
-    ("canciones", "muro"),
     ("megusta", "muro"),
     ("buscar", "muro"),
 ];

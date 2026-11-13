@@ -79,6 +79,34 @@ fn post(endpoint: &str, mut body: Value) -> Result<Value> {
         .map_err(|error| format!("Respuesta de YouTube Music ilegible: {error}"))
 }
 
+/// Estado de reproducción de una pista según el reproductor de YouTube Music (con la
+/// sesión si la hay): `(status, motivo, tipo de vídeo, hay formatos)`. Para diagnosticar.
+pub fn playability(video_id: &str) -> Result<(String, String, String, bool)> {
+    let player = post("player", json!({ "videoId": video_id }))?;
+    let status = &player["playabilityStatus"];
+    Ok((
+        status["status"].as_str().unwrap_or_default().to_owned(),
+        status["reason"].as_str().unwrap_or_default().to_owned(),
+        player["videoDetails"]["musicVideoType"].as_str().unwrap_or_default().to_owned(),
+        player["streamingData"]["adaptiveFormats"].as_array().is_some_and(|formats| !formats.is_empty()),
+    ))
+    .inspect(|_| {
+        // Detalle de los formatos de audio (sin URLs): ¿directos o cifrados?
+        for format in player["streamingData"]["adaptiveFormats"].as_array().into_iter().flatten() {
+            if format["mimeType"].as_str().is_some_and(|mime| mime.starts_with("audio")) {
+                eprintln!(
+                    "  itag {} {} kbps url:{} cifrada:{}",
+                    format["itag"],
+                    format["bitrate"].as_u64().unwrap_or(0) / 1000,
+                    format.get("url").is_some(),
+                    format.get("signatureCipher").is_some()
+                );
+            }
+        }
+        eprintln!("  serverAbrStreamingUrl: {}", player["streamingData"].get("serverAbrStreamingUrl").is_some());
+    })
+}
+
 /// Primera aparición de `key` en profundidad.
 fn find<'a>(value: &'a Value, key: &str) -> Option<&'a Value> {
     match value {
@@ -244,16 +272,6 @@ pub fn library_playlists() -> Result<Vec<Zone>> {
 /// Álbumes guardados en la biblioteca de la cuenta.
 pub fn library_albums() -> Result<Vec<Zone>> {
     titled(browse("FEmusic_liked_albums")?, "Tus álbumes")
-}
-
-/// Canciones guardadas en la biblioteca de la cuenta.
-pub fn library_songs() -> Result<Vec<Zone>> {
-    titled(browse("FEmusic_liked_videos")?, "Tus canciones")
-}
-
-/// Artistas de la biblioteca de la cuenta.
-pub fn library_artists() -> Result<Vec<Zone>> {
-    titled(browse("FEmusic_library_corpus_track_artists")?, "Tus artistas")
 }
 
 /// Canciones marcadas con «Me gusta». Llevan la playlist `LM` para que, al elegir una,

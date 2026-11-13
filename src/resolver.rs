@@ -5,7 +5,7 @@
 //! elemento sobre el que el usuario deja el foco, y al hacer clic la URL ya está aquí.
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     process::{Command, Stdio},
     sync::{
         atomic::{AtomicBool, AtomicU64, Ordering},
@@ -41,14 +41,29 @@ const MAX_WORKERS: usize = 2;
 const EXPIRY_MARGIN: u64 = 10 * 60;
 
 /// Opciones de yt-dlp compartidas con el gancho de mpv (formato `--opción valor`).
+/// Depuración: `MUSICPLAYER_YTDLP_CLIENTS=web_music,…` fuerza los clientes de yt-dlp.
+pub fn clients_override() -> Option<String> {
+    std::env::var("MUSICPLAYER_YTDLP_CLIENTS").ok().filter(|clients| !clients.is_empty())
+}
+
+/// Clientes de YouTube que usa yt-dlp:
+/// - Sin sesión, YouTube exige comprobaciones anti-bot a sus clientes por defecto en las
+///   pistas de YouTube Music; `web_embedded,mweb` las sirven sin ellas.
+/// - Con sesión, `web_music`, el cliente de YouTube Music: es el único que da las pistas que
+///   YouTube reserva a cuentas («Art Tracks» de muchos sellos; los demás responden «Video
+///   unavailable» aun con cookies) y los formatos Premium de 256 kbps (itags 774 y 141).
+pub fn ytdlp_clients() -> String {
+    clients_override().unwrap_or_else(|| {
+        if crate::account::cookies_file().is_some() { "web_music" } else { "web_embedded,mweb" }.to_owned()
+    })
+}
+
 pub fn ytdlp_options(path: &str) -> Vec<String> {
     let mut options = Vec::new();
-    // Sin sesión, YouTube exige comprobaciones anti-bot a los clientes por defecto de yt-dlp
-    // en las pistas de YouTube Music; estos dos clientes las sirven sin ellas. En modo
-    // Premium se deja elegir a yt-dlp: con cookies de Premium usa los clientes que dan 256 kbps.
-    if !premium_mode() {
-        options.push("--extractor-args youtube:player_client=web_embedded,mweb".to_owned());
-    }
+    // Con sesión no hace falta descargar la página del vídeo ni su configuración (yt-dlp ya
+    // tiene la de la cuenta): la pista llega en ~1,7 s en vez de ~3 s.
+    let skip = if crate::account::cookies_file().is_some() { ";player_skip=webpage,configs" } else { "" };
+    options.push(format!("--extractor-args youtube:player_client={}{skip}", ytdlp_clients()));
     // yt-dlp necesita un runtime de JavaScript; usa deno por defecto y hay que
     // indicarle node si es lo único instalado.
     if which("deno", path).is_none() && which("node", path).is_some() {
@@ -133,7 +148,11 @@ pub fn resolve(video_id: &str) -> Result<String, String> {
 
     // YouTube responde de forma irregular a peticiones sin sesión: el mismo vídeo puede
     // salir sin formatos y, un momento después, con ellos. Un segundo intento suele bastar.
-    let result = run_ytdlp(video_id).or_else(|_| {
+    // Si la pista necesita sesión, repetir no cambia nada.
+    let result = run_ytdlp(video_id).or_else(|error| {
+        if error == NEEDS_SESSION {
+            return Err(error);
+        }
         thread::sleep(Duration::from_millis(400));
         run_ytdlp(video_id)
     });
@@ -205,23 +224,46 @@ fn run_ytdlp(video_id: &str) -> Result<String, String> {
     fast_or_ytdlp(video_id).map(|(url, from_ytdlp)| if from_ytdlp { format!("lavf://{url}") } else { url })
 }
 
+/// Marca de error: YouTube solo da esta pista con la sesión iniciada.
+pub const NEEDS_SESSION: &str = "\u{0}necesita-sesion";
+
+/// Pistas que la vía rápida rechazó y solo llegan con la sesión: no se vuelve a probar con ellas.
+static NEEDS_ACCOUNT: LazyLock<Mutex<HashSet<String>>> = LazyLock::new(Default::default);
+
 fn fast_or_ytdlp(video_id: &str) -> Result<(String, bool), String> {
-    let premium = premium_mode();
+    let known = NEEDS_ACCOUNT.lock().is_ok_and(|set| set.contains(video_id));
+    // Directo a yt-dlp con la sesión: en modo Premium (los 256 kbps solo llegan así) y con
+    // las pistas que ya se sabe que la vía rápida rechaza.
+    let session_first = premium_mode() || (known && crate::account::cookies_file().is_some());
     // Calidad normal: 1) la API del reproductor (~0,3 s, Opus ~160 kbps, lo máximo sin
     // Premium). Premium: los formatos de 256 kbps solo llegan con la sesión, vía yt-dlp.
-    if !premium {
+    if !session_first {
         match crate::stream::resolve(video_id) {
             Ok(url) => return Ok((url, false)),
-            Err(error) => eprintln!("vía rápida no disponible para {video_id}: {error}; se usa yt-dlp"),
+            // Algunas pistas (muchas «Art Tracks» de sellos japoneses, por ejemplo) YouTube
+            // solo las da con sesión: ni la web de YouTube Music las reproduce sin ella. Sin
+            // sesión no hay nada que probar; con ella se piden con tus cookies.
+            Err(error) if crate::stream::refused(&error) && crate::account::cookies_file().is_none() => {
+                eprintln!("{video_id}: {error}; necesita la sesión");
+                return Err(NEEDS_SESSION.to_owned());
+            }
+            Err(error) => {
+                if crate::stream::refused(&error) {
+                    if let Ok(mut set) = NEEDS_ACCOUNT.lock() {
+                        set.insert(video_id.to_owned());
+                    }
+                }
+                eprintln!("vía rápida no disponible para {video_id}: {error}; se usa yt-dlp con la sesión");
+            }
         }
     }
     // 2) El yt-dlp residente; 3) si no está disponible, un proceso nuevo.
     if let Some(reply) = crate::daemon::resolve(video_id) {
-        if reply.is_ok() || !premium {
+        if reply.is_ok() || !session_first {
             return reply.map(|url| (url, true));
         }
     }
-    if premium {
+    if session_first {
         if let Ok(url) = run_ytdlp_process(video_id) {
             return Ok((url, true));
         }

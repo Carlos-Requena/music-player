@@ -47,6 +47,10 @@ pub mod qobject {
         #[qproperty(f64, volume)]
         /// Formato real de lo que suena, p. ej. «Opus · 152 kbps».
         #[qproperty(QString, calidad)]
+        /// Al acabar la cola vuelve a empezar.
+        #[qproperty(bool, repetir)]
+        /// Lista temporal (JSON de `[ytm::Track]`): canciones sueltas reunidas a mano.
+        #[qproperty(QString, temporal)]
         type Player = super::PlayerRust;
 
         /// Reproduce un elemento del catálogo (JSON de `ytm::Item`): una canción con
@@ -100,6 +104,28 @@ pub mod qobject {
         /// Cambia el volumen (0–100).
         #[qinvokable]
         fn change_volume(self: Pin<&mut Player>, volume: f64);
+
+        /// Resuelve de antemano las primeras `count` pistas de una lista (JSON de
+        /// `[ytm::Track]` o de `[ytm::Item]`), para que suenen al instante al elegirlas.
+        #[qinvokable]
+        fn prefetch_tracks(self: &Player, tracks: &QString, count: i32);
+
+        /// Añade a la lista temporal una canción, o todas las de un álbum o playlist
+        /// (JSON de `ytm::Item` o de `ytm::Track`).
+        #[qinvokable]
+        fn add_to_temporal(self: Pin<&mut Player>, item: &QString);
+
+        /// Quita de la lista temporal la pista `index`.
+        #[qinvokable]
+        fn remove_from_temporal(self: Pin<&mut Player>, index: i32);
+
+        /// Vacía la lista temporal.
+        #[qinvokable]
+        fn clear_temporal(self: Pin<&mut Player>);
+
+        /// Reproduce la lista temporal desde `index`, en bucle.
+        #[qinvokable]
+        fn play_temporal(self: Pin<&mut Player>, index: i32);
     }
 
     impl cxx_qt::Threading for Player {}
@@ -140,6 +166,26 @@ pub struct PlayerRust {
     calidad: QString,
     codec: String,
     kbps: f64,
+    repetir: bool,
+    temporal: QString,
+    /// Pistas de la lista temporal (`temporal` es su JSON).
+    temporal_tracks: Vec<Track>,
+}
+
+/// Pista a partir del JSON de una tarjeta del catálogo (`Item`) o de una pista (`Track`).
+/// `None` si no es una canción (álbum, playlist…).
+fn track_from(value: &serde_json::Value) -> Option<Track> {
+    if value.get("artist").is_some() {
+        return serde_json::from_value::<Track>(value.clone()).ok().filter(|track| !track.video_id.is_empty());
+    }
+    let item = serde_json::from_value::<Item>(value.clone()).ok()?;
+    (!item.video_id.is_empty()).then(|| Track {
+        artist: artist_from_subtitle(&item.subtitle),
+        title: item.title,
+        thumb: item.thumb,
+        video_id: item.video_id,
+        duration: 0.0,
+    })
 }
 
 /// Artista a partir del subtítulo de una tarjeta: «Quevedo • 75 M reproducciones» o
@@ -217,6 +263,9 @@ impl Default for PlayerRust {
             calidad: QString::default(),
             codec: String::new(),
             kbps: 0.0,
+            repetir: false,
+            temporal: QString::from("[]"),
+            temporal_tracks: Vec::new(),
         }
     }
 }
@@ -311,6 +360,8 @@ impl qobject::Player {
         let next = *self.index() as usize + 1;
         if next < self.tracks.len() {
             self.load(next);
+        } else if *self.repetir() && !self.tracks.is_empty() {
+            self.load(0);
         }
     }
 
@@ -468,11 +519,85 @@ impl qobject::Player {
         self.ensure_engine();
     }
 
-    /// Resuelve de antemano la pista siguiente de la cola.
+    /// Resuelve de antemano las tres pistas siguientes de la cola (con repetición, dando la
+    /// vuelta). Las que necesitan la sesión tardan ~2 s en resolverse: así ya están listas.
     fn prefetch_next(&self) {
-        if let Some(next) = self.tracks.get(*self.index() as usize + 1) {
-            resolver::prefetch(&next.video_id);
+        let len = self.tracks.len();
+        let at = *self.index() as usize;
+        for step in 1..=3 {
+            let next = at + step;
+            let next = if next < len { next } else if *self.repetir() && len > 0 { next % len } else { break };
+            if next != at {
+                resolver::prefetch(&self.tracks[next].video_id);
+            }
         }
+    }
+
+    fn prefetch_tracks(&self, tracks: &QString, count: i32) {
+        let Ok(serde_json::Value::Array(list)) = serde_json::from_str(&tracks.to_string()) else { return };
+        for track in list.iter().filter_map(track_from).take(count.max(0) as usize) {
+            resolver::prefetch(&track.video_id);
+        }
+    }
+
+    fn set_temporal_tracks(mut self: Pin<&mut Self>, tracks: Vec<Track>) {
+        let json = serde_json::to_string(&tracks).unwrap_or_else(|_| "[]".to_owned());
+        self.as_mut().rust_mut().temporal_tracks = tracks;
+        self.set_temporal(QString::from(&json));
+    }
+
+    fn add_to_temporal(mut self: Pin<&mut Self>, item: &QString) {
+        let Ok(value) = serde_json::from_str::<serde_json::Value>(&item.to_string()) else { return };
+        if let Some(track) = track_from(&value) {
+            resolver::prefetch(&track.video_id);
+            let mut tracks = self.temporal_tracks.clone();
+            tracks.push(track);
+            self.as_mut().set_temporal_tracks(tracks);
+            return;
+        }
+        // Un álbum o playlist: se añaden todas sus canciones cuando llegan.
+        let Ok(item) = serde_json::from_value::<Item>(value) else { return };
+        if item.playlist_id.is_empty() {
+            return;
+        }
+        let qt = self.qt_thread();
+        thread::spawn(move || {
+            let result = album_queue(&item.playlist_id);
+            let _ = qt.queue(move |mut player| match result {
+                Ok(added) => {
+                    let mut tracks = player.temporal_tracks.clone();
+                    tracks.extend(added);
+                    player.as_mut().set_temporal_tracks(tracks);
+                }
+                Err(error) => player.fail(&error),
+            });
+        });
+    }
+
+    fn remove_from_temporal(mut self: Pin<&mut Self>, index: i32) {
+        let mut tracks = self.temporal_tracks.clone();
+        if index >= 0 && (index as usize) < tracks.len() {
+            tracks.remove(index as usize);
+            self.as_mut().set_temporal_tracks(tracks);
+        }
+    }
+
+    fn clear_temporal(self: Pin<&mut Self>) {
+        self.set_temporal_tracks(Vec::new());
+    }
+
+    fn play_temporal(mut self: Pin<&mut Self>, index: i32) {
+        let tracks = self.temporal_tracks.clone();
+        if tracks.is_empty() {
+            return;
+        }
+        let start = (index.max(0) as usize).min(tracks.len() - 1);
+        let request = self.request + 1;
+        self.as_mut().rust_mut().request = request;
+        self.as_mut().set_error(QString::default());
+        self.as_mut().set_repetir(true);
+        self.as_mut().set_tracks(tracks);
+        self.load(start);
     }
 
     fn change_volume(mut self: Pin<&mut Self>, volume: f64) {
@@ -571,8 +696,15 @@ impl qobject::Player {
                         if player.load_token != token {
                             return;
                         }
-                        if let Err(error) = &result {
-                            eprintln!("{error}; se usa el gancho de yt-dlp de mpv");
+                        match &result {
+                            Err(error) if error == resolver::NEEDS_SESSION => {
+                                player.fail(
+                                    "YouTube solo deja escuchar esta canción con tu cuenta. Inicia sesión en Opciones › Cuenta.",
+                                );
+                                return;
+                            }
+                            Err(error) => eprintln!("{error}; se usa el gancho de yt-dlp de mpv"),
+                            Ok(_) => {}
                         }
                         player.start_stream(result.ok().as_deref(), &video_id);
                     });
@@ -652,7 +784,7 @@ impl qobject::Player {
                 self.prefetch_next();
             }
             Event::Ended => {
-                if (*self.index() as usize) + 1 < self.tracks.len() {
+                if (*self.index() as usize) + 1 < self.tracks.len() || *self.repetir() {
                     self.next();
                 } else {
                     plugins::emit(plugins::Event::Stopped);
@@ -684,12 +816,25 @@ impl qobject::Player {
 
 #[cfg(test)]
 mod tests {
-    use super::artist_from_subtitle;
+    use super::{artist_from_subtitle, track_from};
 
     #[test]
     fn el_artista_sale_limpio_del_subtitulo() {
         assert_eq!(artist_from_subtitle("Quevedo y Elvis Crespo • 75 M reproducciones"), "Quevedo y Elvis Crespo");
         assert_eq!(artist_from_subtitle("Canción • Vetusta Morla • Mi colección de duelos • 3:27"), "Vetusta Morla");
         assert_eq!(artist_from_subtitle("Vetusta Morla"), "Vetusta Morla");
+    }
+
+    #[test]
+    fn convierte_tarjetas_y_pistas_en_pistas() {
+        let song = serde_json::json!({ "kind": "song", "title": "Canción", "subtitle": "Canción • Artista • 3 M", "videoId": "abc", "thumb": "t" });
+        let track = track_from(&song).expect("una canción es una pista");
+        assert_eq!((track.title.as_str(), track.artist.as_str(), track.video_id.as_str()), ("Canción", "Artista", "abc"));
+
+        let queued = serde_json::json!({ "title": "T", "artist": "A", "videoId": "xyz", "thumb": "", "duration": 200.0 });
+        assert_eq!(track_from(&queued).map(|track| track.duration), Some(200.0));
+
+        let album = serde_json::json!({ "kind": "album", "title": "Álbum", "playlistId": "OLAK" });
+        assert!(track_from(&album).is_none());
     }
 }

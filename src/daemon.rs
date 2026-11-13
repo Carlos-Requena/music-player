@@ -68,8 +68,12 @@ fn options(path: &str) -> Value {
         "format": "bestaudio/best",
     });
     // Los mismos clientes que `resolver::ytdlp_options` (ver allí el porqué).
-    if !crate::resolver::premium_mode() {
-        options["extractor_args"] = json!({ "youtube": { "player_client": ["web_embedded", "mweb"] } });
+    let clients = crate::resolver::ytdlp_clients();
+    let list: Vec<&str> = clients.split(',').collect();
+    options["extractor_args"] = json!({ "youtube": { "player_client": list } });
+    if crate::account::cookies_file().is_some() {
+        // Ver `resolver::ytdlp_options`: ~1,7 s en vez de ~3 s por pista.
+        options["extractor_args"]["youtube"]["player_skip"] = json!(["webpage", "configs"]);
     }
     if which("deno", path).is_none() && which("node", path).is_some() {
         options["js_runtimes"] = json!({ "node": {} });

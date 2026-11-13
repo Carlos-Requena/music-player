@@ -9,6 +9,9 @@ FocusScope {
 
     readonly property var detail: Catalog.detalle
     readonly property var tracks: detail ? (detail.tracks || []) : []
+    // Al llegar las canciones se resuelven las primeras: así la que elijas suena al momento,
+    // también las que YouTube solo da con sesión (que tardan ~2 s en resolverse).
+    onTracksChanged: if (tracks.length) Player.prefetchTracks(JSON.stringify(tracks), 6)
     readonly property var zonas: detail ? (detail.zonas || []) : []
     readonly property bool artist: detail !== null && detail.kind === "artist"
     readonly property real totalSeconds: tracks.reduce((sum, track) => sum + (track.duration || 0), 0)
@@ -69,9 +72,10 @@ FocusScope {
         }
     }
 
+    // Separada de la navegación de arriba para que no parezca pegada a ella.
     IconButton {
         x: 40
-        y: 0
+        y: 20
         icon: Theme.iconBack
         label: "Volver"
         solid: true
@@ -81,7 +85,7 @@ FocusScope {
     Column {
         id: info
         x: 40
-        y: 60
+        y: 84
         width: root.coverSide
         spacing: 14
 
@@ -161,7 +165,7 @@ FocusScope {
         anchors.leftMargin: 40
         anchors.right: parent.right
         anchors.rightMargin: 32
-        y: 60
+        y: 84
         height: root.height - y
         clip: true
         boundsBehavior: Flickable.StopAtBounds
@@ -245,6 +249,12 @@ FocusScope {
                 cursorShape: Qt.PointingHandCursor
             }
 
+            // Clic derecho: menú con «Añadir a la lista temporal».
+            TapHandler {
+                acceptedButtons: Qt.RightButton
+                onTapped: eventPoint => row.Window.window.openMenu(row.modelData, eventPoint.scenePosition)
+            }
+
             TapHandler {
                 onTapped: {
                     root.current = row.index
@@ -317,6 +327,12 @@ FocusScope {
                                     }
 
                                     HoverHandler { cursorShape: Qt.PointingHandCursor }
+
+                                    // Clic derecho: menú con «Añadir a la lista temporal».
+                                    TapHandler {
+                                        acceptedButtons: Qt.RightButton
+                                        onTapped: eventPoint => card.Window.window.openMenu(card.modelData, eventPoint.scenePosition)
+                                    }
 
                                     TapHandler {
                                         onTapped: root.opened(card.modelData)

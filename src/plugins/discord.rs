@@ -79,6 +79,9 @@ pub fn activity(track: &Track, position: f64) -> Value {
     let start = now_ms().saturating_sub((position * 1000.0) as u64);
     let mut activity = json!({
         "type": 2, // «Escuchando»
+        // Qué se ve en la lista de miembros tras «Escuchando»: 2 = `details` (el título de la
+        // canción) en vez del nombre de la aplicación de Discord.
+        "status_display_type": 2,
         "details": field(&track.title),
         "state": field(&track.artist),
         "timestamps": { "start": start },
@@ -195,6 +198,7 @@ mod tests {
         let track = Track { title: "X".into(), artist: "Grupo".into(), duration: 200.0, thumb: "https://a/b.jpg".into(), ..Default::default() };
         let activity = activity(&track, 10.0);
         assert_eq!(activity["type"], 2);
+        assert_eq!(activity["status_display_type"], 2);
         assert_eq!(activity["details"], "X "); // mínimo dos caracteres
         let start = activity["timestamps"]["start"].as_u64().unwrap();
         assert_eq!(activity["timestamps"]["end"].as_u64().unwrap() - start, 200_000);

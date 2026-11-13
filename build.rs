@@ -26,6 +26,8 @@ const QML_FILES: &[&str] = &[
     "qml/InspectView.qml",
     "qml/MiniPlayer.qml",
     "qml/TextField.qml",
+    "qml/NowPlayingView.qml",
+    "qml/ContextMenu.qml",
 ];
 
 /// Singletons QML (tema y datos de ejemplo).
@@ -49,4 +51,18 @@ fn main() {
         .cpp_file("src/window.cpp")
         .files(["src/account.rs", "src/library.rs", "src/player.rs", "src/plugins.rs", "src/settings.rs"])
         .build();
+
+    // Ventana de inicio de sesión (WebKit del sistema). Solo macOS: en Linux el navegador no
+    // está protegido y la sesión se importa de él directamente.
+    if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("macos") {
+        println!("cargo::rerun-if-changed=src/login_mac.mm");
+        cc::Build::new()
+            .cpp(true)
+            .file("src/login_mac.mm")
+            .flag("-fobjc-arc")
+            .flag("-std=c++17")
+            .compile("musicplayer_login");
+        println!("cargo::rustc-link-lib=framework=Cocoa");
+        println!("cargo::rustc-link-lib=framework=WebKit");
+    }
 }

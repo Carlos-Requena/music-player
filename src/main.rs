@@ -38,6 +38,35 @@ fn probe(args: &[String]) -> bool {
             }
             return true;
         }
+        "cookies" => {
+            // Diagnóstico del inicio de sesión: solo cuenta y nombra cookies, no guarda nada.
+            print!("{}", account::diagnose(if argument.is_empty() { "chrome" } else { argument }));
+            return true;
+        }
+        "playable" => {
+            // Qué dice el reproductor de YouTube Music (con la sesión guardada) de cada pista.
+            for id in argument.split(',').filter(|id| !id.is_empty()) {
+                println!("{id}: {:?}", ytm::playability(id));
+            }
+            return true;
+        }
+        "account" => {
+            // ¿YouTube reconoce la sesión guardada? Solo imprime el nombre de la cuenta.
+            println!("sesión guardada: {}", account::cookies_file().is_some());
+            println!("cuenta según YouTube: {:?}", ytm::account_name());
+            return true;
+        }
+        "fast" => {
+            // Prueba la vía rápida con varias pistas (`id1,id2,…`) e imprime por qué falla.
+            for id in argument.split(',').filter(|id| !id.is_empty()) {
+                let start = std::time::Instant::now();
+                match stream::resolve(id) {
+                    Ok(_) => println!("{id}: ok en {} ms", start.elapsed().as_millis()),
+                    Err(error) => println!("{id}: FALLO {error}"),
+                }
+            }
+            return true;
+        }
         "url" => {
             match stream::resolve(argument) {
                 Ok(url) => println!("{url}"),
@@ -51,7 +80,10 @@ fn probe(args: &[String]) -> bool {
             for id in argument.split(',') {
                 let start = std::time::Instant::now();
                 let result = resolver::resolve(id);
-                println!("{id}: {} ms {}", start.elapsed().as_millis(), if result.is_ok() { "ok" } else { "ERROR" });
+                match result {
+                    Ok(_) => println!("{id}: {} ms ok", start.elapsed().as_millis()),
+                    Err(error) => println!("{id}: {} ms ERROR {}", start.elapsed().as_millis(), error.trim_start_matches('\u{0}')),
+                }
             }
             return true;
         }
@@ -119,6 +151,17 @@ fn probe(args: &[String]) -> bool {
     true
 }
 
+fn login_window(out_path: &str) -> i32 {
+    #[cfg(target_os = "macos")]
+    if let Ok(path) = std::ffi::CString::new(out_path) {
+        // SAFETY: cadena C válida durante toda la llamada; la función no la guarda.
+        return unsafe { musicplayer_login(path.as_ptr()) };
+    }
+    let _ = out_path;
+    eprintln!("la ventana de inicio de sesión solo existe en macOS");
+    2
+}
+
 extern "C" {
     /// `src/window.cpp`: libera los recursos gráficos de las ventanas minimizadas u ocultas.
     fn musicplayer_tune_windows();
@@ -126,8 +169,20 @@ extern "C" {
     fn musicplayer_configure_network();
 }
 
+#[cfg(target_os = "macos")]
+extern "C" {
+    /// `src/login_mac.mm`: ventana de inicio de sesión; escribe las cookies en `out_path`.
+    fn musicplayer_login(out_path: *const std::os::raw::c_char) -> i32;
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
+    // `--login <archivo>`: proceso aparte que solo muestra la ventana de inicio de sesión
+    // (lo lanza `Account.signInWeb`). No arranca Qt.
+    if let Some(at) = args.iter().position(|arg| arg == "--login") {
+        let code = login_window(args.get(at + 1).map(String::as_str).unwrap_or_default());
+        std::process::exit(code);
+    }
     if probe(&args) {
         return;
     }

@@ -9,7 +9,7 @@ carátula), letra sincronizada palabra a palabra, y tres formas de recorrer la b
 
 | Vista | Qué es | Por defecto en |
 |---|---|---|
-| **Lomos** | Estantería: el elemento elegido de frente y el resto como lomos, con reflejo | Playlists, Álbumes |
+| **Lomos** | Estantería de cajas en 3D: la elegida de frente y más grande, sus vecinas giradas hacia ella y el resto como lomos, con reflejo en el suelo y halo de color | Playlists, Álbumes |
 | **Cubeta** | Pasar discos de uno en uno, como en una tienda | — |
 | **Muro** | Cuadrícula de carátulas por zonas | Inicio, Explorar |
 
@@ -71,7 +71,8 @@ En **Opciones › Plugins**:
 
 - **Controles del sistema** (activado por defecto): teclas multimedia, Centro de control en
   macOS y MPRIS en Linux (el panel de música del escritorio).
-- **Discord** (activado por defecto): muestra «Escuchando…» en tu perfil y se conecta solo en
+- **Discord** (activado por defecto): muestra «Escuchando *título de la canción*» en tu perfil y
+  en la lista de miembros, con el artista, la carátula y el tiempo. Se conecta solo en
   cuanto Discord está abierto, también si lo abres con la música ya sonando. No hay que
   configurar nada.
 - **Last.fm** (scrobbling): crea una clave de API gratis en
@@ -85,19 +86,24 @@ La configuración de los plugins (con el secreto y la sesión de Last.fm) se gua
 ## Cuenta
 
 Funciona sin cuenta (inicio, explorar, novedades, búsqueda). Con sesión aparecen tu inicio
-personalizado, tus playlists y álbumes, **Artistas**, **Canciones** y **Me gusta**, y YouTube
-rechaza menos peticiones.
+personalizado, **Playlists** (solo las de tu biblioteca de YouTube Music), tus álbumes y
+**Me gusta**, y YouTube rechaza menos peticiones.
 
-Google no permite iniciar sesión desde navegadores embebidos, así que la app usa la sesión que
-ya tienes abierta en tu navegador:
+**macOS:** Opciones › Cuenta › **Iniciar sesión**. Se abre una ventana con la página de Google;
+entra con tu cuenta y, al volver a YouTube Music, la ventana se cierra sola. No hace falta
+ningún permiso. La ventana es un proceso aparte con el WebKit del sistema y una sesión privada:
+al cerrarse no queda nada salvo las cookies de youtube.com.
 
-1. Abre music.youtube.com en Chrome, Firefox, Safari, Brave… e inicia sesión allí.
-2. En la app: botón de cuenta (arriba a la derecha) → elige el navegador → **Iniciar sesión**.
-3. En macOS, el sistema pedirá permiso para leer la clave del navegador: pulsa «Permitir».
-4. **Safari** guarda sus cookies en una carpeta protegida: la aplicación desde la que abres el
-   reproductor (Terminal, iTerm, VS Code… o el propio reproductor si lo abres como app) necesita
-   **Acceso total al disco** (Ajustes del Sistema › Privacidad y seguridad; la app tiene un botón
-   que lleva ahí). Después ciérrala del todo y vuelve a abrirla. Con Chrome no hace falta.
+**Linux** (o «Importar desde el navegador» en macOS): la app usa la sesión que ya tienes abierta
+en tu navegador.
+
+1. Abre music.youtube.com en Chrome, Firefox, Brave… e inicia sesión allí.
+2. En la app: Opciones › Cuenta → elige el navegador → **Iniciar sesión** (o **Importar de…**).
+3. En macOS, importar exige **Acceso total al disco** para la app desde la que abres el
+   reproductor, porque el sistema protege los datos de los navegadores.
+
+Si la importación falla, `musicplayer --probe cookies chrome` (o el navegador que uses) explica el motivo sin
+mostrar ni guardar ninguna cookie.
 
 Solo se copian las cookies de youtube.com, a `cookies.txt` en la carpeta de configuración,
 legible únicamente por tu usuario. **Cerrar sesión** lo borra. Si la sesión caduca, la app lo
@@ -149,6 +155,9 @@ siguientes, unos 10 s.
 | Buscar | `⌘F` / `Ctrl+F` o el campo «Buscar» |
 | Opciones | `⌘,` / `Ctrl+,` o el botón de ajustes |
 | Mini reproductor | `M` o el botón junto al volumen; `Esc` o la flecha vuelven a la ventana completa |
+| Pantalla «Sonando» | Clic en la canción de la barra de reproducción: la carátula en grande sobre sus colores. Se cierra con un clic en la carátula, la flecha o `Esc` |
+| Lista temporal | Clic derecho en una canción, álbum o playlist › «Añadir a la lista temporal». Se ve en la pestaña «Temporal» del panel: «Reproducir en bucle», quitar canciones o vaciarla. No se guarda al cerrar la app |
+| Repetir la cola | Botón de repetir junto a «Siguiente» |
 
 Las opciones se guardan en `~/Library/Application Support/musicplayer/settings.json`
 (macOS) o `~/.config/musicplayer/settings.json` (Linux).

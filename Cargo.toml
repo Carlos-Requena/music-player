@@ -17,6 +17,7 @@ souvlaki = { version = "0.9", default-features = false, features = ["use_zbus"] 
 ureq = { version = "3", features = ["json"] }
 
 [build-dependencies]
+cc = "1"
 cxx-qt-build = { version = "0.10", features = ["link_qt_object_files"] }
 
 [profile.release]

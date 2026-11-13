@@ -63,7 +63,7 @@ Glass {
         height: Theme.hit + 8
         radius: 14
         color: Qt.rgba(0, 0, 0, 0.25)
-        visible: Player.title !== ""
+        visible: Player.title !== "" || Catalog.temporal.length > 0
 
         Row {
             anchors.fill: parent
@@ -73,7 +73,8 @@ Glass {
             Repeater {
                 model: [
                     { id: "letra", label: "Letra" },
-                    { id: "cola", label: "Cola" }
+                    { id: "cola", label: "Cola" },
+                    { id: "temporal", label: "Temporal" + (Catalog.temporal.length ? " · " + Catalog.temporal.length : "") }
                 ]
 
                 Item {
@@ -81,7 +82,7 @@ Glass {
                     required property var modelData
                     readonly property bool chosen: modelData.id === root.tab
 
-                    width: (tabs.width - 12) / 2
+                    width: (tabs.width - 16) / 3
                     height: Theme.hit
                     activeFocusOnTab: true
 
@@ -220,6 +221,135 @@ Glass {
 
             TapHandler {
                 onTapped: Player.playIndex(row.index)
+            }
+
+            // Clic derecho: menú con «Añadir a la lista temporal».
+            TapHandler {
+                acceptedButtons: Qt.RightButton
+                onTapped: eventPoint => row.Window.window.openMenu(row.modelData, eventPoint.scenePosition)
+            }
+        }
+    }
+
+    // Lista temporal: canciones sueltas reunidas con el clic derecho, para oírlas en bucle.
+    Item {
+        id: temporal
+        visible: root.tab === "temporal"
+        anchors.top: tabs.bottom
+        anchors.topMargin: 12
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: root.pad
+        x: root.pad
+        width: root.width - 2 * root.pad
+
+        Text {
+            visible: Catalog.temporal.length === 0
+            width: parent.width
+            topPadding: 18
+            horizontalAlignment: Text.AlignHCenter
+            wrapMode: Text.WordWrap
+            text: "Haz clic derecho en una canción, un álbum o una playlist y elige «Añadir a la lista temporal» para escucharlas juntas en bucle."
+            color: Theme.textMuted
+            font.pixelSize: 14
+            lineHeight: 1.2
+        }
+
+        Row {
+            id: temporalActions
+            visible: Catalog.temporal.length > 0
+            spacing: 8
+
+            PillButton {
+                text: "Reproducir en bucle"
+                icon: Theme.iconRepeat
+                primary: true
+                onClicked: Player.playTemporal(0)
+            }
+
+            PillButton {
+                text: "Vaciar"
+                onClicked: Player.clearTemporal()
+            }
+        }
+
+        ListView {
+            id: temporalList
+            visible: Catalog.temporal.length > 0
+            anchors.top: temporalActions.bottom
+            anchors.topMargin: 10
+            anchors.bottom: parent.bottom
+            width: parent.width
+            clip: true
+            boundsBehavior: Flickable.StopAtBounds
+            model: Catalog.temporal
+
+            delegate: Item {
+                id: entry
+                required property var modelData
+                required property int index
+
+                width: temporalList.width
+                height: 56
+
+                Accessible.role: Accessible.Button
+                Accessible.name: modelData.title + ", " + modelData.artist
+                Accessible.onPressAction: Player.playTemporal(index)
+
+                Rectangle {
+                    anchors.fill: parent
+                    radius: 10
+                    color: entryHover.hovered ? Theme.control : "transparent"
+                }
+
+                Cover {
+                    x: 8
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 40
+                    height: 40
+                    thumb: entry.modelData.thumb
+                    pixels: 120
+                }
+
+                Column {
+                    x: 58
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: parent.width - 58 - Theme.hit - 6
+                    spacing: 1
+
+                    Text {
+                        width: parent.width
+                        text: entry.modelData.title
+                        color: Theme.text
+                        font.pixelSize: 14
+                        elide: Text.ElideRight
+                    }
+
+                    Text {
+                        width: parent.width
+                        text: entry.modelData.artist
+                        color: Theme.textMuted
+                        font.pixelSize: 12
+                        elide: Text.ElideRight
+                    }
+                }
+
+                HoverHandler {
+                    id: entryHover
+                    cursorShape: Qt.PointingHandCursor
+                }
+
+                TapHandler {
+                    onTapped: Player.playTemporal(entry.index)
+                }
+
+                IconButton {
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    icon: Theme.iconClose
+                    iconSize: 16
+                    label: "Quitar «" + entry.modelData.title + "» de la lista temporal"
+                    onClicked: Player.removeFromTemporal(entry.index)
+                }
             }
         }
     }

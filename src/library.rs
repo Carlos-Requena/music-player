@@ -28,8 +28,6 @@ pub mod qobject {
         #[qproperty(QString, playlists)]
         #[qproperty(QString, albumes)]
         #[qproperty(QString, busqueda)]
-        #[qproperty(QString, artistas)]
-        #[qproperty(QString, canciones)]
         #[qproperty(QString, megusta)]
         /// JSON de `ytm::Detail` del álbum, playlist o artista abierto; vacío si no hay.
         #[qproperty(QString, detalle)]
@@ -76,8 +74,6 @@ pub struct LibraryRust {
     load_generation: u64,
     detalle: QString,
     detalle_loading: bool,
-    artistas: QString,
-    canciones: QString,
     megusta: QString,
     /// Descarta detalles que llegan después de abrir otro.
     detail_request: u64,
@@ -160,7 +156,7 @@ impl qobject::Library {
         self.as_mut().set_loading(true);
         self.as_mut().set_error(QString::default());
 
-        let sections: [(&str, fn() -> ytm::Result<Vec<Zone>>, Setter); 7] = [
+        let sections: [(&str, fn() -> ytm::Result<Vec<Zone>>, Setter); 5] = [
             ("inicio", || ytm::browse("FEmusic_home"), |library, json| library.set_inicio(json)),
             ("explorar", || ytm::browse("FEmusic_explore"), |library, json| library.set_explorar(json)),
             (
@@ -180,17 +176,11 @@ impl qobject::Library {
             ),
             (
                 "playlists",
-                || {
-                    // Con sesión, primero las playlists de la cuenta; después las recomendadas.
-                    let mut zones = if signed_in() { personal(ytm::library_playlists()) } else { Vec::new() };
-                    zones.extend(ytm::mood_playlists(3)?);
-                    Ok(zones)
-                },
+                // Solo las de tu biblioteca de YouTube Music; sin sesión queda vacía.
+                || Ok(if signed_in() { personal(ytm::library_playlists()) } else { Vec::new() }),
                 |library, json| library.set_playlists(json),
             ),
             // Secciones solo con sesión; sin ella quedan vacías y la interfaz lo explica.
-            ("artistas", || Ok(if signed_in() { personal(ytm::library_artists()) } else { Vec::new() }), |library, json| library.set_artistas(json)),
-            ("canciones", || Ok(if signed_in() { personal(ytm::library_songs()) } else { Vec::new() }), |library, json| library.set_canciones(json)),
             ("megusta", || Ok(if signed_in() { personal(ytm::liked_songs()) } else { Vec::new() }), |library, json| library.set_megusta(json)),
         ];
 

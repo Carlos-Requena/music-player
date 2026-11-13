@@ -7,6 +7,17 @@ import app.musicplayer
 Window {
     id: mini
 
+    // Al volver de oculta o minimizada, recrea los iconos (ver `Theme.renderEpoch`).
+    property bool wasAway: false
+    onVisibilityChanged: state => {
+        if (state === Window.Hidden || state === Window.Minimized)
+            wasAway = true
+        else if (wasAway) {
+            wasAway = false
+            Theme.renderEpoch++
+        }
+    }
+
     signal restore()
 
     width: 400

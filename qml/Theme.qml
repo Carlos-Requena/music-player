@@ -43,6 +43,11 @@ QtObject {
     readonly property int animFast: 160
     readonly property int animMove: 320
 
+    // Sube cada vez que una ventana vuelve tras ocultarse o minimizarse. Al ocultarla se
+    // liberan sus gráficos (window.cpp) y las `Shape` con CurveRenderer no se vuelven a
+    // dibujar solas: los iconos se recrean al cambiar este número.
+    property int renderEpoch: 0
+
     // Trazos SVG (caja 24×24) de los iconos de la interfaz.
     readonly property string iconSearch: "M18 11a7 7 0 1 1-14 0a7 7 0 0 1 14 0z M20 20l-3.5-3.5"
     readonly property string iconSettings: "M4 7h10 M18 7h2 M4 17h2 M10 17h10 M18 7a2 2 0 1 1-4 0a2 2 0 0 1 4 0z M10 17a2 2 0 1 1-4 0a2 2 0 0 1 4 0z"
@@ -61,6 +66,10 @@ QtObject {
     readonly property string iconMini: "M3 5h18v14H3z M12 12h7v5h-7z"
     readonly property string iconExpand: "M14 4h6v6 M10 20H4v-6 M20 4l-7 7 M4 20l7-7"
     readonly property string iconClose: "M6 6l12 12 M18 6L6 18"
+    readonly property string iconDown: "M6 9l6 6 6-6"
+    readonly property string iconRepeat: "M17 3l3 3-3 3 M4 12V10a4 4 0 0 1 4-4h12 M7 21l-3-3 3-3 M20 12v2a4 4 0 0 1-4 4H4"
+    readonly property string iconPlus: "M12 5v14 M5 12h14"
+    readonly property string iconTemporal: "M4 7h11 M4 12h11 M4 17h7 M18 14v6 M15 17h6"
     readonly property string iconLomos: "M4 5v14 M8 5v14 M11 5h9v14h-9z"
     readonly property string iconCubeta: "M4 9h16v11H4z M6 6h12 M8 3h8"
     readonly property string iconMuro: "M4 4h7v7H4z M13 4h7v7h-7z M4 13h7v7H4z M13 13h7v7h-7z"

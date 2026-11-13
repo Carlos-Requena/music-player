@@ -9,6 +9,8 @@ Glass {
     property bool lyricsOn: true
     signal lyricsToggled()
     signal miniRequested()
+    // Pulsar la canción (carátula o título) abre la pantalla «Sonando».
+    signal expandRequested()
 
     tint: Theme.glassStrong
     radius: compact ? height / 2 : 22
@@ -20,6 +22,17 @@ Glass {
         anchors.verticalCenter: parent.verticalCenter
         width: root.compact ? 230 : 300
         spacing: 12
+
+        HoverHandler {
+            enabled: Player.title !== ""
+            cursorShape: Qt.PointingHandCursor
+        }
+        TapHandler {
+            enabled: Player.title !== ""
+            onTapped: root.expandRequested()
+        }
+        Accessible.role: Accessible.Button
+        Accessible.name: "Abrir la pantalla Sonando"
 
         Cover {
             width: 56
@@ -93,6 +106,14 @@ Glass {
                 label: "Siguiente"
                 filled: true
                 onClicked: Player.next()
+            }
+
+            IconButton {
+                icon: Theme.iconRepeat
+                label: Player.repetir ? "Repetir la cola: activado" : "Repetir la cola"
+                iconSize: 18
+                foreground: Player.repetir ? Theme.accent : Theme.textMuted
+                onClicked: Player.repetir = !Player.repetir
             }
         }
 

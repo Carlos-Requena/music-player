@@ -59,6 +59,7 @@ Glass {
                 }
 
                 TapHandler {
+                    gesturePolicy: TapHandler.ReleaseWithinBounds
                     onTapped: root.selected(tab.modelData.id)
                 }
             }

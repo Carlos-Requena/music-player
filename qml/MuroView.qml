@@ -168,6 +168,12 @@ FocusScope {
                     onHoveredChanged: if (hovered) Player.prefetchItem(JSON.stringify(cell.modelData))
                 }
 
+                                // Clic derecho: menú con «Añadir a la lista temporal».
+                                TapHandler {
+                                    acceptedButtons: Qt.RightButton
+                                    onTapped: eventPoint => cell.Window.window.openMenu(cell.modelData, eventPoint.scenePosition)
+                                }
+
                                 TapHandler {
                                     onTapped: {
                                         root.row = rowItem.index

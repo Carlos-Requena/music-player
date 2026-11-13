@@ -81,6 +81,12 @@ FocusScope {
                 opacity: Math.min(0.6, 0.15 * Math.max(0, disc.depth))
             }
 
+            // Clic derecho: menú con «Añadir a la lista temporal».
+            TapHandler {
+                acceptedButtons: Qt.RightButton
+                onTapped: eventPoint => disc.Window.window.openMenu(disc.modelData, eventPoint.scenePosition)
+            }
+
             TapHandler {
                 onTapped: {
                     if (disc.depth === 0)

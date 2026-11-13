@@ -50,7 +50,10 @@ Item {
         cursorShape: Qt.PointingHandCursor
     }
 
+    // Agarre exclusivo al pulsar: el clic no llega a lo que haya debajo (sin esto, cerrar
+    // «Sonando» con su flecha pulsaba también el botón de opciones, en el mismo sitio).
     TapHandler {
+        gesturePolicy: TapHandler.ReleaseWithinBounds
         onTapped: root.clicked()
     }
 }

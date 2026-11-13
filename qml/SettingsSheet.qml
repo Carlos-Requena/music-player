@@ -155,6 +155,11 @@ Item {
                     : [{ id: "chrome", label: "Chrome" }, { id: "chromium", label: "Chromium" }, { id: "firefox", label: "Firefox" },
                        { id: "brave", label: "Brave" }, { id: "vivaldi", label: "Vivaldi" }]
 
+                // macOS: ventana propia de inicio de sesión; importar del navegador queda como
+                // alternativa (exige «Acceso total al disco»). Linux: importar del navegador.
+                readonly property bool webLogin: Qt.platform.os === "osx"
+                property bool importing: !webLogin
+
                 Heading { text: "Cuenta" }
 
                 Item {
@@ -179,7 +184,9 @@ Item {
                             width: parent.width
                             text: Account.signedIn
                                 ? "Tu biblioteca, tus playlists y tus «Me gusta» de YouTube Music."
-                                : "Usa la sesión de YouTube Music que ya tienes abierta en tu navegador."
+                                : accountSection.webLogin
+                                  ? "Entra con tu cuenta de Google para ver tu biblioteca, tus playlists y tus «Me gusta»."
+                                  : "Usa la sesión de YouTube Music que ya tienes abierta en tu navegador."
                             color: Theme.textMuted
                             font.pixelSize: 13
                             wrapMode: Text.WordWrap
@@ -204,6 +211,8 @@ Item {
                                 return
                             if (Account.signedIn)
                                 Account.signOut()
+                            else if (accountSection.webLogin)
+                                Account.signInWeb()
                             else
                                 Account.signIn()
                         }
@@ -234,7 +243,7 @@ Item {
                 }
 
                 Item {
-                    visible: !Account.signedIn
+                    visible: !Account.signedIn && accountSection.importing
                     width: parent.width
                     height: Theme.hit + 8
 
@@ -259,10 +268,10 @@ Item {
                     visible: text !== ""
                     width: parent.width
                     text: Account.message !== "" ? Account.message
-                        : !Account.signedIn && Qt.platform.os === "osx"
+                        : !Account.signedIn && accountSection.webLogin && accountSection.importing
                           ? (Account.browser === "safari"
-                             ? "Safari necesita que des a esta app «Acceso total al disco» en Ajustes del Sistema › Privacidad."
-                             : "macOS te pedirá permiso para leer la clave del navegador: pulsa «Permitir».")
+                             ? "macOS exige «Acceso total al disco» para leer los datos de Safari."
+                             : "macOS puede pedir «Acceso total al disco» y permiso para la clave del navegador.")
                           : ""
                     color: Account.message !== "" && !Account.busy ? Theme.accent : Theme.textMuted
                     font.pixelSize: 13
@@ -273,6 +282,29 @@ Item {
                     visible: Account.needsDiskAccess && Qt.platform.os === "osx"
                     text: "Abrir «Acceso total al disco»"
                     onClicked: Account.openPrivacySettings()
+                }
+
+                Row {
+                    visible: !Account.signedIn && accountSection.webLogin && !Account.busy
+                    spacing: 12
+
+                    PillButton {
+                        visible: !accountSection.importing
+                        text: "Importar desde el navegador"
+                        onClicked: accountSection.importing = true
+                    }
+
+                    PillButton {
+                        visible: accountSection.importing
+                        text: "Importar de " + (accountSection.browsers.find(b => b.id === Account.browser) || { label: Account.browser }).label
+                        onClicked: Account.signIn()
+                    }
+
+                    PillButton {
+                        visible: accountSection.importing
+                        text: "Cancelar"
+                        onClicked: accountSection.importing = false
+                    }
                 }
             }
 

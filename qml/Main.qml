@@ -11,6 +11,8 @@ Window {
     property bool inspecting: false
     readonly property bool detailOpen: Catalog.detalle !== null
     property bool lyricsOn: Qt.application.arguments.indexOf("--no-panel") < 0
+    // Pantalla «Sonando» (sube desde la barra de reproducción).
+    property bool nowOpen: args.indexOf("--now") >= 0
 
     readonly property bool vidrio: AppSettings.ventana !== "escenario"
     // En ventanas estrechas el panel se oculta para que quepa la navegación.
@@ -32,6 +34,8 @@ Window {
     // [--settings] [--autoplay]` prepara la ventana, guarda una captura y sale.
     readonly property var args: Qt.application.arguments
     property bool autoplayPending: args.indexOf("--autoplay") >= 0
+    // `--index n` sin `--autoplay`: solo coloca la vista (para capturas).
+    property bool indexPending: args.indexOf("--index") >= 0
 
     function arg(name) {
         const at = args.indexOf(name)
@@ -51,6 +55,12 @@ Window {
             Player.playItem(JSON.stringify(item))
         else
             Library.openDetail(JSON.stringify(item))
+    }
+
+    // Clic derecho en una canción, álbum o playlist (`point` en coordenadas de la ventana).
+    function openMenu(item, point) {
+        if (item && item.kind !== "artist")
+            contextMenu.show(item, point.x, point.y)
     }
 
     function closeDetail() {
@@ -97,8 +107,21 @@ Window {
         if (query.trim() === "")
             return
         Library.search(query)
+        if (detailOpen)
+            closeDetail()
         section = "buscar"
         sectionView.forceActiveFocus()
+    }
+
+    // Al volver de oculta o minimizada, recrea los iconos (ver `Theme.renderEpoch`).
+    property bool wasAway: false
+    onVisibilityChanged: state => {
+        if (state === Window.Hidden || state === Window.Minimized)
+            wasAway = true
+        else if (wasAway) {
+            wasAway = false
+            Theme.renderEpoch++
+        }
     }
 
     width: 1440
@@ -131,8 +154,23 @@ Window {
     Timer {
         id: minimizeTimer
         interval: parseInt(win.arg("--minimize"))
-        onTriggered: win.args.indexOf("--mini") >= 0 ? win.showMini()
-            : win.args.indexOf("--hide") >= 0 ? win.hide() : win.showMinimized()
+        onTriggered: {
+            if (win.args.indexOf("--mini") >= 0)
+                win.showMini()
+            else if (win.args.indexOf("--hide") >= 0)
+                win.hide()
+            else
+                win.showMinimized()
+            if (win.arg("--restore") !== "")
+                restoreTimer.start()
+        }
+    }
+
+    // Depuración: `--restore ms` vuelve a la ventana grande tras minimizar u ocultar.
+    Timer {
+        id: restoreTimer
+        interval: parseInt(win.arg("--restore"))
+        onTriggered: win.args.indexOf("--mini") >= 0 ? win.restoreFromMini() : win.showNormal()
     }
 
     Timer {
@@ -141,7 +179,7 @@ Window {
         onTriggered: {
             console.log("estado:", Player.title, "|", Player.artist, "| pos", Player.position.toFixed(1),
                         "| dur", Player.duration, "| cargando", Player.loading, "| sonando", Player.playing,
-                        "| error", Player.error, "| letra", Catalog.lyrics.length, "| cola", Catalog.parse(Player.queue).length, "| calidad", Player.calidad)
+                        "| error", Player.error, "| tinte", playingProbe.tint, "| letra", Catalog.lyrics.length, "| cola", Catalog.parse(Player.queue).length, "| calidad", Player.calidad)
             const target = miniPlayer.visible ? miniPlayer.contentItem : win.contentItem
             target.grabToImage(result => {
                 result.saveToFile(win.arg("--shot"))
@@ -157,6 +195,7 @@ Window {
     Shortcut { sequences: [StandardKey.Find]; enabled: !win.settingsOpen; onActivated: searchField.edit() }
     Shortcut { sequences: [StandardKey.Preferences]; onActivated: win.settingsOpen = true }
     Shortcut { sequence: "Escape"; enabled: win.settingsOpen; onActivated: win.closeSettings() }
+    Shortcut { sequence: "Escape"; enabled: win.nowOpen && !win.settingsOpen; onActivated: win.nowOpen = false }
 
     // Sondas de color para el modo ambiente; quedan tapadas por el fondo.
     TintProbe {
@@ -199,13 +238,18 @@ Window {
 
             onCurrentItemChanged: {
                 prefetchTimer.restart()
-                if (win.autoplayPending && currentItem) {
+                if ((win.autoplayPending || win.indexPending) && currentItem) {
+                    const play = win.autoplayPending
                     win.autoplayPending = false
+                    win.indexPending = false
                     // Fuera de este aviso: cambiar el índice dentro de él deja el título sin actualizar.
                     Qt.callLater(() => {
                         if (win.arg("--index") !== "")
                             sectionView.jump(parseInt(win.arg("--index")))
-                        autoplayTimer.start()
+                        if (play)
+                            autoplayTimer.start()
+                        if (win.arg("--step") !== "")
+                            stepTimer.start()
                     })
                 }
             }
@@ -216,6 +260,14 @@ Window {
                 id: prefetchTimer
                 interval: 250
                 onTriggered: if (sectionView.currentItem) Player.prefetchItem(JSON.stringify(sectionView.currentItem))
+            }
+
+            // Depuración: `--step n [--step-delay ms]` mueve la vista n elementos (negativo =
+            // izquierda) tras ese tiempo; con `--delay` se captura en mitad del movimiento.
+            Timer {
+                id: stepTimer
+                interval: win.arg("--step-delay") !== "" ? parseInt(win.arg("--step-delay")) : 1500
+                onTriggered: sectionView.stepBy(parseInt(win.arg("--step")))
             }
 
             // Depuración: `--autoplay [--autoplay-delay ms] [--then-next ms]`.
@@ -241,6 +293,12 @@ Window {
                             else if (mode === "disc")
                                 inspectView.toggleDisc()
                         })
+                        return
+                    }
+                    // `--temporal`: añade a la lista temporal el elemento y abre el menú sobre él.
+                    if (win.args.indexOf("--temporal") >= 0) {
+                        Player.addToTemporal(JSON.stringify(sectionView.currentItem))
+                        win.openMenu(sectionView.currentItem, Qt.point(win.width * 0.35, win.height * 0.45))
                         return
                     }
                     Player.playItem(JSON.stringify(sectionView.currentItem))
@@ -307,6 +365,10 @@ Window {
         y: 16
         current: win.section
         onSelected: section => {
+            // Desde un álbum o playlist abierto, cambiar de sección lo cierra.
+            if (win.detailOpen)
+                win.closeDetail()
+            win.nowOpen = false
             win.section = section
             sectionView.forceActiveFocus()
         }
@@ -353,6 +415,9 @@ Window {
     }
 
     NowPlayingPanel {
+        id: panel
+        // Depuración: `--tab temporal` abre esa pestaña.
+        tab: win.arg("--tab") !== "" ? win.arg("--tab") : "letra"
         x: win.panelX
         y: Theme.gap
         width: win.panelWidth
@@ -417,16 +482,28 @@ Window {
         }
     }
 
+    NowPlayingView {
+        id: nowPlayingView
+        anchors.fill: parent
+        z: 5
+        open: win.nowOpen
+        tint: playingProbe.tint
+        bottomInset: win.barHeight + 2 * Theme.gap
+        onCloseRequested: win.nowOpen = false
+    }
+
     PlayerBar {
         readonly property real fullWidth: win.width - 2 * Theme.gap
+        z: 6
 
         width: win.vidrio ? fullWidth : Math.min(920, fullWidth)
         height: win.barHeight
         x: (win.width - width) / 2
         y: win.height - height - Theme.gap
         compact: !win.vidrio
-        backdrop: stage
+        backdrop: win.nowOpen ? nowPlayingView : stage
         lyricsOn: win.lyricsOn
+        onExpandRequested: win.nowOpen = !win.nowOpen
         onLyricsToggled: win.lyricsOn = !win.lyricsOn
         onMiniRequested: win.showMini()
     }
@@ -448,6 +525,7 @@ Window {
     InspectView {
         id: inspectView
         anchors.fill: parent
+        z: 7
         visible: win.inspecting
         backdrop: stage
         onClosed: {
@@ -462,9 +540,17 @@ Window {
         onRestore: win.restoreFromMini()
     }
 
+    ContextMenu {
+        id: contextMenu
+        anchors.fill: parent
+        z: 9
+        backdrop: stage
+    }
+
     SettingsSheet {
         id: settingsSheet
         anchors.fill: parent
+        z: 10
         visible: win.settingsOpen
         focus: win.settingsOpen
         backdrop: stage

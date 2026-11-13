@@ -14,20 +14,31 @@ Item {
     implicitWidth: size
     implicitHeight: size
 
-    Shape {
+    // Se recrea cuando la ventana vuelve de estar oculta (ver `Theme.renderEpoch`).
+    Loader {
+        id: loader
         anchors.centerIn: parent
         width: 24
         height: 24
         scale: root.size / 24
-        preferredRendererType: Shape.CurveRenderer
 
-        ShapePath {
-            strokeColor: root.filled ? "transparent" : root.color
-            strokeWidth: 1.8
-            fillColor: root.filled ? root.color : "transparent"
-            capStyle: ShapePath.RoundCap
-            joinStyle: ShapePath.RoundJoin
-            PathSvg { path: root.path }
+        readonly property int epoch: Theme.renderEpoch
+        onEpochChanged: {
+            active = false
+            active = true
+        }
+
+        sourceComponent: Shape {
+            preferredRendererType: Shape.CurveRenderer
+
+            ShapePath {
+                strokeColor: root.filled ? "transparent" : root.color
+                strokeWidth: 1.8
+                fillColor: root.filled ? root.color : "transparent"
+                capStyle: ShapePath.RoundCap
+                joinStyle: ShapePath.RoundJoin
+                PathSvg { path: root.path }
+            }
         }
     }
 }

@@ -16,12 +16,24 @@ Canvas {
     onUrlChanged: {
         if (url === "")
             return
-        if (isImageLoaded(url))
-            requestPaint()
-        else
-            loadImage(url)
+        // Cada lienzo carga la imagen por su cuenta aunque ya esté en la caché de otro.
+        loadImage(url)
+        repaint.restart()
     }
-    onImageLoaded: requestPaint()
+    onImageLoaded: repaint.restart()
+    onAvailableChanged: if (available) repaint.restart()
+
+    // Repintado aplazado con un temporizador propio: si dos sondas piden la misma carátula
+    // (la enfocada y la que suena), la segunda la encuentra ya cargada y pedir el repintado en
+    // ese mismo aviso se perdía; el color de «sonando» se quedaba en gris.
+    Timer {
+        id: repaint
+        interval: 0
+        onTriggered: {
+            probe.markDirty(Qt.rect(0, 0, probe.width, probe.height))
+            probe.requestPaint()
+        }
+    }
 
     onPaint: {
         if (url === "" || !isImageLoaded(url))

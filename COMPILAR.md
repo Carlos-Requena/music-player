@@ -68,13 +68,24 @@ Opciones:
 Sin `--independiente`, la app usa el Qt de Homebrew: tras un `brew upgrade` grande de Qt,
 vuelve a ejecutar el script.
 
-### 3. Permisos
+### 3. Iniciar sesión
 
-- **Iniciar sesión con Chrome, Brave o Edge**: macOS pedirá permiso para leer la clave del
-  navegador; pulsa **Permitir**.
-- **Iniciar sesión con Safari**: Ajustes del Sistema › Privacidad y seguridad › **Acceso total
-  al disco** › activa **Reproductor** (o tu terminal si lo lanzas con `cargo run`). Después
-  cierra la app del todo y vuelve a abrirla.
+Opciones › Cuenta › **Iniciar sesión** abre una ventana con la página de Google: entra con tu
+cuenta y listo, sin permisos especiales.
+
+Solo si prefieres **importar la sesión de tu navegador** («Importar desde el navegador»), macOS
+exige un permiso, porque protege los datos de los navegadores:
+
+1. Ajustes del Sistema › Privacidad y seguridad › **Acceso total al disco** › activa
+   **Reproductor** (o tu terminal: Terminal, iTerm, VS Code… si lo lanzas con `cargo run`).
+   La app tiene un botón que abre ese panel.
+2. Cierra la app (o la terminal) del todo y vuelve a abrirla.
+3. Con Chrome, Brave o Edge, macOS preguntará además por la clave del navegador: pulsa
+   **Permitir**.
+
+Cada vez que vuelves a crear la app con el script, su firma local cambia y macOS puede olvidar
+el permiso: si el inicio de sesión vuelve a fallar tras actualizar, desactiva y activa
+«Reproductor» en Acceso total al disco.
 
 ### Actualizar
 

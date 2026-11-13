@@ -30,12 +30,25 @@
 - **InnerTube.** `ytm.rs` habla con la API interna de YouTube Music como el cliente web
   (`WEB_REMIX`): inicio, explorar, novedades, «Ánimo y géneros», búsqueda, colas (`next`),
   páginas de artista y, con sesión, la biblioteca (`FEmusic_liked_playlists`,
-  `FEmusic_liked_albums`, `FEmusic_liked_videos`, `FEmusic_library_corpus_track_artists`,
-  `VLLM`).
+  `FEmusic_liked_albums`, `VLLM`). La sección Playlists solo muestra las de la biblioteca
+  de la cuenta; sin sesión queda vacía.
 
 ## Sesión
 
-- `account.rs` lanza `yt-dlp --cookies-from-browser <navegador> --cookies <temporal>`, se queda
+- **Ventana de inicio de sesión (macOS)**: `Account.signInWeb` lanza `musicplayer --login
+  <temporal>` y espera. Ese proceso no arranca Qt: `src/login_mac.mm` abre un `WKWebView` (WebKit
+  del sistema) con un almacén de datos no persistente y la `applicationNameForUserAgent` de
+  Safari (sin ella Google lo trata como navegador embebido y bloquea el acceso). Cuando la página
+  vuelve a `music.youtube.com` y existe `SAPISID`, escribe las cookies de youtube.com en formato
+  Netscape (permisos 600) y sale con 0; si el usuario cierra la ventana, con 1. El reproductor no
+  carga ningún motor web: la ventana gasta memoria solo mientras está abierta.
+  Google pasa la sesión a youtube.com con una cadena de redirecciones; la prevención de rastreo
+  de WebKit perdía esas cookies y YouTube acababa en `/oops` (la página de las teles). Se
+  desactiva (ajuste privado `_setResourceLoadStatisticsEnabled:`) y, si aun así youtube.com no
+  recibe `SAPISID`, se copian a `.youtube.com` las cookies de la cuenta de `.google.com` y se
+  abre YouTube Music. Depuración: `MUSICPLAYER_LOGIN_SHOT=ruta.png` guarda la primera página y
+  `MUSICPLAYER_LOGIN_URL` cambia la inicial.
+- **Importar del navegador** (Linux, y alternativa en macOS): `account.rs` lanza `yt-dlp --cookies-from-browser <navegador> --cookies <temporal>`, se queda
   solo con las cookies de `youtube.com`, las guarda en `cookies.txt` (permisos 600) y borra el
   temporal. Comprueba la sesión pidiendo el nombre de la cuenta (`account/account_menu`).
 - Cada petición a InnerTube con sesión lleva `Cookie`, `X-Goog-AuthUser: 0`, `X-Origin` y
@@ -56,6 +69,22 @@
 - **Inspeccionar** (`I`) muestra la caja en grande: giro de 180° para la contraportada con las
   canciones, pliegue de la tapa para ver el libreto y la bandeja, y el disco, que sale y gira
   mientras suena.
+
+## Vista Lomos (estantería 3D)
+
+- Cada caja es un cuerpo con frontal y dos lomos. Cada cara es un `Item` plano con una
+  `Matrix4x4` calculada en `LomosView.faceMatrix`: giro en Y, escala y una perspectiva suave con
+  la cámara delante del eje de la caja (fila de z a cero, como hace `Rotation`). Solo se pinta
+  el lomo que mira a la cámara.
+- La estantería tiene una posición continua (`pos`) que sigue a `index` con una animación.
+  Ángulo (`signedAngle`), escala y sitio (`slots`, interpolados) son funciones continuas del
+  desplazamiento, así que una caja que cruza el centro no salta (antes el lomo y el eje de giro
+  cambiaban de lado de golpe y se veía raro al ir a la izquierda).
+- `slots` encaja las cajas proyectando sus esquinas: lomos pegados, hueco solo junto a la elegida.
+- Reflejo por caja: una cara más que nace del borde inferior con la carátula volteada (misma
+  textura en caché) y un degradado como máscara (`MultiEffect`, una capa pequeña por caja
+  visible, ~7 MB en total con Retina). Halo de color bajo la elegida con `RectangularShadow`.
+- Memoria con Álbumes en Lomos (release, Retina): ~290 MB.
 
 ## Reproducción: de clic a sonido
 
@@ -81,8 +110,17 @@ Dos piezas:
 1. **Vía rápida** (`stream.rs`): en vez de yt-dlp, una petición a la API del reproductor de
    YouTube (`/youtubei/v1/player`) con el cliente de visionOS, que devuelve URLs de audio
    directas sin descifrado JavaScript ni tokens. Necesita un «visitor data» (identificador de
-   visitante, de `/visitor_id`), que se pide una vez. Si falla (vídeo restringido, cambios de
-   YouTube) se usa yt-dlp: primero el residente (`daemon.rs`) y si no, un proceso.
+   visitante, de `/visitor_id`), que se pide una vez. Sirve ~9 de cada 10 pistas en 0,2–0,4 s.
+   - **Pistas que YouTube reserva a cuentas** (`UNPLAYABLE`, «Este vídeo no está disponible»;
+     p. ej. muchas «Art Tracks» de sellos japoneses): ningún cliente las da sin sesión, ni la
+     propia web de YouTube Music (comprobado). Sin sesión se avisa al momento
+     (`resolver::NEEDS_SESSION`, ~0,3 s) en vez de probar yt-dlp y reintentos. Con sesión, el
+     reproductor de YouTube Music (`WEB_REMIX`) sí las da, pero con URLs cifradas: se piden a
+     yt-dlp con el cliente `web_music` y tus cookies (~1,7–2,9 s; los demás clientes de yt-dlp
+     responden «Video unavailable» aun con cookies). Esas pistas se recuerdan y van directas a
+     yt-dlp; la precarga suele tenerlas listas antes del clic.
+   - Otros fallos (red, cambios de YouTube): yt-dlp, primero el residente (`daemon.rs`) y si
+     no, un proceso.
 2. **Precarga** (`resolver.rs`): las URLs se guardan hasta 10 min antes de su `expire=` y se
    resuelven por adelantado:
 
@@ -90,7 +128,10 @@ Dos piezas:
 |---|---|---|
 | El foco se detiene 250 ms en un elemento | Esa canción, o la primera pista del álbum o playlist (y su cola) | `Player.prefetchItem` → `resolver::hint` |
 | El ratón pasa por una carátula (Muro, Lomos) | Igual | Igual |
-| Empieza a sonar una pista | La siguiente de la cola | `Player::prefetch_next` → `resolver::prefetch` |
+| Empieza a sonar una pista | Las tres siguientes de la cola (con repetición, dando la vuelta) | `Player::prefetch_next` → `resolver::prefetch` |
+| Se abre un álbum o playlist | Sus seis primeras canciones | `DetailView` → `Player.prefetchTracks` |
+| Se carga una sección | Las cuatro primeras canciones sueltas de su primera fila | `SectionView` → `Player.prefetchTracks` |
+| Se añade algo a la lista temporal | Esa canción | `Player.addToTemporal` |
 | Arranca la app | El proceso de mpv | `Player.warmUp` |
 
 `resolver::hint` solo atiende la **última** petición, así que recorrer veinte carátulas no lanza

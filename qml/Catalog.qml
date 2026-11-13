@@ -8,10 +8,8 @@ QtObject {
     readonly property var sections: [
         { id: "inicio", label: "Inicio" },
         { id: "explorar", label: "Explorar" },
-        { id: "playlists", label: "Playlists" },
+        { id: "playlists", label: "Playlists", cuenta: true },
         { id: "albumes", label: "Álbumes" },
-        { id: "artistas", label: "Artistas", cuenta: true },
-        { id: "canciones", label: "Canciones", cuenta: true },
         { id: "megusta", label: "Me gusta", cuenta: true }
     ]
 
@@ -26,8 +24,6 @@ QtObject {
     readonly property var playlists: parse(Library.playlists)
     readonly property var albumes: parse(Library.albumes)
     readonly property var busqueda: parse(Library.busqueda)
-    readonly property var artistas: parse(Library.artistas)
-    readonly property var canciones: parse(Library.canciones)
     readonly property var megusta: parse(Library.megusta)
 
     // Detalle abierto (álbum, playlist o artista) o `null`.
@@ -35,6 +31,9 @@ QtObject {
 
     // Cola de reproducción: pistas `{ title, artist, thumb, videoId, duration }`.
     readonly property var queue: parse(Player.queue)
+
+    // Lista temporal: pistas con el mismo formato que la cola.
+    readonly property var temporal: parse(Player.temporal)
 
     // Líneas `{ t, text }` de la pista que suena; vacío si no hay letra sincronizada.
     readonly property var lyrics: parse(Player.lyrics)
@@ -55,8 +54,6 @@ QtObject {
         case "playlists": return playlists
         case "albumes": return albumes
         case "buscar": return busqueda
-        case "artistas": return artistas
-        case "canciones": return canciones
         case "megusta": return megusta
         default: return inicio
         }
@@ -70,11 +67,10 @@ QtObject {
         return false
     }
 
-    // Nombre de una sección personal dentro de una frase («tus artistas»).
+    // Nombre de una sección personal dentro de una frase («tus playlists»).
     function ownLabel(section) {
         switch (section) {
-        case "artistas": return "tus artistas"
-        case "canciones": return "tus canciones"
+        case "playlists": return "tus playlists"
         case "megusta": return "tus «Me gusta»"
         default: return "tu biblioteca"
         }

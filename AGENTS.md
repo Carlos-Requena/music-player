@@ -21,8 +21,10 @@ Los identificadores de código siguen el idioma del archivo (`vista_inicio`, `pl
 ```
 src/
   main.rs       Arranque de Qt y la sonda de terminal (--probe).
-  account.rs    Singleton QML `Account`: importa la sesión del navegador (cookies de
-                youtube.com vía yt-dlp) y firma las peticiones (SAPISIDHASH).
+  account.rs    Singleton QML `Account`: inicia sesión (ventana propia en macOS o cookies del
+                navegador vía yt-dlp) y firma las peticiones (SAPISIDHASH).
+  login_mac.mm  Ventana de inicio de sesión de macOS (WKWebView), en un proceso aparte
+                (`musicplayer --login`); se compila con `cc` desde `build.rs`.
   ytm.rs        Cliente InnerTube de YouTube Music, sin sesión: secciones, búsqueda, colas.
   stream.rs     Vía rápida: API `/player` de YouTube con el cliente de visionOS (~0,3 s).
   resolver.rs   URL de audio de cada pista (vía rápida → yt-dlp residente → yt-dlp), con
@@ -50,6 +52,8 @@ qml/
   DetailView.qml    Detalle de álbum, playlist o artista (canciones, Reproducir, Aleatorio).
   InspectView.qml   Modo inspeccionar: caja 3D que se gira, se abre y suelta el disco.
   MiniPlayer.qml    Ventana pequeña siempre encima; la grande se oculta mientras tanto.
+  NowPlayingView.qml  Pantalla «Sonando»: sube desde la barra; carátula grande y sus colores.
+  ContextMenu.qml   Menú de clic derecho (`Main.openMenu`) y aviso breve; lista temporal.
   Glass.qml, Ambient.qml, TintProbe.qml          Vidrio, modo ambiente y color dominante.
   Cover.qml, Icon.qml, IconButton.qml, PillButton.qml, Slider.qml, SearchField.qml, TopNav.qml,
   ViewSwitcher.qml, SettingsSheet.qml            Piezas reutilizables.
@@ -95,11 +99,16 @@ MUSICPLAYER_SILENT=1 ./target/release/musicplayer \
 | `--shot ruta.png` | Captura la ventana y sale |
 | `--delay ms` | Espera antes de capturar (por defecto 1500) |
 | `--section id` | `inicio`, `explorar`, `playlists`, `albumes` o `buscar` |
-| `--index n` | Lleva Lomos o Cubeta al elemento `n` (con `--autoplay`) |
+| `--index n` | Lleva Lomos o Cubeta al elemento `n` |
+| `--step n` | Mueve la vista `n` elementos (negativo = izquierda) a los `--step-delay` ms (1500 por defecto); con `--delay` se captura en mitad del movimiento |
 | `--search texto` | Busca al arrancar |
 | `--settings` | Abre las opciones |
 | `--settings-end` | Abre las opciones desplazadas hasta el final |
 | `--minimize ms` | Minimiza la ventana tras ese tiempo; con `--hide` la oculta y con `--mini` abre el mini reproductor (la captura toma entonces el mini) |
+| `--restore ms` | (con `--minimize`) vuelve a la ventana grande tras ese tiempo; con `--mini`, como el botón del mini |
+| `--now` | Arranca con la pantalla «Sonando» abierta |
+| `--tab id` | Abre esa pestaña del panel (`letra`, `cola`, `temporal`) |
+| `--temporal` | (con `--autoplay`) añade el elemento enfocado a la lista temporal y abre el menú sobre él |
 | `--no-panel` | Arranca con el panel derecho cerrado |
 | `--autoplay` | Reproduce el elemento enfocado |
 | `--autoplay-delay ms` | Espera antes de reproducir (deja tiempo a la precarga) |
@@ -108,6 +117,10 @@ MUSICPLAYER_SILENT=1 ./target/release/musicplayer \
 | `--shuffle` | (con `--open`) pulsa «Aleatorio» a los 5 s |
 | `--inspect [flip\|open\|disc]` | (con `--autoplay`) inspecciona el elemento y deja la caja girada, abierta o con el disco fuera |
 
+- `MUSICPLAYER_DEBUG_CLICK="x,y,boton,ms;…"` envía clics de ratón de verdad a la ventana
+  (`boton`: `left` o `right`; coordenadas lógicas, `ms` desde el arranque). Sirve para probar
+  menús y botones en capturas: p. ej. `"120,250,right,5000;245,348,left,5500"` abre el menú de
+  la primera tarjeta de Inicio y pulsa «Añadir a la lista temporal».
 - `MUSICPLAYER_SILENT=1` hace que mpv reproduzca sin sonido (`--ao=null`). Úsalo siempre en
   pruebas automáticas.
 - `HOME=/ruta/temporal` aísla las preferencias de las del usuario.
@@ -121,6 +134,7 @@ MUSICPLAYER_SILENT=1 ./target/release/musicplayer \
   ~104 bytes) y `plugins.json` con `{"discord": true, "discord_id": "1234"}` en el `HOME`
   temporal.
 - `--probe resolve id1,id2` mide la resolución con el yt-dlp residente.
+- `--probe fast id1,id2` prueba solo la vía rápida e imprime por qué falla cada pista.
 - Sin ventana visible: `QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software`.
 - Al arrancar una pista el programa escribe en stderr `arranque de pista: N ms`.
 
@@ -171,10 +185,29 @@ fallos del código sin comprobarlo con `yt-dlp` directamente.
 - **La vía rápida necesita «visitor data»** (`stream.rs`); sin él YouTube responde
   `LOGIN_REQUIRED` («confirma que no eres un bot»).
 - **yt-dlp sin sesión**: con los clientes por defecto YouTube pide verificación anti-bot en
-  pistas de YouTube Music. Se usan `web_embedded,mweb` (`resolver::ytdlp_options`).
+  pistas de YouTube Music. Se usan `web_embedded,mweb` (`resolver::ytdlp_clients`).
+- **yt-dlp con sesión**: solo `web_music` da las pistas que YouTube reserva a cuentas (muchas
+  «Art Tracks») y los formatos Premium; con `player_skip=webpage,configs` tarda ~1,7 s en vez
+  de ~3 s. Diagnóstico: `--probe playable ID` (qué dice YouTube Music de la pista) y
+  `--probe account` (si reconoce la sesión guardada).
 - **mpv solo avisa de la pausa cuando cambia**: al empezar una pista se aplica la última
   conocida (`mpv_paused`); si no, «sonando» se queda desfasado.
 - **Minimizar no libera memoria gráfica en macOS**; ocultar la ventana sí (`window.cpp`).
+- **Clics que atraviesan**: un `TapHandler` normal solo toma un agarre pasivo y el clic sigue
+  hacia lo que hay debajo (cerrar «Sonando» abría las opciones; elegir una opción del menú
+  seleccionaba la tarjeta de debajo). En botones y opciones usa
+  `gesturePolicy: TapHandler.ReleaseWithinBounds` (ya lo llevan `IconButton`, `PillButton` y
+  `TopNav`). Un `MouseArea` debajo no basta.
+- **`Window.window` dentro de un `TapHandler`** es `null` (los gestores no son `Item`): usa el del
+  elemento, `delegado.Window.window.openMenu(…)`.
+- **`TintProbe` (Canvas)**: cada lienzo debe llamar a `loadImage` aunque otro ya tenga la imagen,
+  y repintar con su propio `Timer`; si no, la segunda sonda con la misma carátula no pintaba
+  nunca y el color de «sonando» se quedaba gris. Una sonda fuera de la zona visible (recortada)
+  tampoco pinta: usa la de `Main.qml` (`playingProbe`).
+- **`Shape` con CurveRenderer no se redibuja** tras liberar los gráficos de la ventana (al ocultarla
+  para el mini o minimizarla): los iconos desaparecían. `Icon.qml` los recrea con un `Loader`
+  cada vez que sube `Theme.renderEpoch`, que `Main.qml` y `MiniPlayer.qml` incrementan al volver.
+  Una `Shape` nueva con ese renderizador necesita lo mismo.
 - **yt-dlp reescribe el archivo de `--cookies`** al terminar. Nunca le pases el
   `cookies.txt` original: usa `account::cookies_copy`.
 - **Cambiar un índice dentro del aviso de cambio** de la misma propiedad (`onCurrentItemChanged`)

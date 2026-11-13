@@ -104,6 +104,12 @@ fn best_audio(player: &Value) -> Option<String> {
     })
 }
 
+/// ¿YouTube se negó a dar la pista (no disponible sin sesión, restringida…)? Distinto de un
+/// fallo de red o de la verificación anti-bot, que sí merecen otro intento.
+pub fn refused(error: &str) -> bool {
+    error.starts_with("player (")
+}
+
 /// URL de audio de `video_id` por la vía rápida.
 pub fn resolve(video_id: &str) -> Result<String, String> {
     for attempt in 0..2 {

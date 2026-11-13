@@ -13,7 +13,7 @@ necesita una decisión del propietario antes de empezar.
 - Reproducción con mpv + yt-dlp, cola, siguiente/anterior, posición, volumen.
 - Arranque instantáneo de pistas con precarga (ver [ARCHITECTURE.md](ARCHITECTURE.md)).
 - Letra sincronizada (LRCLIB), resaltado palabra a palabra.
-- Inicio de sesión con la sesión del navegador; secciones Artistas, Canciones y Me gusta.
+- Inicio de sesión (ventana propia en macOS o sesión del navegador); Playlists de tu biblioteca y Me gusta.
 - Detalle de álbum, playlist y artista con Reproducir y Aleatorio; artistas en la búsqueda.
 - Modo inspeccionar: girar la caja, abrirla, sacar el disco.
 - Rendimiento: caché de secciones, mini reproductor que libera la ventana grande, yt-dlp
