@@ -10,7 +10,6 @@
 
 #include <QtCore/QByteArray>
 #include <QtCore/QMap>
-#include <QtCore/QRegularExpression>
 #include <QtCore/QSet>
 #include <QtCore/QTimer>
 #include <QtCore/QUrl>
@@ -94,12 +93,13 @@ extern "C" int musicplayer_login_linux(const char *outPath)
     QApplication app(argc, argv);
 
     // Sin nombre de almacenamiento: perfil privado, en memoria.
+    //
+    // El agente de usuario NO se toca. Hacerse pasar por Chrome (quitando «QtWebEngine/x.y»)
+    // es justo lo que delata la ventana: el motor sigue enviando sus cabeceras de cliente
+    // (`Sec-CH-UA: "Chromium"`, sin «Google Chrome») y Google, al ver la contradicción, responde
+    // «Este navegador o esta aplicación pueden no ser seguros». Con la identidad real del motor
+    // todo coincide (cabecera, `navigator.userAgent` y cabeceras de cliente).
     QWebEngineProfile profile;
-    // Google rechaza los navegadores embebidos que se anuncian como tales: se quita la marca
-    // «QtWebEngine/x.y» y queda un Chrome normal de la misma versión.
-    QString agent = profile.httpUserAgent();
-    agent.remove(QRegularExpression(QStringLiteral(" ?QtWebEngine/[^ ]+")));
-    profile.setHttpUserAgent(agent);
 
     QMap<QString, QNetworkCookie> jar;
     QWebEngineCookieStore *store = profile.cookieStore();
