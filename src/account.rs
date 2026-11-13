@@ -45,6 +45,9 @@ pub mod qobject {
         #[qproperty(QString, message)]
         // macOS impidió leer las cookies (Safari necesita «Acceso total al disco»).
         #[qproperty(bool, needs_disk_access)]
+        /// Hay ventana de inicio de sesión: siempre en macOS; en Linux, si se compiló
+        /// `musicplayer-login` con Qt WebEngine.
+        #[qproperty(bool, web_login)]
         type Account = super::AccountRust;
 
         /// Abre en Ajustes del Sistema el panel «Acceso total al disco» (macOS).
@@ -55,7 +58,7 @@ pub mod qobject {
         #[qinvokable]
         fn sign_in(self: Pin<&mut Account>);
 
-        /// Abre la ventana de inicio de sesión de Google (macOS).
+        /// Abre la ventana de inicio de sesión de Google (macOS, y Linux con Qt WebEngine).
         #[qinvokable]
         fn sign_in_web(self: Pin<&mut Account>);
 
@@ -261,14 +264,42 @@ fn store(youtube: &str, session: Session) -> Result<String, String> {
 /// Marca de error para «el usuario cerró la ventana sin iniciar sesión».
 const CANCELLED: &str = "\u{0}cancelado";
 
+/// Programa de la ventana de inicio de sesión, listo para añadirle la ruta del archivo:
+/// - macOS: el propio reproductor con `--login` (WebKit del sistema, `src/login_mac.mm`).
+/// - Linux: `musicplayer-login` (Qt WebEngine, `login/`), junto al ejecutable o en el PATH,
+///   si responde que está disponible.
+fn login_command() -> Option<Command> {
+    if cfg!(target_os = "macos") {
+        let mut command = Command::new(std::env::current_exe().ok()?);
+        command.arg("--login");
+        return Some(command);
+    }
+    linux_helper().map(Command::new)
+}
+
+fn linux_helper() -> Option<PathBuf> {
+    static HELPER: LazyLock<Option<PathBuf>> = LazyLock::new(|| {
+        let sibling = std::env::current_exe().ok().map(|exe| exe.with_file_name("musicplayer-login"));
+        let helper = sibling.filter(|path| path.is_file()).or_else(|| which("musicplayer-login", &search_path()))?;
+        let available = Command::new(&helper)
+            .arg("--check")
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .is_ok_and(|status| status.success());
+        available.then_some(helper)
+    });
+    HELPER.clone()
+}
+
 /// Abre la ventana de inicio de sesión en un proceso aparte y espera a que termine.
 fn login_web() -> Result<String, String> {
     let target = cookies_path().ok_or("No hay carpeta de configuración.")?;
     let scratch = target.with_file_name("cookies-login.tmp");
     write_private(&scratch, "").map_err(|error| format!("No se pudo preparar el inicio de sesión: {error}"))?;
-    let exe = std::env::current_exe().map_err(|error| format!("No se encuentra el programa: {error}"))?;
-
-    let status = Command::new(exe).arg("--login").arg(&scratch).stdin(Stdio::null()).status();
+    let mut command = login_command().ok_or("Esta instalación no incluye la ventana de inicio de sesión.")?;
+    let status = command.arg(&scratch).stdin(Stdio::null()).status();
     let dump = String::from_utf8_lossy(&fs::read(&scratch).unwrap_or_default()).into_owned();
     let _ = fs::remove_file(&scratch);
     let status = status.map_err(|error| format!("No se pudo abrir la ventana de inicio de sesión: {error}"))?;
@@ -410,6 +441,7 @@ pub struct AccountRust {
     browser: QString,
     message: QString,
     needs_disk_access: bool,
+    web_login: bool,
 }
 
 impl Default for AccountRust {
@@ -426,6 +458,7 @@ impl Default for AccountRust {
             browser: QString::from(&browser),
             message: QString::default(),
             needs_disk_access: false,
+            web_login: cfg!(target_os = "macos") || linux_helper().is_some(),
         }
     }
 }

@@ -61,11 +61,13 @@ Item {
             tint: root.stageTint
             cx: root.stageCenter
             cy: root.height * 0.36
-            reach: root.width * 0.46
+            reach: root.width * (Theme.ambientSingle ? 0.6 : 0.46)
             strength: 0.85
         }
 
+        // En modo «Suave» solo queda el foco del escenario: un único color.
         Glow {
+            visible: !Theme.ambientSingle
             tint: root.playingTint
             cx: root.playingCenter
             cy: root.height * 0.2
@@ -74,6 +76,7 @@ Item {
         }
 
         Glow {
+            visible: !Theme.ambientSingle
             tint: root.playingTint
             cx: root.width * 0.12
             cy: root.height * 1.05

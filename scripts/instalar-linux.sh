@@ -10,11 +10,13 @@ cd "$(dirname "$0")/.."
 
 PREFIJO="${XDG_DATA_HOME:-$HOME/.local/share}"
 BIN="$HOME/.local/bin"
-DEPENDENCIAS=(base-devel rust qt6-base qt6-declarative qt6-shadertools qt6-wayland mpv yt-dlp deno)
+# qt6-webengine: la ventana de inicio de sesión (musicplayer-login). Sin él la app funciona y
+# se puede importar la sesión del navegador.
+DEPENDENCIAS=(base-devel rust qt6-base qt6-declarative qt6-shadertools qt6-wayland qt6-webengine mpv yt-dlp deno)
 
 case "${1:-}" in
     --desinstalar)
-        rm -f "$BIN/musicplayer" \
+        rm -f "$BIN/musicplayer" "$BIN/musicplayer-login" \
               "$PREFIJO/applications/musicplayer.desktop" \
               "$PREFIJO/icons/hicolor/scalable/apps/musicplayer.svg"
         command -v update-desktop-database >/dev/null && update-desktop-database "$PREFIJO/applications" || true
@@ -49,6 +51,14 @@ QMAKE="${QMAKE:-$(command -v qmake6)}" cargo build --release
 
 echo "› Instalando en ~/.local…"
 install -Dm755 target/release/musicplayer "$BIN/musicplayer"
+# Ventana de inicio de sesión, solo si se compiló con Qt WebEngine.
+if target/release/musicplayer-login --check; then
+    install -Dm755 target/release/musicplayer-login "$BIN/musicplayer-login"
+else
+    rm -f "$BIN/musicplayer-login"
+    echo "Aviso: sin qt6-webengine no hay ventana de inicio de sesión; podrás importar la sesión del navegador." >&2
+    echo "       Para tenerla: sudo pacman -S qt6-webengine y vuelve a ejecutar este script." >&2
+fi
 install -Dm644 assets/icon.svg "$PREFIJO/icons/hicolor/scalable/apps/musicplayer.svg"
 install -Dm644 /dev/stdin "$PREFIJO/applications/musicplayer.desktop" <<EOF
 [Desktop Entry]

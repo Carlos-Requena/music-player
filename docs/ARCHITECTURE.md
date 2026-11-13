@@ -35,6 +35,11 @@
 
 ## Sesión
 
+- **Ventana de inicio de sesión (Linux)**: `Account.signInWeb` lanza `musicplayer-login
+  <temporal>` (crate `login/`, Qt WebEngine Widgets con un perfil privado). Mismo flujo que la de
+  macOS. Es opcional: `login/build.rs` solo la compila si encuentra `qt6-webengine`; si no, el
+  binario responde 3 a `--check` y la app ofrece importar del navegador (`Account.webLogin`).
+  Va en un binario aparte para que el reproductor no enlace ni cargue Chromium.
 - **Ventana de inicio de sesión (macOS)**: `Account.signInWeb` lanza `musicplayer --login
   <temporal>` y espera. Ese proceso no arranca Qt: `src/login_mac.mm` abre un `WKWebView` (WebKit
   del sistema) con un almacén de datos no persistente y la `applicationNameForUserAgent` de

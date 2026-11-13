@@ -34,8 +34,12 @@ QtObject {
     // Opciones de disposición que afectan al aspecto (Opciones › Disposición).
     readonly property int revision: AppSettings.revision
     readonly property bool blur: { void revision; return AppSettings.opcion("desenfoque") !== "no" }
-    readonly property bool ambientOn: { void revision; return AppSettings.opcion("ambiente") !== "no" }
-    readonly property real ambient: ambientOn ? (skin.ambiente !== undefined ? skin.ambiente : 1) : 0
+    readonly property string ambientMode: { void revision; return AppSettings.opcion("ambiente") || "si" }
+    readonly property bool ambientOn: ambientMode !== "no"
+    // «Suave»: un solo color (el del elemento enfocado) y menos intensidad. Se ve mejor en
+    // pantallas que muestran con escalones los degradados de varios colores.
+    readonly property bool ambientSingle: ambientMode === "suave"
+    readonly property real ambient: ambientOn ? (skin.ambiente !== undefined ? skin.ambiente : 1) * (ambientSingle ? 0.7 : 1) : 0
 
     readonly property int radius: skin.radio !== undefined ? skin.radio : 20
     readonly property int gap: 12

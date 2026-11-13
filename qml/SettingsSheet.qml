@@ -155,9 +155,9 @@ Item {
                     : [{ id: "chrome", label: "Chrome" }, { id: "chromium", label: "Chromium" }, { id: "firefox", label: "Firefox" },
                        { id: "brave", label: "Brave" }, { id: "vivaldi", label: "Vivaldi" }]
 
-                // macOS: ventana propia de inicio de sesión; importar del navegador queda como
-                // alternativa (exige «Acceso total al disco»). Linux: importar del navegador.
-                readonly property bool webLogin: Qt.platform.os === "osx"
+                // Ventana propia de inicio de sesión (macOS, y Linux con qt6-webengine); importar
+                // del navegador queda como alternativa (en macOS exige «Acceso total al disco»).
+                readonly property bool webLogin: Account.webLogin
                 property bool importing: !webLogin
 
                 Heading { text: "Cuenta" }
@@ -268,7 +268,9 @@ Item {
                     visible: text !== ""
                     width: parent.width
                     text: Account.message !== "" ? Account.message
-                        : !Account.signedIn && accountSection.webLogin && accountSection.importing
+                        : !Account.signedIn && !accountSection.webLogin && Qt.platform.os !== "osx"
+                          ? "Para iniciar sesión en una ventana, instala qt6-webengine y vuelve a instalar el reproductor (scripts/instalar-linux.sh)."
+                        : !Account.signedIn && Qt.platform.os === "osx" && accountSection.importing
                           ? (Account.browser === "safari"
                              ? "macOS exige «Acceso total al disco» para leer los datos de Safari."
                              : "macOS puede pedir «Acceso total al disco» y permiso para la clave del navegador.")
@@ -529,8 +531,8 @@ Item {
                     model: [
                         { key: "panel", label: "Panel de letra y cola", fallback: "derecha",
                           options: [{ id: "izquierda", label: "Izquierda" }, { id: "derecha", label: "Derecha" }] },
-                        { key: "ambiente", label: "Modo ambiente", fallback: "si",
-                          options: [{ id: "si", label: "Activado" }, { id: "no", label: "Desactivado" }] },
+                        { key: "ambiente", label: "Modo ambiente", hint: "Suave usa un solo color: mejor en pantallas sencillas.", fallback: "si",
+                          options: [{ id: "si", label: "Vivo" }, { id: "suave", label: "Suave" }, { id: "no", label: "Desactivado" }] },
                         { key: "desenfoque", label: "Desenfoque", hint: "Desactivarlo ahorra memoria y batería.", fallback: "si",
                           options: [{ id: "si", label: "Activado" }, { id: "no", label: "Desactivado" }] },
                         { key: "calidad", label: "Calidad del audio", hint: "Premium (256 kbps) necesita sesión y suscripción.", fallback: "alta",

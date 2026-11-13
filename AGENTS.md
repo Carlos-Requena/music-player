@@ -40,6 +40,8 @@ src/
   window.cpp    C++: libera los recursos gráficos de las ventanas ocultas.
   settings.rs   Singleton QML `AppSettings`: estilo de ventana, vista de cada sección, skin y
                 opciones de disposición (mapa clave → valor genérico, `opcion`/`setOpcion`).
+login/          Crate aparte `musicplayer-login`: ventana de inicio de sesión de Linux (Qt
+                WebEngine, opcional). Un binario propio para que el reproductor no cargue Chromium.
 skins/          Skins incluidas (JSON, se compilan dentro del binario con `include_str!`).
 qml/
   Main.qml          Ventana: escenario, navegación, panel, barra, opciones.

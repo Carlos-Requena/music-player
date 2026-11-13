@@ -89,13 +89,17 @@ Funciona sin cuenta (inicio, explorar, novedades, búsqueda). Con sesión aparec
 personalizado, **Playlists** (solo las de tu biblioteca de YouTube Music), tus álbumes y
 **Me gusta**, y YouTube rechaza menos peticiones.
 
-**macOS:** Opciones › Cuenta › **Iniciar sesión**. Se abre una ventana con la página de Google;
-entra con tu cuenta y, al volver a YouTube Music, la ventana se cierra sola. No hace falta
-ningún permiso. La ventana es un proceso aparte con el WebKit del sistema y una sesión privada:
-al cerrarse no queda nada salvo las cookies de youtube.com.
+Opciones › Cuenta › **Iniciar sesión**. Se abre una ventana con la página de Google; entra con
+tu cuenta y, al volver a YouTube Music, la ventana se cierra sola. La ventana es un programa
+aparte con una sesión privada: al cerrarse no queda nada salvo las cookies de youtube.com.
 
-**Linux** (o «Importar desde el navegador» en macOS): la app usa la sesión que ya tienes abierta
-en tu navegador.
+- **macOS**: usa el WebKit del sistema; no hace falta nada más ni ningún permiso.
+- **Linux**: usa Qt WebEngine (`sudo pacman -S qt6-webengine`, incluido en
+  `scripts/instalar-linux.sh --dependencias`). Sin él, la app ofrece importar la sesión del
+  navegador.
+
+**Importar desde el navegador** (alternativa): la app usa la sesión que ya tienes abierta en tu
+navegador.
 
 1. Abre music.youtube.com en Chrome, Firefox, Brave… e inicia sesión allí.
 2. En la app: Opciones › Cuenta → elige el navegador → **Iniciar sesión** (o **Importar de…**).

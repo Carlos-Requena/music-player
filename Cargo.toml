@@ -4,6 +4,12 @@ version = "0.1.0"
 edition = "2021"
 description = "Cliente de escritorio ligero para YouTube Music (Qt 6 / QML + Rust)"
 
+[workspace]
+# `login`: ventana de inicio de sesión de Linux, en un binario aparte para que el reproductor
+# no cargue Qt WebEngine (un Chromium entero) en memoria.
+members = ["login"]
+default-members = [".", "login"]
+
 [dependencies]
 cxx = "1.0.95"
 cxx-qt = "0.10"

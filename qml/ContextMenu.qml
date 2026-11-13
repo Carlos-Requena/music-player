@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Effects
 import app.musicplayer
 
 // Menú contextual (clic derecho) de una canción, álbum o playlist, y aviso breve de lo hecho.
@@ -66,14 +67,27 @@ Item {
         onClicked: root.close()
     }
 
+    // Sombra suave bajo el menú.
+    RectangularShadow {
+        visible: root.opened
+        x: menu.x
+        y: menu.y + 6
+        width: menu.width
+        height: menu.height
+        radius: 14
+        blur: 28
+        color: Qt.rgba(0, 0, 0, 0.45)
+    }
+
+    // Sin desenfoque de fondo: en un panel tan pequeño el desenfoque asomaba por fuera del
+    // borde como un rectángulo borroso. Fondo casi opaco del color de la skin.
     Glass {
         id: menu
         visible: root.opened
         width: 300
         height: list.height + 12
         radius: 14
-        tint: Theme.glassStrong
-        backdrop: root.backdrop
+        tint: Qt.rgba(Theme.ground.r, Theme.ground.g, Theme.ground.b, 0.94)
 
         Keys.onEscapePressed: root.close()
 

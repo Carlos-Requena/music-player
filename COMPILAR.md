@@ -117,12 +117,14 @@ scripts/instalar-linux.sh --dependencias
 ```
 
 Instala con `pacman` (te pedirá la contraseña):
-`base-devel rust qt6-base qt6-declarative qt6-shadertools qt6-wayland mpv yt-dlp deno`.
+`base-devel rust qt6-base qt6-declarative qt6-shadertools qt6-wayland qt6-webengine mpv yt-dlp deno`.
+(`qt6-webengine` es para la ventana de inicio de sesión; sin él la app funciona igual y puedes
+importar la sesión del navegador.)
 
 Si prefieres hacerlo a mano:
 
 ```bash
-sudo pacman -S --needed base-devel rust qt6-base qt6-declarative qt6-shadertools qt6-wayland mpv yt-dlp deno
+sudo pacman -S --needed base-devel rust qt6-base qt6-declarative qt6-shadertools qt6-wayland qt6-webengine mpv yt-dlp deno
 ```
 
 (Si ya usas `rustup`, quita `rust` de la lista.)
@@ -138,6 +140,7 @@ El script compila en modo release y lo instala **para tu usuario**, sin `sudo`:
 | Qué | Dónde |
 |---|---|
 | Programa | `~/.local/bin/musicplayer` |
+| Ventana de inicio de sesión (con `qt6-webengine`) | `~/.local/bin/musicplayer-login` |
 | Entrada del menú | `~/.local/share/applications/musicplayer.desktop` |
 | Icono | `~/.local/share/icons/hicolor/scalable/apps/musicplayer.svg` |
 
