@@ -34,12 +34,32 @@ QtObject {
     // Opciones de disposición que afectan al aspecto (Opciones › Disposición).
     readonly property int revision: AppSettings.revision
     readonly property bool blur: { void revision; return AppSettings.opcion("desenfoque") !== "no" }
+    // Letra: tamaño (factor), familia y grosor, de Opciones › Letra.
+    readonly property real lyricsScale: {
+        void revision
+        const size = AppSettings.opcion("letraTamano")
+        return size === "pequena" ? 0.8 : size === "grande" ? 1.25 : size === "enorme" ? 1.5 : 1
+    }
+    readonly property string lyricsFamily: {
+        void revision
+        const family = AppSettings.opcion("letraFuente")
+        if (family === "serif")
+            return Qt.platform.os === "osx" ? "Georgia" : "serif"
+        if (family === "mono")
+            return Qt.platform.os === "osx" ? "Menlo" : "monospace"
+        return Qt.application.font.family
+    }
+    readonly property int lyricsWeight: { void revision; return AppSettings.opcion("letraPeso") === "normal" ? Font.Medium : Font.Bold }
+
     readonly property string ambientMode: { void revision; return AppSettings.opcion("ambiente") || "si" }
     readonly property bool ambientOn: ambientMode !== "no"
     // «Suave»: un solo color (el del elemento enfocado) y menos intensidad. Se ve mejor en
     // pantallas que muestran con escalones los degradados de varios colores.
-    readonly property bool ambientSingle: ambientMode === "suave"
-    readonly property real ambient: ambientOn ? (skin.ambiente !== undefined ? skin.ambiente : 1) * (ambientSingle ? 0.7 : 1) : 0
+    // «Tenue»: igual que «Suave» pero apenas un velo de color.
+    readonly property bool ambientSingle: ambientMode === "suave" || ambientMode === "tenue"
+    readonly property real ambient: ambientOn
+        ? (skin.ambiente !== undefined ? skin.ambiente : 1) * (ambientMode === "tenue" ? 0.3 : ambientSingle ? 0.7 : 1)
+        : 0
 
     readonly property int radius: skin.radio !== undefined ? skin.radio : 20
     readonly property int gap: 12

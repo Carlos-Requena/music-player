@@ -312,7 +312,7 @@ pub fn detail(target: &Item) -> Result<Detail> {
         ..Detail::default()
     };
     if target.kind != "artist" {
-        out.tracks = queue("", &target.playlist_id)?;
+        out.tracks = playlist_tracks(&target.playlist_id)?;
         return Ok(out);
     }
 
@@ -426,6 +426,83 @@ fn seconds(clock: &str) -> f64 {
         .fold(0.0, |total, part| total * 60.0 + part)
 }
 
+/// Pistas de un álbum o playlist tal como las muestra YouTube Music: la página `VL<id>`,
+/// siguiendo sus continuaciones hasta el final. Solo la lista principal (no las «canciones
+/// sugeridas» de debajo) y en su orden, con los duplicados que tenga la propia lista.
+///
+/// Antes se usaba la cola de reproducción (`next`), que no sirve para esto: junto a cada
+/// canción trae su versión en vídeo (otra pista, con otra duración), se corta en ~50 y puede
+/// añadir canciones que no están en la lista.
+pub fn playlist_tracks(playlist_id: &str) -> Result<Vec<Track>> {
+    let page = post("browse", json!({ "browseId": format!("VL{playlist_id}") }))?;
+
+    // Artista y carátula de la cabecera: las filas de un álbum no traen ni una ni otra.
+    let header = find(&page, "musicResponsiveHeaderRenderer").or_else(|| find(&page, "musicDetailHeaderRenderer"));
+    let album_artist = header.map(|h| text(h.get("straplineTextOne"))).unwrap_or_default();
+    let album_thumb = header.map(thumb).unwrap_or_default();
+
+    // La lista principal: la primera estantería de la página.
+    let shelf = find(&page, "musicPlaylistShelfRenderer").or_else(|| find(&page, "musicShelfRenderer"));
+    let mut items: Vec<Value> = shelf
+        .and_then(|shelf| shelf.get("contents"))
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+
+    let mut tracks = Vec::new();
+    for _ in 0..60 {
+        let mut token = String::new();
+        for entry in &items {
+            if let Some(row) = entry.get("musicResponsiveListItemRenderer") {
+                if let Some(track) = track_row(row, &album_artist, &album_thumb) {
+                    tracks.push(track);
+                }
+            } else if let Some(more) = entry.get("continuationItemRenderer") {
+                token = string(find(more, "token"));
+            }
+        }
+        if token.is_empty() {
+            break;
+        }
+        let next = post("browse", json!({ "continuation": token }))?;
+        let mut appended = Vec::new();
+        find_all(&next, "continuationItems", &mut appended);
+        items = appended.first().and_then(|list| list.as_array()).cloned().unwrap_or_default();
+    }
+    Ok(tracks)
+}
+
+/// Una fila (`musicResponsiveListItemRenderer`) de un álbum o playlist como pista.
+fn track_row(row: &Value, album_artist: &str, album_thumb: &str) -> Option<Track> {
+    let mut video_id = string(row.pointer("/playlistItemData/videoId"));
+    if video_id.is_empty() {
+        video_id = string(find(row, "watchEndpoint").and_then(|endpoint| endpoint.get("videoId")));
+    }
+    if video_id.is_empty() {
+        return None;
+    }
+    let column = |index: usize| {
+        row.pointer(&format!("/flexColumns/{index}/musicResponsiveListItemFlexColumnRenderer/text"))
+            .map(|value| text(Some(value)))
+            .unwrap_or_default()
+    };
+    // En un álbum la segunda columna suele estar vacía o traer las reproducciones.
+    let artist = column(1);
+    let artist = if artist.is_empty() || artist.chars().next().is_some_and(|c| c.is_ascii_digit()) {
+        album_artist.to_owned()
+    } else {
+        artist
+    };
+    let picture = thumb(row);
+    Some(Track {
+        title: column(0),
+        artist,
+        thumb: if picture.is_empty() { album_thumb.to_owned() } else { picture },
+        video_id,
+        duration: seconds(&text(row.pointer("/fixedColumns/0/musicResponsiveListItemFixedColumnRenderer/text"))),
+    })
+}
+
 /// Cola de reproducción: la radio de una canción o las pistas de un álbum o playlist.
 pub fn queue(video_id: &str, playlist_id: &str) -> Result<Vec<Track>> {
     let mut body = json!({ "isAudioOnly": true, "enablePersistentPlaylistPanel": true });
@@ -439,8 +516,22 @@ pub fn queue(video_id: &str, playlist_id: &str) -> Result<Vec<Track>> {
     }
 
     let page = post("next", body)?;
-    let mut renderers = Vec::new();
-    find_all(&page, "playlistPanelVideoRenderer", &mut renderers);
+    // Cada elemento es una pista o un envoltorio con la pista (`primaryRenderer`) y su
+    // versión en vídeo (`counterpart`): solo cuenta la principal, o saldría duplicada.
+    let mut panels = Vec::new();
+    find_all(&page, "playlistPanelRenderer", &mut panels);
+    let renderers: Vec<&Value> = panels
+        .first()
+        .and_then(|panel| panel.get("contents"))
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|entry| {
+            entry.get("playlistPanelVideoRenderer").or_else(|| {
+                entry.pointer("/playlistPanelVideoWrapperRenderer/primaryRenderer/playlistPanelVideoRenderer")
+            })
+        })
+        .collect();
 
     Ok(renderers
         .into_iter()

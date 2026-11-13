@@ -531,14 +531,20 @@ Item {
                     model: [
                         { key: "panel", label: "Panel de letra y cola", fallback: "derecha",
                           options: [{ id: "izquierda", label: "Izquierda" }, { id: "derecha", label: "Derecha" }] },
-                        { key: "ambiente", label: "Modo ambiente", hint: "Suave usa un solo color: mejor en pantallas sencillas.", fallback: "si",
-                          options: [{ id: "si", label: "Vivo" }, { id: "suave", label: "Suave" }, { id: "no", label: "Desactivado" }] },
+                        { key: "ambiente", label: "Modo ambiente", hint: "Suave y Tenue usan un solo color; Tenue, apenas un velo.", fallback: "si",
+                          options: [{ id: "si", label: "Vivo" }, { id: "suave", label: "Suave" }, { id: "tenue", label: "Tenue" }, { id: "no", label: "No" }] },
                         { key: "desenfoque", label: "Desenfoque", hint: "Desactivarlo ahorra memoria y batería.", fallback: "si",
                           options: [{ id: "si", label: "Activado" }, { id: "no", label: "Desactivado" }] },
                         { key: "calidad", label: "Calidad del audio", hint: "Premium (256 kbps) necesita sesión y suscripción.", fallback: "alta",
                           options: [{ id: "alta", label: "Alta · 160 kbps" }, { id: "premium", label: "Premium · 256 kbps" }] },
                         { key: "ytdlp", label: "yt-dlp residente", hint: "Suena ~1 s antes; ocupa ~120 MB mientras navegas.", fallback: "si",
                           options: [{ id: "si", label: "Activado" }, { id: "no", label: "Desactivado" }] },
+                        { key: "letraTamano", label: "Tamaño de la letra", hint: "El retraso se ajusta en cada canción, bajo su letra.", fallback: "mediana",
+                          options: [{ id: "pequena", label: "Pequeña" }, { id: "mediana", label: "Mediana" }, { id: "grande", label: "Grande" }, { id: "enorme", label: "Enorme" }] },
+                        { key: "letraFuente", label: "Fuente de la letra", fallback: "sistema",
+                          options: [{ id: "sistema", label: "Sistema" }, { id: "serif", label: "Serif" }, { id: "mono", label: "Mono" }] },
+                        { key: "letraPeso", label: "Grosor de la letra", fallback: "negrita",
+                          options: [{ id: "negrita", label: "Negrita" }, { id: "normal", label: "Normal" }] },
                         { key: "caratulas", label: "Carátulas del Muro", fallback: "medianas",
                           options: [{ id: "pequenas", label: "Pequeñas" }, { id: "medianas", label: "Medianas" }, { id: "grandes", label: "Grandes" }] }
                     ]

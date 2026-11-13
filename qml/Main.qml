@@ -51,8 +51,11 @@ Window {
     function choose(item) {
         if (!item)
             return
-        if (item.kind === "song")
+        // Una canción suena y abre la pantalla «Sonando» con su letra y su cola.
+        if (item.kind === "song") {
             Player.playItem(JSON.stringify(item))
+            nowOpen = true
+        }
         else
             Library.openDetail(JSON.stringify(item))
     }
@@ -432,8 +435,8 @@ Window {
     Column {
         id: stageLyric
 
-        readonly property int line: Catalog.lineAt(Player.position)
-        readonly property real progress: Catalog.lineProgress(line, Player.position)
+        readonly property int line: Catalog.lineAt(Catalog.lyricsTime)
+        readonly property real progress: Catalog.lineProgress(line, Catalog.lyricsTime)
         readonly property var words: line >= 0 ? Catalog.lyrics[line].text.split(" ") : []
         readonly property string upcoming: line >= 0 && line + 1 < Catalog.lyrics.length ? Catalog.lyrics[line + 1].text : ""
 
@@ -466,8 +469,9 @@ Window {
 
                     text: modelData
                     color: Qt.rgba(1, 1, 1, 0.5 + 0.5 * sung)
-                    font.pixelSize: 34
-                    font.weight: Font.Bold
+                    font.pixelSize: Math.round(34 * Theme.lyricsScale)
+                    font.family: Theme.lyricsFamily
+                    font.weight: Theme.lyricsWeight
                     font.letterSpacing: -0.4
                 }
             }

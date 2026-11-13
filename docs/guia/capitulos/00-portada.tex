@@ -1,0 +1,29 @@
+\begin{titlepage}
+\centering
+\vspace*{3cm}
+{\sffamily\color{acento}\large GUÍA DEL PROYECTO\par}
+\vspace{0.8cm}
+{\sffamily\bfseries\color{tinta}\fontsize{34}{40}\selectfont Reproductor de música\par}
+\vspace{0.4cm}
+{\sffamily\color{tinta}\Large Un cliente de YouTube Music en Rust y Qt, explicado\\ archivo por archivo\par}
+\vspace{2cm}
+\begin{tikzpicture}
+  \foreach \i/\a in {0/62,1/54,2/46,3/38} {
+    \fill[acento!\the\numexpr 30+\i*15\relax, rounded corners=1pt]
+      (\i*0.42,0) -- ++(0.32,0.12) -- ++(0,2.3) -- ++(-0.32,-0.12) -- cycle;
+  }
+  \fill[tinta, rounded corners=3pt] (2.0,-0.2) rectangle ++(2.7,2.7);
+  \fill[acento, rounded corners=2pt] (2.25,0.05) rectangle ++(2.2,2.2);
+  \foreach \i in {0,1,2,3} {
+    \fill[acento!\the\numexpr 90-\i*15\relax, rounded corners=1pt]
+      (5.0+\i*0.42,0.12) -- ++(0.32,-0.12) -- ++(0,2.3) -- ++(-0.32,0.12) -- cycle;
+  }
+  \fill[tinta!10] (-0.3,-0.35) rectangle (7.0,-0.3);
+\end{tikzpicture}
+\vfill
+{\sffamily\color{comentario}
+Para quien sabe programar pero empieza con Rust y QML.\\
+Arquitectura, código, decisiones y recetas para seguir desarrollándolo.\par}
+\vspace{1cm}
+{\sffamily\small\color{comentario}Compilar: \texttt{latexmk -xelatex guia.tex} (carpeta \texttt{docs/guia})\par}
+\end{titlepage}

@@ -228,7 +228,11 @@ fn album_queue(playlist_id: &str) -> ytm::Result<Vec<Track>> {
     if let Some(tracks) = cached_queue(playlist_id) {
         return Ok(tracks);
     }
-    let tracks = ytm::queue("", playlist_id)?;
+    // La lista real del álbum o playlist; si YouTube no la da, la cola de reproducción.
+    let tracks = match ytm::playlist_tracks(playlist_id) {
+        Ok(tracks) if !tracks.is_empty() => tracks,
+        _ => ytm::queue("", playlist_id)?,
+    };
     if let Ok(mut queues) = QUEUES.lock() {
         queues.insert(playlist_id.to_owned(), tracks.clone());
     }

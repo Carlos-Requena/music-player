@@ -76,7 +76,7 @@ FocusScope {
         tint: Qt.rgba(0.02, 0.025, 0.04, 0.72)
     }
 
-    TapHandler {}
+    TapHandler { acceptedButtons: Qt.AllButtons; gesturePolicy: TapHandler.ReleaseWithinBounds }
 
     // Disco: etiqueta con la carátula, recortada en círculo, sobre un CD plateado.
     component Disc: Item {

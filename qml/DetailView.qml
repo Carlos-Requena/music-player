@@ -55,7 +55,7 @@ FocusScope {
     }
 
     // Absorbe clics para que no lleguen a la vista de debajo.
-    TapHandler {}
+    TapHandler { acceptedButtons: Qt.AllButtons; gesturePolicy: TapHandler.ReleaseWithinBounds }
 
     readonly property real coverSide: Math.min(360, height * 0.5, width * 0.32)
 

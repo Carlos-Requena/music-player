@@ -26,7 +26,7 @@ fn probe(args: &[String]) -> bool {
         "playlists" => ytm::mood_playlists(3),
         "search" => ytm::search(argument),
         "queue" | "album" => {
-            let tracks = if what == "queue" { ytm::queue(argument, "") } else { ytm::queue("", argument) };
+            let tracks = if what == "queue" { ytm::queue(argument, "") } else { ytm::playlist_tracks(argument) };
             match tracks {
                 Ok(tracks) => {
                     for track in tracks.iter().take(8) {

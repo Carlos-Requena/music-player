@@ -32,6 +32,11 @@
   páginas de artista y, con sesión, la biblioteca (`FEmusic_liked_playlists`,
   `FEmusic_liked_albums`, `VLLM`). La sección Playlists solo muestra las de la biblioteca
   de la cuenta; sin sesión queda vacía.
+- **Canciones de un álbum o playlist** (`ytm::playlist_tracks`): la página `VL<id>` y sus
+  continuaciones, solo la lista principal, en su orden (~3 s para 500 pistas). No se usa la
+  cola `next` para esto: trae junto a cada canción su versión en vídeo (`counterpart`, con
+  otra duración), se corta en ~50 y puede añadir canciones ajenas. La radio (`ytm::queue`) sí
+  usa `next`, pero solo toma el `primaryRenderer` de cada elemento.
 
 ## Sesión
 

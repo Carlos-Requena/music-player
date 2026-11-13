@@ -32,6 +32,24 @@ QtObject {
     // Cola de reproducción: pistas `{ title, artist, thumb, videoId, duration }`.
     readonly property var queue: parse(Player.queue)
 
+    // Pista que suena (de la cola) y su retraso de letra, en segundos, guardado por canción en
+    // las opciones (`retraso:<videoId>`). Positivo: la letra va más tarde.
+    readonly property string currentVideoId: Player.index >= 0 && Player.index < queue.length ? queue[Player.index].videoId : ""
+    readonly property real lyricsDelay: {
+        void AppSettings.revision
+        const stored = currentVideoId !== "" ? AppSettings.opcion("retraso:" + currentVideoId) : ""
+        return stored !== "" ? parseFloat(stored) : 0
+    }
+    // Momento de la letra: la posición de la canción corregida con el retraso.
+    readonly property real lyricsTime: Player.position - lyricsDelay
+
+    function setLyricsDelay(seconds) {
+        if (currentVideoId === "")
+            return
+        const rounded = Math.round(seconds * 10) / 10
+        AppSettings.setOpcion("retraso:" + currentVideoId, Math.abs(rounded) < 0.05 ? "" : rounded.toFixed(1))
+    }
+
     // Lista temporal: pistas con el mismo formato que la cola.
     readonly property var temporal: parse(Player.temporal)
 

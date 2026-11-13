@@ -1,8 +1,8 @@
 //! Catálogo expuesto a QML como singleton `Library`.
 //!
 //! Cada sección se publica como JSON (`[{ titulo, items: [...] }]`) que la interfaz
-//! convierte en sus zonas. Sin sesión de usuario no hay biblioteca personal, así que
-//! "Álbumes" muestra las novedades y "Playlists" las recomendadas por estado de ánimo.
+//! convierte en sus zonas. Sin sesión de usuario no hay biblioteca personal: «Álbumes»
+//! muestra solo las novedades y «Playlists» y «Me gusta» quedan vacías.
 
 use std::{pin::Pin, thread};
 

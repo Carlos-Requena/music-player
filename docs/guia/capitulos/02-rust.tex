@@ -1,0 +1,768 @@
+\chapter{Rust desde cero, lo justo para este proyecto}
+\label{cap:rust}
+
+Rust tiene fama de difícil. Parte de esa fama es merecida: el compilador es estricto y al
+principio rechaza código que en otros lenguajes funcionaría. La otra parte es que casi todo lo
+que rechaza son errores reales (accesos a memoria liberada, condiciones de carrera entre
+hilos) que en C++ o Java descubrirías en producción. Este capítulo te lleva de cero a poder
+leer y modificar el proyecto. No cubre todo Rust: cubre lo que el proyecto usa, en el orden en
+que conviene aprenderlo.
+
+\section{Un proyecto de prácticas}
+
+Antes de tocar el reproductor, crea un proyecto aparte para experimentar. Rust se instala con
+\texttt{rustup} (ver \archivo{COMPILAR.md}); después:
+
+\begin{terminal}
+cargo new practicas
+cd practicas
+cargo run
+\end{terminal}
+
+\texttt{cargo} es la herramienta de Rust para todo: crea proyectos, descarga dependencias,
+compila, ejecuta y pasa las pruebas. \texttt{cargo new} crea esta estructura:
+
+\begin{codigo}
+practicas/
+├── Cargo.toml      ← nombre del proyecto y dependencias («crates»)
+└── src/
+    └── main.rs     ← el programa
+\end{codigo}
+
+y \archivo{src/main.rs} trae ya el saludo de siempre:
+
+\begin{rust}
+fn main() {
+    println!("Hola, mundo");
+}
+\end{rust}
+
+Todos los ejemplos de este capítulo se pueden pegar ahí y ejecutar con \texttt{cargo run}. Hazlo:
+leer Rust no es lo mismo que escribirlo, y el compilador es el mejor profesor que vas a tener.
+
+\section{Variables, tipos y funciones}
+
+\begin{rust}
+fn main() {
+    let titulo = "Columbia";        // inmutable por defecto
+    let mut reproducciones = 0;     // `mut` para poder cambiarla
+    reproducciones += 1;
+
+    let duracion: f64 = 186.5;      // tipo explícito (f64 = double)
+    let minutos = (duracion / 60.0) as u32;   // conversión explícita con `as`
+    println!("{titulo}: {minutos} min, {reproducciones} vez");
+}
+\end{rust}
+
+\begin{itemize}
+  \item \textbf{Inmutable por defecto.} \cod{let} crea una variable que no se puede cambiar. Si
+  quieres cambiarla, \cod{let mut}. Parece una molestia; en la práctica hace que leer código
+  ajeno sea mucho más fácil, porque sabes qué puede cambiar y qué no.
+  \item \textbf{Inferencia de tipos.} Normalmente no escribes el tipo: el compilador lo deduce.
+  Lo escribes cuando quieres dejarlo claro o cuando no puede deducirlo.
+  \item \textbf{Sin conversiones implícitas.} Un \cod{f64} no se convierte solo en entero: hay
+  que pedirlo con \cod{as}. Así no hay sorpresas de precisión.
+\end{itemize}
+
+Tipos básicos que verás:
+
+\begin{center}
+\begin{tabular}{@{}ll@{}}
+\toprule
+Tipo & Qué es \\
+\midrule
+\cod{i32}, \cod{i64}, \cod{u32}, \cod{u64}, \cod{usize} & enteros con y sin signo (\cod{usize}: índices y tamaños) \\
+\cod{f64} & número decimal de doble precisión \\
+\cod{bool} & \cod{true} o \cod{false} \\
+\cod{char} & un carácter Unicode \\
+\cod{String} & texto propio, que puede crecer \\
+\cod{&str} & texto prestado (una vista de solo lectura sobre un texto) \\
+\cod{Vec<T>} & lista dinámica de elementos de tipo \cod{T} (como \cod{ArrayList<T>}) \\
+\cod{HashMap<K, V>}, \cod{HashSet<T>} & diccionario y conjunto \\
+\cod{(A, B)} & tupla \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Las funciones declaran el tipo de sus parámetros y de lo que devuelven:
+
+\begin{rust}
+fn segundos(reloj: &str) -> f64 {
+    reloj
+        .split(':')
+        .filter_map(|parte| parte.trim().parse::<f64>().ok())
+        .fold(0.0, |total, parte| total * 60.0 + parte)
+}
+\end{rust}
+
+Esta es, tal cual, la función \cod{seconds} de \archivo{src/ytm.rs}: convierte \cod{"3:27"} en
+207. Fíjate en dos cosas que sorprenden al principio:
+
+\begin{enumerate}
+  \item \textbf{No hay \cod{return}.} En Rust casi todo es una expresión que produce un valor,
+  y la \emph{última expresión} de un bloque (sin punto y coma) es lo que el bloque devuelve.
+  \cod{return} existe, pero se usa para salir antes.
+  \item \textbf{Cadenas de métodos.} \cod{split}, \cod{filter_map} y \cod{fold} son
+  \emph{iteradores}: lo verás en la sección~\ref{sec:iteradores}. De momento, léelo como «parte
+  por \cod{:}, convierte cada trozo en número descartando los que no lo sean, y acumula».
+\end{enumerate}
+
+\begin{ejercicio}
+Copia \cod{segundos} a tu proyecto de prácticas y llama a
+\cod{println!("{}", segundos("1:02:03"))}. ¿Qué devuelve? ¿Y con \cod{"abc"}? Explica por qué.
+\end{ejercicio}
+
+\section{Control de flujo}
+
+\begin{rust}
+let volumen = 120.0_f64;
+let volumen = if volumen > 100.0 { 100.0 } else { volumen };  // if es una expresión
+
+for numero in 1..=3 {            // 1, 2, 3 (con `..` sería 1, 2)
+    println!("pista {numero}");
+}
+
+let mut intentos = 0;
+while intentos < 2 {
+    intentos += 1;
+}
+
+let resultado = loop {           // bucle infinito que devuelve un valor con break
+    intentos += 1;
+    if intentos == 5 { break intentos * 10; }
+};
+\end{rust}
+
+Fíjate en el segundo \cod{let volumen}: en Rust puedes «tapar» (\emph{shadowing}) una variable
+declarando otra con el mismo nombre. El proyecto lo usa a menudo para ir refinando un valor
+sin inventar nombres (\cod{let artist = ...; let artist = if ... }).
+
+\section{Structs: datos con nombre}
+
+Un \cod{struct} agrupa datos. Es lo más parecido a una clase, pero sin herencia. Esta es la
+pista de reproducción del proyecto (\archivo{src/ytm.rs}):
+
+\begin{rust}
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct Track {
+    pub title: String,
+    pub artist: String,
+    pub thumb: String,
+    pub video_id: String,
+    pub duration: f64,
+}
+\end{rust}
+
+\begin{itemize}
+  \item \cod{pub} hace visible el struct (o un campo) desde otros archivos. Sin \cod{pub}, es
+  privado del archivo (del «módulo»).
+  \item Lo que empieza por \cod{#[...]} son \emph{atributos}: instrucciones para el
+  compilador o para una biblioteca. \cod{#[derive(...)]} le pide que \emph{genere código}
+  automáticamente:
+  \begin{itemize}
+    \item \cod{Clone}: poder duplicar el valor con \cod{.clone()}.
+    \item \cod{Debug}: poder imprimirlo con \cod{println!("{:?}", pista)}.
+    \item \cod{Default}: un valor «vacío» (\cod{Track::default()}: textos vacíos, duración 0).
+    \item \cod{Serialize}, \cod{Deserialize}: convertir a JSON y desde JSON, con la biblioteca
+    \cod{serde}. La segunda línea, \cod{rename_all = "camelCase"}, hace que \cod{video_id} se
+    escriba \cod{videoId} en el JSON, que es lo que espera la interfaz.
+  \end{itemize}
+\end{itemize}
+
+Crear y usar un struct:
+
+\begin{rust}
+let pista = Track {
+    title: "Columbia".to_owned(),     // &str → String
+    artist: "Quevedo".to_owned(),
+    video_id: "abc123".to_owned(),
+    ..Track::default()                // el resto, con sus valores por defecto
+};
+println!("{} — {}", pista.title, pista.artist);
+\end{rust}
+
+\cod{"Columbia"} es un \cod{&str} (un texto fijo dentro del programa) y el campo es un
+\cod{String} (un texto propio). \cod{.to_owned()} (o \cod{String::from}, o \cod{.to_string()})
+hace la copia. Verás muchísimos \cod{to_owned()}: es normal.
+
+\subsection{Métodos}
+
+Los métodos se escriben en un bloque \cod{impl}. El primer parámetro dice cómo recibe el método
+a su propio objeto:
+
+\begin{rust}
+impl Track {
+    fn minutos(&self) -> f64 {            // &self: lo lee, no lo cambia
+        self.duration / 60.0
+    }
+    fn renombrar(&mut self, nuevo: &str) { // &mut self: lo modifica
+        self.title = nuevo.to_owned();
+    }
+    fn nueva(titulo: &str) -> Track {      // sin self: «función estática», se llama Track::nueva(...)
+        Track { title: titulo.to_owned(), ..Track::default() }
+    }
+}
+\end{rust}
+
+\section{Enums y \texttt{match}}
+\label{sec:enums}
+
+Un \cod{enum} de Rust es mucho más que una lista de constantes: \textbf{cada variante puede
+llevar sus propios datos}. Son ideales para representar «una cosa que puede ser de varias
+formas». Los eventos que el motor de audio manda al reproductor (\archivo{src/audio.rs}):
+
+\begin{rust}
+pub enum Event {
+    Codec(String),      // lleva el nombre del códec
+    Bitrate(f64),       // lleva los kbps
+    Position(f64),
+    Duration(f64),
+    Paused(bool),
+    Started,            // no lleva nada
+    Ended,
+    Failed,
+}
+\end{rust}
+
+Se tratan con \cod{match}, que compara el valor con cada forma posible y \textbf{obliga a
+cubrir todos los casos} (si añades una variante y olvidas tratarla, no compila):
+
+\begin{rust}
+match event {
+    Event::Position(position) => self.set_position(position),
+    Event::Duration(duration) if duration > 0.0 => self.set_duration(duration),
+    Event::Duration(_) => {}                  // `_`: no me importa el valor
+    Event::Started => { /* ... */ }
+    Event::Ended => { /* pasar a la siguiente */ }
+    _ => {}                                   // cualquier otro caso
+}
+\end{rust}
+
+Es un extracto simplificado de \cod{Player::on_event} en \archivo{src/player.rs}. La línea con
+\cod{if} es una \emph{guarda}: esa rama solo vale si se cumple la condición.
+
+\begin{idea}
+\cod{match} es una de las herramientas más usadas en Rust. Cuando veas uno, léelo como un
+\cod{switch} que además «desempaqueta» los datos de cada variante en variables.
+\end{idea}
+
+\section{Sin null ni excepciones: \texttt{Option} y \texttt{Result}}
+
+Rust no tiene \cod{null}. Tampoco excepciones. Para ambos casos usa dos enums de la biblioteca
+estándar:
+
+\begin{rust}
+enum Option<T> { Some(T), None }        // un valor que puede no estar
+enum Result<T, E> { Ok(T), Err(E) }     // una operación que puede fallar
+\end{rust}
+
+(La \cod{T} y la \cod{E} son \emph{genéricos}: \cod{Option<String>} es «quizá un texto»,
+\cod{Result<Vec<Track>, String>} es «una lista de pistas o un mensaje de error».)
+
+Ejemplos reales:
+
+\begin{rust}
+// src/account.rs: puede que no haya sesión guardada.
+pub fn cookies_file() -> Option<PathBuf> { ... }
+
+// src/stream.rs: la URL del audio, o por qué no se pudo.
+pub fn resolve(video_id: &str) -> Result<String, String> { ... }
+\end{rust}
+
+Como son enums, se pueden tratar con \cod{match}, pero hay formas más cortas que el proyecto
+usa constantemente:
+
+\begin{rust}
+// 1) if let: «si es Some (u Ok), dame el valor»
+if let Some(url) = resolver::cached(&video_id) {
+    self.start_stream(Some(&url), &video_id);
+}
+
+// 2) let ... else: «si no es Some, sal»
+let Some(track) = self.tracks.get(index).cloned() else { return };
+
+// 3) valores por defecto
+let nombre = info.name.unwrap_or_default();      // "" si no había
+let volumen = guardado.unwrap_or(100.0);
+
+// 4) transformar sin desempaquetar
+let mayusculas = titulo_opcional.map(|t| t.to_uppercase());
+\end{rust}
+
+\subsection{El operador \texttt{?}}
+
+El más importante: \cod{?} significa «si esto es un error (o \cod{None}), devuélvelo
+inmediatamente desde la función actual; si no, dame el valor de dentro».
+
+\begin{rust}
+// src/ytm.rs (simplificado)
+pub fn browse(browse_id: &str) -> Result<Vec<Zone>> {
+    let pagina = post("browse", json!({ "browseId": browse_id }))?;  // si falla la red, sale con el error
+    Ok(zones(&pagina))
+}
+\end{rust}
+
+Sin \cod{?} habría que escribir un \cod{match} en cada llamada que puede fallar. Con él, el
+camino feliz se lee de corrido y los errores suben solos hasta quien sepa qué hacer con ellos
+(normalmente, mostrar un mensaje en la interfaz).
+
+\begin{trampa}[\texttt{unwrap()}]
+\cod{.unwrap()} saca el valor de un \cod{Option}/\cod{Result} y, si no lo hay, \textbf{cierra
+el programa de golpe} («panic»). En este proyecto no se usa en código normal: un fallo de red
+no debe tumbar el reproductor. Solo aparece en las pruebas, donde un fallo debe parar la
+prueba.
+\end{trampa}
+
+\begin{ejercicio}
+Escribe \cod{fn primera_palabra(texto: &str) -> Option<&str>} que devuelva la primera palabra o
+\cod{None} si el texto está vacío. Pista: \cod{texto.split_whitespace().next()}. Después
+escribe \cod{fn doble(texto: &str) -> Result<i32, String>} que convierta el texto en número y
+lo multiplique por dos, usando \cod{?} y \cod{map_err} para convertir el error en texto.
+\end{ejercicio}
+
+\section{Propiedad y préstamos}
+\label{sec:propiedad}
+
+Aquí está lo que hace a Rust distinto. Rust no tiene recolector de basura (como Java) ni te
+obliga a liberar memoria a mano (como C). En su lugar sigue tres reglas que el compilador
+comprueba:
+
+\begin{enumerate}
+  \item \textbf{Cada valor tiene un único dueño} (una variable).
+  \item \textbf{Cuando el dueño desaparece} (sale de su bloque), \textbf{el valor se libera}.
+  \item Puedes \textbf{prestar} el valor: muchos préstamos de solo lectura (\cod{&}) \emph{o}
+  un único préstamo para modificar (\cod{&mut}), nunca las dos cosas a la vez.
+\end{enumerate}
+
+\subsection{Mover}
+
+\begin{rust}
+let a = String::from("Columbia");
+let b = a;              // el texto se MUEVE a `b`: ahora `b` es el dueño
+println!("{a}");        // ERROR: `a` ya no tiene nada
+\end{rust}
+
+No se copió el texto: se pasó la propiedad. Esto evita que dos variables liberen el mismo
+texto. Lo mismo pasa al llamar a una función que recibe un \cod{String}: se lo das y ya no es
+tuyo.
+
+\subsection{Prestar}
+
+\begin{rust}
+fn imprime(texto: &str) { println!("{texto}"); }       // pide prestado
+fn alarga(texto: &mut String) { texto.push('!'); }      // pide prestado para modificar
+
+let mut titulo = String::from("Columbia");
+imprime(&titulo);        // préstamo de lectura: `titulo` sigue siendo tuyo
+alarga(&mut titulo);     // préstamo de escritura
+imprime(&titulo);        // "Columbia!"
+\end{rust}
+
+\subsection{Clonar}
+
+Si necesitas tu propia copia, \cod{.clone()}. En este proyecto los datos (textos, listas de
+unas decenas de pistas) son pequeños, y clonar es la solución habitual cuando el compilador
+protesta. Es barato y claro.
+
+\begin{rust}
+let pistas = self.tracks.clone();   // copia la lista para usarla en otro hilo
+\end{rust}
+
+\subsection{\texttt{Copy}}
+
+Los tipos pequeños (números, \cod{bool}, \cod{char}) se \emph{copian} en vez de moverse: tras
+\cod{let b = a;} puedes seguir usando \cod{a}. Por eso nunca tendrás problemas de propiedad con
+un \cod{f64}.
+
+\subsection{Cómo resolver los errores de propiedad}
+
+Los dos errores que más verás:
+
+\begin{terminal}
+error[E0382]: borrow of moved value: `titulo`
+error[E0502]: cannot borrow `x` as mutable because it is also borrowed as immutable
+\end{terminal}
+
+Casi siempre se arreglan con una de estas:
+
+\begin{enumerate}
+  \item Prestar (\cod{&titulo}) en vez de mover (\cod{titulo}).
+  \item \cod{.clone()} si de verdad necesitas dos copias.
+  \item Reordenar: usar el valor \emph{antes} de moverlo, o terminar de leer antes de empezar a
+  modificar.
+  \item Guardar en una variable lo que necesitas antes de pedir el préstamo mutable:
+\begin{rust}
+let duracion = *self.duration();        // copio el número
+self.as_mut().set_position(duracion);   // ahora ya puedo modificar
+\end{rust}
+\end{enumerate}
+
+\begin{idea}
+Lee el mensaje de error \emph{entero}. El compilador de Rust señala la línea donde se movió el
+valor, la línea donde se usó después, y a menudo sugiere el arreglo exacto
+(\emph{help: consider cloning the value}). \cod{rustc --explain E0382} da la explicación larga.
+\end{idea}
+
+\subsection{\texttt{String} frente a \texttt{\&str}}
+
+Ahora se entiende la diferencia: un \cod{String} es un texto \emph{propio} (lo puedes guardar
+en un struct, modificar, devolver); un \cod{&str} es un \emph{préstamo} de un texto que es de
+otro. Regla práctica: \textbf{los parámetros de funciones, \cod{&str}; los campos de structs y
+lo que devuelves, \cod{String}}.
+
+\subsection{Vidas (\emph{lifetimes}), solo para reconocerlas}
+
+A veces verás \cod{'a} en una firma:
+
+\begin{rust}
+fn find<'a>(value: &'a Value, key: &str) -> Option<&'a Value> { ... }   // src/ytm.rs
+\end{rust}
+
+Se lee: «lo que devuelvo es un préstamo de \cod{value}, así que vive lo mismo que él». Es una
+anotación para el compilador, no cambia lo que hace la función. En este proyecto aparece muy
+poco; si escribes una función que devuelve un préstamo y el compilador te pide una, copia este
+patrón.
+
+\begin{ejercicio}
+En tu proyecto de prácticas, haz que compile esto sin cambiar la función \cod{guarda}:
+\begin{rust}
+fn guarda(lista: &mut Vec<String>, texto: String) { lista.push(texto); }
+fn main() {
+    let mut lista = Vec::new();
+    let titulo = String::from("Halo");
+    guarda(&mut lista, titulo);
+    println!("{titulo} guardado; hay {}", lista.len());
+}
+\end{rust}
+Hay al menos dos soluciones. ¿Cuál gasta más memoria?
+\end{ejercicio}
+
+\section{Colecciones}
+
+\begin{rust}
+let mut pistas: Vec<Track> = Vec::new();
+pistas.push(pista);
+let primera = pistas.first();          // Option<&Track>
+let tercera = pistas.get(2);           // Option<&Track> (no se sale del vector)
+let n = pistas.len();
+pistas.remove(0);
+
+use std::collections::HashMap;
+let mut colas: HashMap<String, Vec<Track>> = HashMap::new();
+colas.insert("OLAK5uy...".to_owned(), pistas);
+if let Some(cola) = colas.get("OLAK5uy...") { /* ... */ }
+\end{rust}
+
+\cod{vec[i]} también existe, pero si \cod{i} se sale del vector el programa se cierra (panic).
+Por eso el proyecto usa casi siempre \cod{.get(i)}, que devuelve \cod{Option}.
+
+\section{Clausuras e iteradores}
+\label{sec:iteradores}
+
+Una \emph{clausura} es una función anónima (una lambda): \cod{|parámetros| cuerpo}.
+
+\begin{rust}
+let doble = |n: i32| n * 2;
+let sumar = |a, b| { let s = a + b; s };
+\end{rust}
+
+Los \emph{iteradores} encadenan operaciones sobre colecciones. Son perezosos: no hacen nada
+hasta que algo consume el resultado (\cod{collect}, \cod{sum}, \cod{for}…).
+
+\begin{rust}
+// Nombres de las pistas de más de 3 minutos, en mayúsculas
+let nombres: Vec<String> = pistas
+    .iter()                                  // recorre por referencia
+    .filter(|p| p.duration > 180.0)          // se queda con algunas
+    .map(|p| p.title.to_uppercase())         // transforma cada una
+    .collect();                              // junta el resultado en un Vec
+
+let total: f64 = pistas.iter().map(|p| p.duration).sum();
+let hay_larga = pistas.iter().any(|p| p.duration > 600.0);
+let posicion = pistas.iter().position(|p| p.video_id == actual);   // Option<usize>
+\end{rust}
+
+Operaciones que verás en el proyecto: \cod{iter}, \cod{map}, \cod{filter},
+\cod{filter_map} (transforma y descarta los \cod{None}), \cod{find}, \cod{position},
+\cod{any}, \cod{take(n)}, \cod{flatten}, \cod{collect}, \cod{enumerate} (da también el
+índice), \cod{rev}, \cod{fold}.
+
+\subsection{\texttt{move} en clausuras}
+
+Una clausura puede usar variables de fuera. Por defecto las \emph{toma prestadas}. Con
+\cod{move} se \emph{las queda} (las mueve dentro). Es imprescindible cuando la clausura va a
+vivir más que la función que la crea, por ejemplo al mandarla a otro hilo:
+
+\begin{rust}
+let video_id = track.video_id.clone();
+thread::spawn(move || {            // el hilo se queda con su copia de video_id
+    let url = resolver::resolve(&video_id);
+});
+\end{rust}
+
+\section{Traits: comportamientos compartidos}
+
+Un \emph{trait} declara un comportamiento que varios tipos pueden tener, como una interfaz de
+Java. En este proyecto casi nunca escribirás uno, pero usarás muchos:
+
+\begin{itemize}
+  \item \cod{Default}, \cod{Clone}, \cod{Debug}: los generas con \cod{#[derive]}.
+  \item \cod{Serialize}/\cod{Deserialize} de serde: también con \cod{#[derive]}.
+  \item \cod{Drop}: código que se ejecuta cuando un valor se libera. El motor de audio lo usa
+  para cerrar mpv al destruir el objeto (\archivo{src/audio.rs}):
+\begin{rust}
+impl Drop for Mpv {
+    fn drop(&mut self) {
+        let _ = self.child.kill();      // mata el proceso de mpv
+    }
+}
+\end{rust}
+\end{itemize}
+
+Y verás parámetros como \cod{impl Fn(Event) + Send + 'static}: «cualquier función que reciba
+un \cod{Event}, que se pueda mandar a otro hilo (\cod{Send}) y que no tome prestado nada
+temporal (\cod{'static})». Es la firma de \cod{Mpv::spawn}, que recibe la función a la que
+avisar de cada evento.
+
+\section{Módulos y visibilidad}
+
+Cada archivo \archivo{src/x.rs} es un \emph{módulo}. \archivo{src/main.rs} los declara:
+
+\begin{rust}
+mod account;
+mod audio;
+mod player;
+// ...
+\end{rust}
+
+Desde otro archivo se usan con su ruta (\cod{crate::audio::which(...)}) o importándolos:
+
+\begin{rust}
+use crate::audio::{search_path, which};       // ahora basta con which(...)
+use std::collections::HashMap;                 // de la biblioteca estándar
+use serde_json::{json, Value};                 // de una crate externa
+\end{rust}
+
+Solo es visible desde fuera lo marcado con \cod{pub}. Un módulo puede tener submódulos: los
+plugins están en \archivo{src/plugins.rs} y declaran \cod{mod discord;} y \cod{mod lastfm;}, que
+viven en \archivo{src/plugins/discord.rs} y \archivo{src/plugins/lastfm.rs}.
+
+\section{Macros}
+
+Lo que acaba en \cod{!} es una \emph{macro}: código que genera código al compilar.
+
+\begin{center}
+\begin{tabular}{@{}lp{9cm}@{}}
+\toprule
+\cod{println!}, \cod{eprintln!} & escribir en la salida estándar o en la de errores \\
+\cod{format!} & como \cod{println!} pero devuelve un \cod{String} \\
+\cod{vec![a, b]} & crear un \cod{Vec} \\
+\cod{json!({...})} & escribir JSON literal (de \cod{serde_json}) \\
+\cod{include_str!("x")} & meter el contenido de un archivo dentro del binario al compilar \\
+\cod{assert!}, \cod{assert_eq!} & comprobaciones en las pruebas \\
+\cod{matches!(x, patrón)} & \cod{true} si \cod{x} encaja con el patrón \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+En los textos de \cod{format!}/\cod{println!}, \cod{{nombre}} inserta una variable,
+\cod{{}} inserta el siguiente argumento y \cod{{:?}} usa la forma de depuración (\cod{Debug}),
+útil para imprimir casi cualquier cosa.
+
+\section{Hilos y estado compartido}
+\label{sec:hilos}
+
+El proyecto hace mucho trabajo lento (peticiones a YouTube, arrancar yt-dlp, hablar con mpv) y
+\textbf{la interfaz no puede quedarse congelada}. Por eso lo lento siempre va en otro hilo.
+
+\subsection{Lanzar un hilo}
+
+\begin{rust}
+use std::thread;
+
+let handle = thread::spawn(move || {
+    // trabajo lento
+    42
+});
+let resultado = handle.join();   // esperar al hilo (el proyecto casi nunca espera)
+\end{rust}
+
+\subsection{Compartir datos: \texttt{Mutex}}
+
+Si dos hilos tocan el mismo dato a la vez, hay una condición de carrera. Rust \emph{no compila}
+ese código. Para compartir datos se usa un \cod{Mutex} (un candado): para tocar el dato hay que
+coger el candado, y solo un hilo puede tenerlo.
+
+\begin{rust}
+use std::sync::{LazyLock, Mutex};
+use std::collections::HashMap;
+
+// Una variable global, creada la primera vez que se usa (LazyLock), protegida por un Mutex.
+static QUEUES: LazyLock<Mutex<HashMap<String, Vec<Track>>>> = LazyLock::new(Default::default);
+
+fn cached_queue(playlist_id: &str) -> Option<Vec<Track>> {
+    QUEUES.lock().ok()?.get(playlist_id).cloned()
+    //     ^ coge el candado (puede fallar si otro hilo se cayó con él: por eso .ok()?)
+}   // aquí se suelta el candado solo, al salir del bloque
+\end{rust}
+
+Es, tal cual, la caché de colas de \archivo{src/player.rs}. El candado se suelta solo cuando la
+variable que lo tiene desaparece: no hay \cod{unlock}.
+
+\subsection{Otros mecanismos que verás}
+
+\begin{description}[leftmargin=1.2em]
+  \item[\cod{AtomicBool}, \cod{AtomicU64}] Un número o booleano que varios hilos pueden leer y
+  escribir sin candado. Para indicadores simples (\cod{PREMIUM} en \archivo{src/resolver.rs}).
+  \item[\cod{Condvar}] «Esperar hasta que otro hilo avise». El resolvedor lo usa para que, si
+  dos partes del programa piden la misma URL a la vez, la segunda espere a la primera en vez de
+  lanzar otro yt-dlp.
+  \item[\cod{mpsc::channel}] Una cola de mensajes entre hilos: uno envía (\cod{Sender}), otro
+  recibe (\cod{Receiver}). Los plugins la usan: el reproductor manda eventos y un hilo propio
+  los reparte a Discord y Last.fm.
+\end{description}
+
+\subsection{El patrón del proyecto: trabajar en otro hilo y volver al de Qt}
+
+Qt exige que todo lo que toca la interfaz se haga \emph{en su hilo}. Así que el patrón, que
+encontrarás en casi todos los archivos, es: lanzar un hilo para el trabajo lento y, al
+terminar, \emph{encolar} una función que se ejecutará en el hilo de Qt.
+
+\begin{rust}
+// src/library.rs, búsqueda (simplificado)
+let qt = self.qt_thread();                   // «buzón» del hilo de Qt
+thread::spawn(move || {
+    let result = ytm::search(&query);        // lento: red
+    let _ = qt.queue(move |mut library| {    // esto se ejecuta luego en el hilo de Qt
+        match result {
+            Ok(zones) => library.as_mut().set_busqueda(QString::from(&to_json(&zones))),
+            Err(error) => library.as_mut().set_error(QString::from(&error)),
+        }
+    });
+});
+\end{rust}
+
+Lo verás con detalle en el capítulo~\ref{cap:puente}. Quédate con la idea:
+\textbf{\cod{thread::spawn} para lo lento, \cod{qt.queue} para volver}.
+
+\section{Llamar a C y C++: \texttt{extern} y \texttt{unsafe}}
+
+Unas pocas partes del proyecto están en C++ u Objective-C++ (lo que Qt no expone a QML y la
+ventana de inicio de sesión de macOS). Rust las llama así (\archivo{src/main.rs}):
+
+\begin{rust}
+extern "C" {
+    fn musicplayer_tune_windows();          // definida en src/window.cpp
+}
+
+// SAFETY: función C++ sin argumentos; se llama en el hilo de Qt.
+unsafe { musicplayer_tune_windows() };
+\end{rust}
+
+\cod{unsafe} no significa «peligroso», sino «aquí el compilador no puede comprobarlo; lo
+garantizo yo». Por convención, cada \cod{unsafe} lleva encima un comentario \cod{SAFETY:}
+explicando por qué es correcto. En el proyecto solo se usa para estas llamadas.
+
+\section{Atributos condicionales y pruebas}
+
+\begin{rust}
+#[cfg(target_os = "macos")]          // esta función solo existe al compilar para macOS
+fn abrir_ajustes() { ... }
+
+if cfg!(target_os = "macos") { ... } // lo mismo, como condición en una expresión
+\end{rust}
+
+Las pruebas viven al final de cada archivo, en un módulo que solo se compila al probar:
+
+\begin{rust}
+#[cfg(test)]
+mod tests {
+    use super::*;                     // todo lo del archivo
+
+    #[test]
+    fn el_artista_sale_limpio_del_subtitulo() {
+        assert_eq!(artist_from_subtitle("Quevedo • 75 M reproducciones"), "Quevedo");
+    }
+}
+\end{rust}
+
+\begin{terminal}
+cargo test --release
+\end{terminal}
+
+\section{Leer los errores del compilador}
+
+Un ejemplo completo y cómo leerlo:
+
+\begin{terminal}
+error[E0308]: mismatched types
+  --> src/player.rs:312:23
+   |
+312 |         self.load(next);
+   |              ---- ^^^^ expected `usize`, found `i32`
+   |              |
+   |              arguments to this method are incorrect
+   |
+help: you can convert an `i32` to a `usize` and panic if the converted value doesn't fit
+   |
+312 |         self.load(next.try_into().unwrap());
+\end{terminal}
+
+\begin{enumerate}
+  \item La primera línea dice \emph{qué} pasa (tipos que no coinciden) y su código (E0308).
+  \item La flecha dice \emph{dónde}: archivo, línea y columna.
+  \item El dibujo señala exactamente la expresión y explica (se esperaba \cod{usize}, llegó
+  \cod{i32}).
+  \item \emph{help} propone un arreglo. No siempre es el mejor (aquí, \cod{next as usize} es
+  más simple), pero apunta a la causa.
+\end{enumerate}
+
+\section{Resumen y siguientes pasos}
+
+\begin{center}
+\begin{tabular}{@{}p{0.42\linewidth}p{0.52\linewidth}@{}}
+\toprule
+Ves esto & Significa \\
+\midrule
+\cod{let mut x} & variable modificable \\
+\cod{&x}, \cod{&mut x} & préstamo de lectura / de escritura \\
+\cod{x.clone()} & copia propia \\
+\cod{Option<T>}, \cod{Some}, \cod{None} & valor que puede faltar \\
+\cod{Result<T, E>}, \cod{Ok}, \cod{Err} & operación que puede fallar \\
+\cod{x?} & si es error/None, sal de la función con él \\
+\cod{if let Some(v) = x} & si hay valor, úsalo \\
+\cod{let Some(v) = x else { return }} & si no hay valor, sal \\
+\cod{match} & elegir según la forma del valor \\
+\cod{|a| ...}, \cod{move ||} & clausura; que se queda con lo que usa \\
+\cod{#[derive(...)]} & generar código automáticamente \\
+\cod{x!(...)} & macro \\
+\cod{thread::spawn}, \cod{Mutex}, \cod{LazyLock} & hilos y estado compartido \\
+\cod{unsafe}, \cod{extern "C"} & llamar a código C/C++ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Para ir más allá (en este orden):
+
+\begin{enumerate}
+  \item \emph{The Rust Programming Language} («el libro», gratis en
+  \url{https://doc.rust-lang.org/book/}): capítulos 1 a 10, 13 (iteradores y clausuras) y 16
+  (concurrencia).
+  \item \emph{Rust by Example} (\url{https://doc.rust-lang.org/rust-by-example/}): ejemplos
+  cortos de cada tema.
+  \item \emph{Rustlings} (\url{https://github.com/rust-lang/rustlings}): ejercicios pequeños que
+  se corrigen solos.
+\end{enumerate}
+
+\begin{ejercicio}[Ejercicio de cierre]
+En tu proyecto de prácticas, escribe un programa que:
+\begin{enumerate}
+  \item Tenga un \cod{struct Pista { titulo: String, segundos: f64 }}.
+  \item Cree un \cod{Vec<Pista>} con cinco pistas.
+  \item Lance un hilo que calcule la duración total y la devuelva.
+  \item Imprima la pista más larga (pista: \cod{iter().max_by(|a, b|
+  a.segundos.total_cmp(&b.segundos))}).
+\end{enumerate}
+Si compila a la primera, enhorabuena; si no, lee cada error con calma: cada uno te enseña algo.
+\end{ejercicio}

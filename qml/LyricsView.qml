@@ -7,8 +7,13 @@ import app.musicplayer
 Item {
     id: root
 
-    property real fontSize: 24
-    property real position: Player.position
+    // Tamaño base; Opciones › Letra lo escala.
+    property real baseSize: 24
+    readonly property real fontSize: Math.round(baseSize * Theme.lyricsScale)
+    // Momento de la letra: la posición corregida con el retraso de esta canción.
+    property real position: Catalog.lyricsTime
+    // Muestra abajo el ajuste de retraso (adelantar/atrasar la letra de esta canción).
+    property bool showTiming: true
 
     readonly property var lines: Catalog.lyrics
     readonly property int current: Catalog.lineAt(position)
@@ -28,6 +33,9 @@ Item {
         font.pixelSize: 15
         wrapMode: Text.WordWrap
     }
+
+    // Deja sitio abajo para el ajuste de retraso.
+    readonly property real timingHeight: showTiming && lines.length ? Theme.hit + 8 : 0
 
     Column {
         id: column
@@ -82,11 +90,19 @@ Item {
                         text: modelData
                         color: Qt.rgba(1, 1, 1, line.active ? 0.5 + 0.5 * sung : 1)
                         font.pixelSize: root.fontSize
-                        font.weight: Font.Bold
+                        font.family: Theme.lyricsFamily
+                        font.weight: Theme.lyricsWeight
                         font.letterSpacing: -0.3
                     }
                 }
             }
         }
+    }
+
+    // Ajuste de retraso de la letra de esta canción.
+    LyricsTiming {
+        visible: root.timingHeight > 0
+        anchors.bottom: parent.bottom
+        anchors.horizontalCenter: parent.horizontalCenter
     }
 }

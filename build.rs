@@ -28,6 +28,7 @@ const QML_FILES: &[&str] = &[
     "qml/TextField.qml",
     "qml/NowPlayingView.qml",
     "qml/ContextMenu.qml",
+    "qml/LyricsTiming.qml",
 ];
 
 /// Singletons QML (tema y datos de ejemplo).

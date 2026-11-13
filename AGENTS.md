@@ -1,7 +1,8 @@
 # Guía para colaboradores y agentes
 
-Léelo antes de tocar el código. La guía para usuarios está en [README.md](README.md) y el
-detalle técnico en [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+Léelo antes de tocar el código. La guía para usuarios está en [README.md](README.md), el
+detalle técnico en [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) y, si no sabes Rust o QML,
+empieza por [docs/GUIA.md](docs/GUIA.md): explica el proyecto desde cero.
 
 ## El proyecto en una frase
 
@@ -55,6 +56,8 @@ qml/
   InspectView.qml   Modo inspeccionar: caja 3D que se gira, se abre y suelta el disco.
   MiniPlayer.qml    Ventana pequeña siempre encima; la grande se oculta mientras tanto.
   NowPlayingView.qml  Pantalla «Sonando»: sube desde la barra; carátula grande y sus colores.
+  LyricsTiming.qml  Ajuste del retraso de la letra (por canción: opción `retraso:<videoId>`,
+                    `Catalog.lyricsDelay` / `Catalog.lyricsTime`).
   ContextMenu.qml   Menú de clic derecho (`Main.openMenu`) y aviso breve; lista temporal.
   Glass.qml, Ambient.qml, TintProbe.qml          Vidrio, modo ambiente y color dominante.
   Cover.qml, Icon.qml, IconButton.qml, PillButton.qml, Slider.qml, SearchField.qml, TopNav.qml,
@@ -79,7 +82,7 @@ cargo run --release
 ./target/release/musicplayer --probe playlists       # playlists por estado de ánimo
 ./target/release/musicplayer --probe search "texto"
 ./target/release/musicplayer --probe queue VIDEO_ID  # radio de una canción
-./target/release/musicplayer --probe album PLAYLIST_ID
+./target/release/musicplayer --probe album PLAYLIST_ID   # canciones de un álbum/playlist (página real)
 ./target/release/musicplayer --probe lyrics "título" "artista"
 MUSICPLAYER_SILENT=1 ./target/release/musicplayer --probe play VIDEO_ID   # mide el arranque
 ```

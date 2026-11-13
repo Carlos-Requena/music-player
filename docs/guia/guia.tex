@@ -1,0 +1,184 @@
+% Guía del proyecto «Reproductor de música».
+% Compilar (en esta carpeta):  latexmk -xelatex guia.tex
+% Necesita XeLaTeX (incluido en MacTeX / TeX Live) por las fuentes y los acentos.
+
+\documentclass[11pt,a4paper,openany]{book}
+
+% ---------------------------------------------------------------- Idioma y fuentes
+\usepackage{fontspec}
+\usepackage[spanish,es-noquoting,es-tabla]{babel}
+\setmainfont{texgyrepagella}[
+  Extension = .otf, UprightFont = *-regular, BoldFont = *-bold,
+  ItalicFont = *-italic, BoldItalicFont = *-bolditalic]
+\setsansfont{texgyreheros}[
+  Extension = .otf, UprightFont = *-regular, BoldFont = *-bold,
+  ItalicFont = *-italic, BoldItalicFont = *-bolditalic]
+\IfFontExistsTF{Menlo}
+  {\setmonofont{Menlo}[Scale=0.82]}
+  {\setmonofont{texgyrecursor}[Extension=.otf, UprightFont=*-regular, BoldFont=*-bold, Scale=0.95]}
+
+% ---------------------------------------------------------------- Página
+\usepackage[a4paper,margin=2.5cm,headheight=14pt]{geometry}
+\usepackage{microtype}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{booktabs,tabularx,longtable,array}
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,fit,calc,shapes.geometric,backgrounds}
+\usepackage[most]{tcolorbox}
+\usepackage{listings}
+\usepackage[hidelinks]{hyperref}
+\usepackage{bookmark}
+
+\setlength{\parskip}{0.55em}
+\setlength{\parindent}{0pt}
+\setlist{itemsep=0.25em, topsep=0.35em}
+
+% ---------------------------------------------------------------- Colores
+\definecolor{acento}{HTML}{C8622A}
+\definecolor{tinta}{HTML}{1E2230}
+\definecolor{fondocodigo}{HTML}{F6F4F0}
+\definecolor{borde}{HTML}{D9D4CA}
+\definecolor{comentario}{HTML}{7A7468}
+\definecolor{clave}{HTML}{8A3B12}
+\definecolor{cadena}{HTML}{2F6B3A}
+\definecolor{idea}{HTML}{2A5C8A}
+\definecolor{trampa}{HTML}{A23A2A}
+\definecolor{ejercicio}{HTML}{3D7A3D}
+
+\hypersetup{colorlinks=true, linkcolor=tinta, urlcolor=acento, citecolor=tinta}
+
+% ---------------------------------------------------------------- Títulos
+\titleformat{\chapter}[display]
+  {\sffamily\bfseries\color{tinta}}
+  {\large\color{acento}\MakeUppercase{\chaptertitlename}\ \thechapter}
+  {0.4em}{\Huge}
+\titlespacing*{\chapter}{0pt}{0pt}{1.6em}
+\titleformat{\section}{\sffamily\bfseries\Large\color{tinta}}{\color{acento}\thesection}{0.8em}{}
+\titleformat{\subsection}{\sffamily\bfseries\large\color{tinta}}{\color{acento}\thesubsection}{0.8em}{}
+\titleformat{\subsubsection}{\sffamily\bfseries\color{tinta}}{}{0em}{}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[LE,RO]{\sffamily\small\thepage}
+\fancyhead[RE]{\sffamily\small\color{comentario}\leftmark}
+\fancyhead[LO]{\sffamily\small\color{comentario}\rightmark}
+\renewcommand{\headrulewidth}{0.3pt}
+
+% ---------------------------------------------------------------- Código
+\lstdefinelanguage{Rust}{
+  morekeywords={as,async,await,break,const,continue,crate,dyn,else,enum,extern,false,fn,for,
+    if,impl,in,let,loop,match,mod,move,mut,pub,ref,return,self,Self,static,struct,super,trait,
+    true,type,unsafe,use,where,while},
+  morekeywords=[2]{bool,char,f32,f64,i8,i16,i32,i64,isize,u8,u16,u32,u64,usize,str,String,
+    Vec,Option,Result,Some,None,Ok,Err,Box,HashMap,HashSet,BTreeMap,Mutex,LazyLock,Pin,
+    QString,Value,PathBuf},
+  sensitive=true,
+  morecomment=[l]{//},
+  morecomment=[s]{/*}{*/},
+  morestring=[b]",
+}
+\lstdefinelanguage{QML}{
+  morekeywords={import,property,readonly,signal,function,id,return,if,else,for,const,let,
+    var,true,false,null,required,component,default,alias,on},
+  morekeywords=[2]{Item,Rectangle,Text,Row,Column,Repeater,ListView,MouseArea,TapHandler,
+    HoverHandler,Behavior,NumberAnimation,Timer,Image,Window,FocusScope,Loader,Shape,
+    QtObject,Connections,Glass,Cover,IconButton,PillButton,LyricsView},
+  sensitive=true,
+  morecomment=[l]{//},
+  morecomment=[s]{/*}{*/},
+  morestring=[b]",
+}
+\lstset{
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{clave}\bfseries,
+  keywordstyle=[2]\color{idea},
+  commentstyle=\color{comentario}\itshape,
+  stringstyle=\color{cadena},
+  backgroundcolor=\color{fondocodigo},
+  frame=single, rulecolor=\color{borde}, framesep=6pt, xleftmargin=8pt, xrightmargin=8pt,
+  breaklines=true, breakatwhitespace=false, columns=fullflexible, keepspaces=true,
+  showstringspaces=false, tabsize=4, upquote=true, aboveskip=0.9em, belowskip=0.9em,
+  extendedchars=true,
+  literate={á}{{\'a}}1 {é}{{\'e}}1 {í}{{\'i}}1 {ó}{{\'o}}1 {ú}{{\'u}}1 {ñ}{{\~n}}1
+           {Á}{{\'A}}1 {É}{{\'E}}1 {Í}{{\'I}}1 {Ó}{{\'O}}1 {Ú}{{\'U}}1 {Ñ}{{\~N}}1
+           {ü}{{\"u}}1 {¿}{{?`}}1 {¡}{{!`}}1 {«}{{\guillemotleft}}1 {»}{{\guillemotright}}1
+           {→}{{$\rightarrow$}}1 {·}{{$\cdot$}}1 {…}{{...}}3 {–}{{--}}1 {—}{{---}}1
+           {×}{{$\times$}}1 {≤}{{$\le$}}1 {≥}{{$\ge$}}1 {≈}{{$\approx$}}1 {−}{{-}}1,
+}
+\lstnewenvironment{rust}[1][]{\lstset{language=Rust,#1}}{}
+\lstnewenvironment{qml}[1][]{\lstset{language=QML,#1}}{}
+\lstnewenvironment{terminal}[1][]{\lstset{language={},backgroundcolor=\color{tinta!92},
+  basicstyle=\ttfamily\small\color{white},rulecolor=\color{tinta},#1}}{}
+\lstnewenvironment{codigo}[1][]{\lstset{language={},#1}}{}
+
+% Código en línea. Lee `#` y `%` tal cual (cambia su catcode antes de leer el argumento);
+% por eso no puede ir dentro del argumento de otra orden (títulos, \item[...], tabularx).
+\newcommand{\cod}{\begingroup\catcode`\#=12 \catcode`\%=12 \catcode`\~=12 \codaux}
+\newcommand{\codaux}[1]{\texttt{\detokenize{#1}}\endgroup}
+\newcommand{\archivo}[1]{\textsf{\color{acento}#1}}
+\newcommand{\opcion}[1]{«\textit{#1}»}
+
+% ---------------------------------------------------------------- Cajas
+\newtcolorbox{idea}[1][Idea clave]{enhanced, breakable, colback=idea!6, colframe=idea,
+  boxrule=0.6pt, left=8pt, right=8pt, top=6pt, bottom=6pt, fonttitle=\sffamily\bfseries,
+  title=#1, arc=2pt}
+\newtcolorbox{trampa}[1][Cuidado]{enhanced, breakable, colback=trampa!5, colframe=trampa,
+  boxrule=0.6pt, left=8pt, right=8pt, top=6pt, bottom=6pt, fonttitle=\sffamily\bfseries,
+  title=#1, arc=2pt}
+\newtcolorbox{ejercicio}[1][Ejercicio]{enhanced, breakable, colback=ejercicio!6,
+  colframe=ejercicio, boxrule=0.6pt, left=8pt, right=8pt, top=6pt, bottom=6pt,
+  fonttitle=\sffamily\bfseries, title=#1, arc=2pt}
+\newtcolorbox{porque}[1][¿Por qué así?]{enhanced, breakable, colback=acento!6,
+  colframe=acento, boxrule=0.6pt, left=8pt, right=8pt, top=6pt, bottom=6pt,
+  fonttitle=\sffamily\bfseries, title=#1, arc=2pt}
+
+% ---------------------------------------------------------------- TikZ
+\tikzset{
+  caja/.style={draw=tinta, fill=white, rounded corners=3pt, align=center, inner sep=6pt,
+    font=\sffamily\small},
+  capa/.style={draw=acento, fill=acento!8, rounded corners=4pt, align=center, inner sep=8pt,
+    font=\sffamily\small},
+  externo/.style={draw=idea, fill=idea!8, rounded corners=3pt, align=center, inner sep=6pt,
+    font=\sffamily\small},
+  flecha/.style={-{Stealth[length=6pt]}, thick, draw=tinta},
+  doble/.style={{Stealth[length=6pt]}-{Stealth[length=6pt]}, thick, draw=tinta},
+  etiqueta/.style={font=\sffamily\scriptsize, fill=white, inner sep=2pt},
+}
+
+\begin{document}
+
+\frontmatter
+\input{capitulos/00-portada}
+\tableofcontents
+
+\mainmatter
+\input{capitulos/01-como-leer}
+\part{Empezar con buen pie}
+\input{capitulos/02-rust}
+\input{capitulos/03-qml}
+\part{Cómo está hecho}
+\input{capitulos/04-arquitectura}
+\input{capitulos/05-herramientas}
+\input{capitulos/06-puente}
+\input{capitulos/07-nucleo}
+\input{capitulos/08-nativo}
+\input{capitulos/09-interfaz}
+\input{capitulos/10-datos}
+\input{capitulos/11-flujos}
+\part{Por qué está así}
+\input{capitulos/12-decisiones}
+\input{capitulos/13-rendimiento}
+\input{capitulos/14-trampas}
+\part{Desarrollar por tu cuenta}
+\input{capitulos/15-recetas}
+\input{capitulos/16-depurar}
+\input{capitulos/17-ejercicios}
+
+\appendix
+\input{capitulos/18-apendices}
+
+\end{document}

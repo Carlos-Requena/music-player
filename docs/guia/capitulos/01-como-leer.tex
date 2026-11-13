@@ -1,0 +1,77 @@
+\chapter{Cómo leer esta guía}
+
+Esta guía está pensada para alguien recién graduado en Ingeniería Informática: sabes
+programar, conoces estructuras de datos, hilos, HTTP y algo de orientación a objetos, pero
+\textbf{no sabes Rust} y no has tocado QML. Al terminarla deberías poder abrir cualquier
+archivo del proyecto, entender qué hace y por qué está escrito así, y añadir funciones nuevas
+sin romper nada.
+
+\section{El recorrido}
+
+\begin{description}[style=nextline, leftmargin=0pt]
+  \item[Parte I. Empezar con buen pie] Un tutorial de Rust (capítulo~\ref{cap:rust}) que
+  arranca desde cero y se centra en lo que este proyecto usa, con ejercicios que puedes hacer
+  en un proyecto de prácticas aparte. Después, QML (capítulo~\ref{cap:qml}), el lenguaje de la
+  interfaz. Si ya sabes Rust, salta al capítulo~\ref{cap:qml}.
+  \item[Parte II. Cómo está hecho] La arquitectura completa, las herramientas de compilación,
+  el puente entre Rust y QML y, sobre todo, un recorrido \emph{archivo por archivo} por todo el
+  código: el núcleo en Rust, el código nativo en C++ y Objective-C++, cada componente de la
+  interfaz, los formatos de datos y los flujos completos de principio a fin.
+  \item[Parte III. Por qué está así] Las decisiones de diseño con sus alternativas
+  descartadas, las medidas de rendimiento y memoria que las justifican y las «trampas» que ya
+  nos encontramos (y cómo evitarlas).
+  \item[Parte IV. Desarrollar por tu cuenta] Recetas paso a paso para los cambios más comunes,
+  cómo depurar, y una colección de ejercicios graduados sobre el propio proyecto.
+\end{description}
+
+\section{Convenciones}
+
+\begin{itemize}
+  \item Los nombres de archivo aparecen así: \archivo{src/player.rs}. Las rutas son relativas a
+  la raíz del repositorio.
+  \item El código aparece en bloques. Cuando un bloque es un \emph{extracto} del proyecto se
+  indica de qué archivo sale; a veces está recortado (con \cod{...}) para quedarnos con lo
+  importante. Abre el archivo real al lado: la guía no sustituye al código, lo acompaña.
+  \item Los comandos de terminal van en bloques oscuros:
+\begin{terminal}
+cargo build --release
+\end{terminal}
+\end{itemize}
+
+Encontrarás cuatro tipos de recuadro:
+
+\begin{idea}
+Algo que conviene retener: un concepto que aparece por todo el proyecto.
+\end{idea}
+
+\begin{porque}
+La razón de una decisión: qué alternativa había y por qué se descartó.
+\end{porque}
+
+\begin{trampa}
+Un error que ya cometimos (o que es fácil cometer) y cómo evitarlo.
+\end{trampa}
+
+\begin{ejercicio}
+Algo para hacer tú. Hacer los ejercicios es la forma más rápida de que esto se quede.
+\end{ejercicio}
+
+\section{Documentos hermanos}
+
+La guía es el documento largo. En el repositorio hay otros, más cortos, que conviene tener a
+mano:
+
+\begin{description}[leftmargin=1.2em]
+  \item[\archivo{README.md}] Qué es la aplicación y cómo se usa (para usuarios).
+  \item[\archivo{COMPILAR.md}] Compilar e instalar en macOS y CachyOS/Arch.
+  \item[\archivo{AGENTS.md}] La chuleta de quien desarrolla: mapa de archivos, comandos,
+  argumentos de depuración, convenciones y trampas. Si añades algo, añádelo también ahí.
+  \item[\archivo{docs/ARCHITECTURE.md}] Detalle técnico y medidas, en formato corto.
+  \item[\archivo{docs/ROADMAP.md}] Qué está hecho y qué falta.
+\end{description}
+
+\begin{trampa}[Esta guía también envejece]
+El código cambia; si un detalle de la guía no coincide con el archivo, manda el archivo.
+Cuando cambies algo importante, actualiza el capítulo correspondiente
+(\archivo{docs/guia/capitulos/}) y vuelve a compilar el PDF.
+\end{trampa}

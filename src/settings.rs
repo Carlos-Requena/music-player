@@ -247,7 +247,13 @@ impl qobject::AppSettings {
             "calidad" => crate::resolver::set_premium(valor.to_string() == "premium"),
             _ => {}
         }
-        self.as_mut().rust_mut().opciones.insert(clave.to_string(), valor.to_string());
+        // Vacío = valor por defecto: se borra la clave (así no se acumulan, p. ej., los retrasos
+        // de letra a cero de cada canción).
+        if valor.is_empty() {
+            self.as_mut().rust_mut().opciones.remove(&clave.to_string());
+        } else {
+            self.as_mut().rust_mut().opciones.insert(clave.to_string(), valor.to_string());
+        }
         let revision = *self.revision() + 1;
         self.as_mut().set_revision(revision);
         self.save();

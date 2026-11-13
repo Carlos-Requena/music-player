@@ -159,7 +159,8 @@ siguientes, unos 10 s.
 | Buscar | `⌘F` / `Ctrl+F` o el campo «Buscar» |
 | Opciones | `⌘,` / `Ctrl+,` o el botón de ajustes |
 | Mini reproductor | `M` o el botón junto al volumen; `Esc` o la flecha vuelven a la ventana completa |
-| Pantalla «Sonando» | Clic en la canción de la barra de reproducción: la carátula en grande sobre sus colores. Se cierra con un clic en la carátula, la flecha o `Esc` |
+| Pantalla «Sonando» | Se abre sola al elegir una canción, o con un clic en la canción de la barra de reproducción: la carátula en grande sobre sus colores, y a la derecha la letra (si la hay) y la cola. Se cierra con un clic en la carátula, la flecha o `Esc` |
+| Letra desincronizada | Bajo la letra (o en su cabecera en «Sonando»): `−` la adelanta y `+` la atrasa medio segundo; se guarda para esa canción. Clic en el texto la deja en hora. Tamaño, fuente y grosor en Opciones › Disposición |
 | Lista temporal | Clic derecho en una canción, álbum o playlist › «Añadir a la lista temporal». Se ve en la pestaña «Temporal» del panel: «Reproducir en bucle», quitar canciones o vaciarla. No se guarda al cerrar la app |
 | Repetir la cola | Botón de repetir junto a «Siguiente» |
 
@@ -178,6 +179,8 @@ Las opciones se guardan en `~/Library/Application Support/musicplayer/settings.j
 
 ## Documentación
 
+- [docs/GUIA.md](docs/GUIA.md): **guía para aprender el proyecto desde cero** (Rust y QML
+  explicados con su propio código, recorrido de un clic, recetas y ejercicios).
 - [COMPILAR.md](COMPILAR.md): compilar e instalar en macOS y CachyOS.
 - [AGENTS.md](AGENTS.md): guía para colaboradores y agentes (cómo está montado, convenciones,
   cómo probar, trampas conocidas).
