@@ -61,6 +61,31 @@ QtObject {
         ? (skin.ambiente !== undefined ? skin.ambiente : 1) * (ambientMode === "tenue" ? 0.3 : ambientSingle ? 0.7 : 1)
         : 0
 
+    // Skins en carpeta (`<config>/musicplayer/skins/<id>/skin.json`): sus imágenes van con
+    // ruta relativa a la carpeta, que Rust añade como `carpeta`.
+    function skinImage(name) {
+        return name && skin.carpeta ? skin.carpeta + name : ""
+    }
+    // Imagen de fondo del escenario, su opacidad y un velo del color de fondo encima (0–1)
+    // para que el texto se lea sobre imágenes claras.
+    readonly property string backdrop: skinImage(skin.fondo)
+    readonly property real backdropOpacity: skin.fondoOpacidad !== undefined ? skin.fondoOpacidad : 1
+    readonly property real backdropVeil: skin.fondoVelo !== undefined ? skin.fondoVelo : 0
+    // Mascota elegida en Opciones › Mascota, independiente de la skin
+    // (`<config>/musicplayer/mascotas/<id>/mascota.json`); `null` si no hay ninguna.
+    readonly property var mascot: {
+        try {
+            const data = AppSettings.mascotaData === "" ? null : JSON.parse(AppSettings.mascotaData)
+            return data && data.poses ? data : null
+        } catch (error) {
+            return null
+        }
+    }
+    readonly property bool mascotOn: mascot !== null
+    function mascotImage(name) {
+        return name && mascot && mascot.carpeta ? mascot.carpeta + name : ""
+    }
+
     readonly property int radius: skin.radio !== undefined ? skin.radio : 20
     readonly property int gap: 12
     readonly property int hit: 44
@@ -92,8 +117,22 @@ QtObject {
     readonly property string iconClose: "M6 6l12 12 M18 6L6 18"
     readonly property string iconDown: "M6 9l6 6 6-6"
     readonly property string iconRepeat: "M17 3l3 3-3 3 M4 12V10a4 4 0 0 1 4-4h12 M7 21l-3-3 3-3 M20 12v2a4 4 0 0 1-4 4H4"
+    // Repetir una: el mismo bucle con un «1» en medio.
+    readonly property string iconRepeatOne: iconRepeat + " M11 10.5l1.5-1v5"
+    readonly property string iconCheck: "M5 12.5l4.5 4.5L19 7"
+    readonly property string iconImage: "M4 5h16v14H4z M4 16l5-5 4 4 2-2 5 5 M15.5 9a1 1 0 1 1-2 0a1 1 0 0 1 2 0z"
+    readonly property string iconEdit: "M4 20h4L19 9l-4-4L4 16z M13.5 6.5l4 4"
+    readonly property string iconTrash: "M5 7h14 M10 7V4h4v3 M7 7l1 13h8l1-13"
     readonly property string iconPlus: "M12 5v14 M5 12h14"
     readonly property string iconTemporal: "M4 7h11 M4 12h11 M4 17h7 M18 14v6 M15 17h6"
+    // Menú contextual: poner a continuación, añadir al final de la cola, guardar en una
+    // playlist (marcapáginas con «+»), entrar en una subpágina y categorías.
+    readonly property string iconPlayNext: "M4 4.5v6l5-3z M12 7.5h8 M4 13h16 M4 18h16"
+    readonly property string iconAddQueue: "M4 6h16 M4 11h16 M4 16h9 M18 12v9 M15 18l3 3 3-3"
+    readonly property string iconSaveList: "M5 4h14v16l-7-4-7 4z M12 8v6 M9 11h6"
+    readonly property string iconForward: "M9 5l7 7-7 7"
+    readonly property string iconFolder: "M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"
+    readonly property string iconPlug: "M9 3v5 M15 3v5 M6 8h12v3a6 6 0 0 1-12 0z M12 17v4"
     readonly property string iconLomos: "M4 5v14 M8 5v14 M11 5h9v14h-9z"
     readonly property string iconCubeta: "M4 9h16v11H4z M6 6h12 M8 3h8"
     readonly property string iconMuro: "M4 4h7v7H4z M13 4h7v7h-7z M4 13h7v7H4z M13 13h7v7h-7z"

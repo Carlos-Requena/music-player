@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 const ENDPOINT: &str = "https://music.youtube.com/youtubei/v1";
-const USER_AGENT: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 \
+pub const USER_AGENT: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 \
      (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36";
 const CLIENT_VERSION: &str = "1.20251101.01.00";
 
@@ -105,6 +105,42 @@ pub fn playability(video_id: &str) -> Result<(String, String, String, bool)> {
         }
         eprintln!("  serverAbrStreamingUrl: {}", player["streamingData"].get("serverAbrStreamingUrl").is_some());
     })
+}
+
+/// Direcciones con las que el reproductor de YouTube Music registra una escucha en la cuenta
+/// (`history`): `(inicio, tiempo escuchado)`. Necesita la sesión.
+pub fn tracking_urls(video_id: &str) -> Result<(String, String)> {
+    let player = post("player", json!({ "videoId": video_id }))?;
+    let tracking = &player["playbackTracking"];
+    let url = |key: &str| tracking[key]["baseUrl"].as_str().unwrap_or_default().to_owned();
+    let (playback, watchtime) = (url("videostatsPlaybackUrl"), url("videostatsWatchtimeUrl"));
+    if playback.is_empty() || watchtime.is_empty() {
+        return Err("YouTube Music no dio cómo registrar la escucha.".to_owned());
+    }
+    Ok((playback, watchtime))
+}
+
+/// Añade a la playlist propia `playlist_id` una canción (`video_id`) o todas las de otra
+/// lista (`source_playlist`), como «Guardar en playlist» de YouTube Music. Si la canción ya
+/// estaba, no la duplica y devuelve `Ok(false)`.
+pub fn add_to_playlist(playlist_id: &str, video_id: &str, source_playlist: &str) -> Result<bool> {
+    if crate::account::with_session(|_| ()).is_none() {
+        return Err("Hace falta iniciar sesión para guardar en una playlist.".to_owned());
+    }
+    let action = if !video_id.is_empty() {
+        json!({ "action": "ACTION_ADD_VIDEO", "addedVideoId": video_id, "dedupeOption": "DEDUPE_OPTION_CHECK" })
+    } else {
+        json!({ "action": "ACTION_ADD_PLAYLIST", "addedFullListId": source_playlist })
+    };
+    let edit = post("browse/edit_playlist", json!({ "playlistId": playlist_id, "actions": [action] }))?;
+    match edit["status"].as_str() {
+        Some(status) if status.contains("SUCCEEDED") => Ok(true),
+        // Con DEDUPE_OPTION_CHECK, si ya estaba YouTube responde con un diálogo de
+        // confirmación en vez de añadirla otra vez.
+        _ if find(&edit, "confirmDialogRenderer").is_some() || find(&edit, "confirmDialogEndpoint").is_some() => Ok(false),
+        Some(status) => Err(format!("YouTube Music no la guardó ({status}).")),
+        None => Err("YouTube Music no la guardó.".to_owned()),
+    }
 }
 
 /// Primera aparición de `key` en profundidad.
@@ -262,6 +298,78 @@ fn zones(root: &Value) -> Vec<Zone> {
 pub fn account_name() -> Result<String> {
     let menu = post("account/account_menu", json!({}))?;
     Ok(text(find(&menu, "accountName")))
+}
+
+/// Cambia la portada de una playlist propia por la imagen `image` (bytes de un JPEG o PNG),
+/// como el botón «Editar › Cambiar miniatura» de YouTube Music: se sube la imagen por el
+/// protocolo «resumable» de Google y después se asigna a la playlist con `edit_playlist`.
+/// El cambio queda en la cuenta, así que se ve también en el móvil.
+pub fn set_playlist_cover(playlist_id: &str, image: &[u8]) -> Result<()> {
+    let Some((cookie, authorization)) = crate::account::with_session(|session| session.headers()) else {
+        return Err("Hace falta iniciar sesión para cambiar la portada.".to_owned());
+    };
+    const UPLOAD: &str = "https://music.youtube.com/playlist_image_upload/playlist_custom_thumbnail";
+    let authed = |request: ureq::RequestBuilder<ureq::typestate::WithBody>| {
+        request
+            .header("User-Agent", USER_AGENT)
+            .header("Origin", "https://music.youtube.com")
+            .header("X-Origin", "https://music.youtube.com")
+            .header("Cookie", &cookie)
+            .header("Authorization", &authorization)
+            .header("X-Goog-AuthUser", "0")
+    };
+
+    // 1. Abre la subida y recibe la URL a la que mandar los bytes.
+    let start = authed(ureq::post(format!("{UPLOAD}?authuser=0")))
+        .header("Content-Type", "text/plain; charset=utf-8")
+        .header("X-Goog-Upload-Command", "start")
+        .header("X-Goog-Upload-Header-Content-Length", image.len().to_string())
+        .header("X-Goog-Upload-Protocol", "resumable")
+        .send(&[][..])
+        .map_err(|error| format!("YouTube Music rechazó la subida de la imagen: {error}"))?;
+    let upload_url = start
+        .headers()
+        .get("x-goog-upload-url")
+        .and_then(|value| value.to_str().ok())
+        .ok_or("YouTube Music no dio dónde subir la imagen.")?
+        .to_owned();
+
+    // 2. Sube la imagen entera de una vez; la respuesta trae el identificador del archivo.
+    // El tipo es el que usa la implementación de ytmusicapi (PR #866): con otros, el servidor
+    // de subidas respondía 400.
+    let mut uploaded = authed(ureq::post(&upload_url))
+        .header("Content-Type", "text/html; charset=UTF-8")
+        .header("X-Goog-Upload-Command", "upload, finalize")
+        .header("X-Goog-Upload-Offset", "0")
+        .send(image)
+        .map_err(|error| format!("No se pudo subir la imagen: {error}"))?;
+    let answer: Value = uploaded
+        .body_mut()
+        .read_json()
+        .map_err(|error| format!("Respuesta de la subida ilegible: {error}"))?;
+    let blob = ["playlistScottyEncryptedBlobId", "encryptedBlobId"]
+        .iter()
+        .find_map(|key| answer[*key].as_str())
+        .ok_or("YouTube Music no aceptó la imagen.")?;
+
+    // 3. Asigna la imagen subida a la playlist.
+    let edit = post(
+        "browse/edit_playlist",
+        json!({
+            "playlistId": playlist_id,
+            "actions": [{
+                "action": "ACTION_SET_CUSTOM_THUMBNAIL",
+                "addedCustomThumbnail": {
+                    "imageKey": { "type": "PLAYLIST_IMAGE_TYPE_CUSTOM_THUMBNAIL", "name": "studio_square_thumbnail" },
+                    "playlistScottyEncryptedBlobId": blob,
+                },
+            }],
+        }),
+    )?;
+    match edit["status"].as_str() {
+        Some("STATUS_SUCCEEDED") | None => Ok(()),
+        Some(status) => Err(format!("YouTube Music no cambió la portada ({status}).")),
+    }
 }
 
 /// Playlists guardadas en la biblioteca de la cuenta (incluye «Música que te gusta»).

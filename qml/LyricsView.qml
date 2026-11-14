@@ -2,25 +2,102 @@ import QtQuick
 import QtQuick.Effects
 import app.musicplayer
 
-// Letra dinámica: la línea activa se ilumina palabra a palabra y el resto se atenúa
-// y desenfoca según su distancia a ella.
+// Letra al estilo de Better Lyrics (la extensión para YouTube Music):
+//
+// - La línea que suena va entera y brillante, a un 37 % de la altura; las demás, al 30 % de
+//   opacidad y al 95 % de tamaño. Pinchar una línea salta a ese momento.
+// - Al cambiar de línea, cada una se desplaza por su cuenta con una curva rápida en medio y
+//   suave en los extremos; las de abajo llegan algo después (efecto cascada). El desplazamiento
+//   empieza medio segundo antes de que se cante la línea, para que llegue a su sitio a tiempo.
+// - Las palabras se rellenan con un barrido de izquierda a derecha y se elevan un poco al
+//   cantarse; la línea activa lleva un brillo suave que se apaga poco a poco. Si el LRC trae el
+//   tiempo de cada palabra se usa; si no, se estima repartiendo la línea según su largo.
+// - Las pausas instrumentales (líneas vacías del LRC, o una intro larga) son tres puntos que se
+//   encienden a medida que pasa la pausa.
+//
+// Tres modos (Opciones › Apariencia › Calidad de la letra), porque cada fotograma redibuja la
+// ventana entera con su vidrio desenfocado y eso es lo que cuesta CPU:
+//
+//   calidad      barrido a la frecuencia de la pantalla (60 Hz), cascada, brillo y palabras que
+//                se elevan con suavidad. (Se probó además dibujar el texto con curvas,
+//                `Text.CurveRendering`: ~95 MB más para una nitidez que apenas se nota.)
+//   equilibrado  barrido a 30 Hz, cascada y brillo; el resto, al instante. (Por defecto.)
+//   bajo         sin barrido suave (diez pasos por segundo, los de mpv), un único desplazamiento
+//                corto en vez de la cascada, sin brillo y sin encoger las otras líneas.
+//
+// En todos el texto se dibuja directamente (el brillo es una copia desenfocada detrás, no un
+// efecto sobre el propio texto) y en píxeles enteros, para que no se vea borroso.
 Item {
     id: root
 
-    // Tamaño base; Opciones › Letra lo escala.
+    // Tamaño base; Opciones › Apariencia lo escala.
     property real baseSize: 24
     readonly property real fontSize: Math.round(baseSize * Theme.lyricsScale)
     // Momento de la letra: la posición corregida con el retraso de esta canción.
     property real position: Catalog.lyricsTime
     // Muestra abajo el ajuste de retraso (adelantar/atrasar la letra de esta canción).
     property bool showTiming: true
+    // Altura (0 arriba, 1 abajo) donde queda la línea que suena.
+    property real anchorRatio: 0.37
 
     readonly property var lines: Catalog.lyrics
-    readonly property int current: Catalog.lineAt(position)
-    readonly property real progress: Catalog.lineProgress(current, position)
-    readonly property Item currentLine: {
-        void repeater.count
-        return current >= 0 ? repeater.itemAt(current) : null
+    // Modo de la letra (ver arriba). La opción vieja «letraAnimada: ligera» equivale a «bajo».
+    readonly property string mode: {
+        void AppSettings.revision
+        const chosen = AppSettings.opcion("letraCalidad")
+        if (chosen === "calidad" || chosen === "bajo")
+            return chosen
+        return chosen === "" && AppSettings.opcion("letraAnimada") === "ligera" ? "bajo" : "equilibrado"
+    }
+    readonly property bool quality: mode === "calidad"
+    readonly property bool low: mode === "bajo"
+    // Línea iluminada (con una pizca de adelanto, como Better Lyrics) y línea a la que se
+    // desplaza la vista (medio segundo antes, para que llegue cuando empieza).
+    readonly property int current: lines.length ? Catalog.lineAt(position + 0.1) : -1
+    readonly property int scrollLine: lines.length ? Catalog.lineAt(position + 0.5) : -1
+
+    // mpv da la posición diez veces por segundo; para que el barrido de las palabras sea suave,
+    // un reloj propio avanza entre una y otra (a 60 Hz en «calidad», a 30 Hz en «equilibrado»).
+    // Solo mientras se está cantando la línea activa y se ve: en las pausas o con la línea ya
+    // entera se queda en los diez pasos por segundo de mpv.
+    property real smooth: 0
+    readonly property bool ticking: !low && visible && Player.playing && position < fillEnd
+    readonly property real clock: ticking ? smooth : position
+    onPositionChanged: {
+        if (!ticking || Math.abs(position - smooth) > 0.35)
+            smooth = position
+    }
+    function advance(seconds) {
+        smooth = Math.min(smooth + seconds, position + 0.15)
+    }
+    // Hasta cuándo dura el barrido de la línea activa (estimado como en `words`).
+    readonly property real fillEnd: {
+        if (current < 0 || current >= lines.length || lines[current].text === "")
+            return -1
+        const line = lines[current]
+        const next = current + 1 < lines.length ? lines[current + 1].t : line.t + 6
+        const timed = line.w || []
+        if (timed.length > 0)
+            return Math.min(next, timed[timed.length - 1].t + 1.5) + 0.3
+        return line.t + Math.min(next - line.t, Math.max(1.0, line.text.length * 0.075)) + 0.3
+    }
+    // «Calidad»: con cada fotograma de la pantalla.
+    FrameAnimation {
+        running: root.ticking && root.quality
+        onTriggered: root.advance(frameTime)
+    }
+    // «Equilibrado»: a 30 Hz.
+    Timer {
+        property double last: 0
+        interval: 33
+        repeat: true
+        running: root.ticking && !root.quality
+        onRunningChanged: last = Date.now()
+        onTriggered: {
+            const now = Date.now()
+            root.advance((now - last) / 1000)
+            last = now
+        }
     }
 
     clip: true
@@ -37,62 +114,306 @@ Item {
     // Deja sitio abajo para el ajuste de retraso.
     readonly property real timingHeight: showTiming && lines.length ? Theme.hit + 8 : 0
 
+    // Coloca la línea de `scrollLine` a su altura. Con `animated`, cada línea recorre la
+    // distancia con su propia duración (ver `slideFrom`).
+    function place(animated) {
+        const at = repeater.itemAt(Math.max(0, scrollLine))
+        if (!at)
+            return
+        const target = Math.round((height - timingHeight) * anchorRatio - at.y - at.height / 2)
+        columnAnim.stop()
+        // «Bajo»: un único desplazamiento corto de toda la columna.
+        if (animated && low && Math.abs(column.y - target) >= 1) {
+            columnAnim.to = target
+            columnAnim.start()
+            return
+        }
+        const delta = column.y - target
+        column.y = target
+        if (!animated || low || Math.abs(delta) < 1)
+            return
+        for (let i = 0; i < repeater.count; ++i) {
+            const line = repeater.itemAt(i)
+            if (line && line.near)
+                line.slideFrom(delta, i - Math.max(0, scrollLine))
+        }
+    }
+    onScrollLineChanged: place(true)
+    onHeightChanged: Qt.callLater(place, false)
+    onWidthChanged: Qt.callLater(place, false)
+    onFontSizeChanged: Qt.callLater(place, false)
+    onLinesChanged: Qt.callLater(place, false)
+
+    // Ratón: un solo gestor de clic para toda la letra, que averigua la línea pinchada, y sin
+    // seguir el puntero (nada de HoverHandler): mientras la letra se mueve bajo el puntero, Qt
+    // repasa la escena en cada fotograma para el «hover» y la letra pasaba de ~5 % a ~25 % de
+    // CPU. La mano del cursor la pone un `MouseArea` que no escucha el «hover».
+    function lineUnder(point) {
+        const local = column.mapFromItem(root, point.x, point.y)
+        const item = column.childAt(local.x, local.y)
+        return item && item.modelData !== undefined && !item.gap && item.near ? item.index : -1
+    }
+    // Pinchar una línea salta a ese momento de la canción.
+    TapHandler {
+        gesturePolicy: TapHandler.ReleaseWithinBounds
+        onTapped: eventPoint => {
+            const at = root.lineUnder(eventPoint.position)
+            if (at >= 0)
+                Player.seek(root.lines[at].t + Catalog.lyricsDelay)
+        }
+    }
+
+    NumberAnimation {
+        id: columnAnim
+        target: column
+        property: "y"
+        duration: 320
+        easing.type: Easing.OutCubic
+    }
+
     Column {
         id: column
         width: parent.width
-        spacing: root.fontSize * 0.5
-        y: root.currentLine ? root.height * 0.16 - root.currentLine.y : 0
-
-        Behavior on y { NumberAnimation { duration: 420; easing.type: Easing.OutCubic } }
 
         Repeater {
             id: repeater
             model: root.lines
+            onItemAdded: Qt.callLater(root.place, false)
 
-            Flow {
+            Item {
                 id: line
                 required property var modelData
                 required property int index
 
+                readonly property bool gap: modelData.text === ""
+                readonly property real start: modelData.t
+                readonly property real end: index + 1 < root.lines.length ? root.lines[index + 1].t : start + 6
                 readonly property int distance: index - root.current
                 readonly property bool active: distance === 0
-                readonly property var words: modelData.text.split(" ")
+                // Solo se dibujan (y se animan) las cercanas; el resto ocupa su sitio sin pintarse.
+                readonly property bool near: index >= root.scrollLine - 8 && index <= root.scrollLine + 12
+                // Pausas cortas: no merece la pena dibujarlas.
+                readonly property bool gapShown: gap && end - start >= 2.5
 
-                width: column.width
-                spacing: root.fontSize * 0.26
-                visible: distance >= -2 && distance <= 5
-                opacity: active ? 1 : (distance < 0 ? 0.62 + 0.18 * distance : Math.max(0.3, 0.74 - 0.11 * distance))
-
-                layer.enabled: visible && !active && Theme.blur
-                // En píxeles físicos: el tamaño lógico es media resolución en pantallas Retina.
-                layer.textureSize: Qt.size(Math.ceil(width), Math.ceil(height))
-                layer.smooth: true
-                layer.effect: MultiEffect {
-                    blurEnabled: true
-                    blurMax: 8
-                    blur: Math.min(1, Math.abs(line.distance) * 0.22)
+                // Palabras con su comienzo y su final, en segundos.
+                readonly property var words: {
+                    if (gap)
+                        return []
+                    const timed = modelData.w || []
+                    if (timed.length > 0)
+                        return timed.map((w, i) => ({
+                            text: w.text, start: w.t,
+                            end: i + 1 < timed.length ? timed[i + 1].t : Math.min(line.end, w.t + 1.5)
+                        }))
+                    // Sin tiempos: la línea dura lo que tarda en cantarse (unos 75 ms por letra,
+                    // sin pasar del comienzo de la siguiente) y cada palabra, según su largo.
+                    const parts = modelData.text.split(" ").filter(p => p !== "")
+                    const total = Math.min(line.end - line.start, Math.max(1.0, modelData.text.length * 0.075))
+                    const weight = parts.reduce((sum, p) => sum + p.length + 1, 0)
+                    let at = line.start
+                    return parts.map(p => {
+                        const length = total * (p.length + 1) / weight
+                        const word = { text: p, start: at, end: at + length }
+                        at += length
+                        return word
+                    })
                 }
 
-                Behavior on opacity { NumberAnimation { duration: 300 } }
+                width: column.width
+                height: gap ? (gapShown ? root.fontSize * 1.5 : 0) : body.height + root.fontSize * 0.6
+                // Ocultar con `visible` sacaría la línea del `Column` y movería las demás: las
+                // lejanas solo dejan de pintarse (opacidad 0 no se dibuja).
+                visible: !gap || gapShown
 
-                Repeater {
-                    model: line.words
+                opacity: !near ? 0 : active ? 1 : 0.3
+                Behavior on opacity { NumberAnimation { duration: 250; easing.type: Easing.OutQuad } }
 
-                    Text {
-                        required property string modelData
-                        required property int index
+                transform: Translate { id: slide }
 
-                        // Parte de esta palabra ya cantada, repartiendo la línea a partes iguales.
-                        readonly property real sung: line.active
-                            ? Math.max(0, Math.min(1, root.progress * line.words.length - index))
-                            : 0
+                // Recorre `delta` píxeles hasta su sitio. Más lejos de la línea activa, más tarda:
+                // las de abajo llegan en cascada, las de arriba casi a la vez.
+                function slideFrom(delta, n) {
+                    slideAnim.stop()
+                    slide.y += delta
+                    slideAnim.duration = n >= 0 ? 750 + Math.log(n + 1) * 80 + n * 20
+                                                : 750 + Math.log(1 - n) * 10
+                    slideAnim.start()
+                }
+                NumberAnimation {
+                    id: slideAnim
+                    target: slide
+                    property: "y"
+                    to: 0
+                    easing.type: Easing.Bezier
+                    easing.bezierCurve: [0.86, 0, 0.2, 1, 1, 1]
+                }
 
-                        text: modelData
-                        color: Qt.rgba(1, 1, 1, line.active ? 0.5 + 0.5 * sung : 1)
-                        font.pixelSize: root.fontSize
-                        font.family: Theme.lyricsFamily
-                        font.weight: Theme.lyricsWeight
-                        font.letterSpacing: -0.3
+                Accessible.role: Accessible.Button
+                Accessible.name: line.gap ? "" : modelData.text
+                Accessible.ignored: line.gap
+                Accessible.onPressAction: Player.seek(line.start + Catalog.lyricsDelay)
+
+                // ---- Brillo de la línea activa ----
+                // Una copia desenfocada detrás del texto: fuerte al empezar la línea y apagada en
+                // 1,6 s, como en Better Lyrics. Detrás y no como efecto del propio texto: así el
+                // texto se dibuja directo y nítido. Apagado, el efecto se quita (se rehace con cada
+                // palabra que se rellena).
+                MultiEffect {
+                    visible: !root.low && line.active && Theme.blur && body.glow > 0.01
+                    source: visible ? body : null
+                    x: body.x
+                    y: body.y
+                    width: body.width
+                    height: body.height
+                    blurEnabled: true
+                    blur: 1
+                    blurMax: 24
+                    opacity: body.glow
+                }
+
+                // ---- Línea con texto ----
+                Flow {
+                    id: body
+                    visible: !line.gap
+                    width: parent.width
+                    spacing: root.fontSize * 0.27
+
+                    // Las inactivas, algo más pequeñas (desde la izquierda, como el texto). En
+                    // «bajo», no: el texto escalado queda algo menos nítido.
+                    transform: Scale {
+                        origin.y: body.height / 2
+                        xScale: line.active || root.low ? 1 : 0.95
+                        yScale: xScale
+                        Behavior on xScale { NumberAnimation { duration: 166; easing.type: Easing.InOutQuad } }
+                    }
+
+                    property real glow: 0
+                    NumberAnimation on glow {
+                        id: glowAnim
+                        running: false
+                        from: 0.9
+                        to: 0
+                        duration: 1600
+                        easing.type: Easing.OutQuad
+                    }
+                    Connections {
+                        target: line
+                        function onActiveChanged() {
+                            if (line.active)
+                                glowAnim.restart()
+                        }
+                    }
+
+                    Repeater {
+                        model: line.words
+
+                        Item {
+                            id: word
+                            required property var modelData
+
+                            // Parte rellena (0–1). El barrido empieza un poco antes de la palabra
+                            // y dura algo más que ella, como en Better Lyrics. Fuera de la línea
+                            // activa, entera.
+                            readonly property real fill: {
+                                if (!line.active)
+                                    return 1
+                                const d = Math.max(0.05, modelData.end - modelData.start)
+                                return Math.max(0, Math.min(1, (root.clock - modelData.start + 0.1 * d) / (1.2 * d)))
+                            }
+                            // Se eleva mientras se canta y queda apenas levantada después.
+                            // En píxeles enteros: medio píxel deja el texto borroso.
+                            readonly property real lift: !line.active || fill <= 0 ? 0
+                                : Math.round((fill < 1 ? -0.05 : -0.02) * root.fontSize)
+
+                            width: dim.implicitWidth
+                            height: dim.implicitHeight
+                            // Animado solo en «calidad»: cada animación redibuja la ventana a 60 Hz
+                            // y, con una palabra cada pocas décimas, casi no paran.
+                            transform: Translate {
+                                y: word.lift
+                                Behavior on y {
+                                    enabled: root.quality
+                                    NumberAnimation { duration: 300; easing.type: Easing.OutQuad }
+                                }
+                            }
+
+                            // Una sola `Text` por palabra: tenue sin cantar, entera una vez cantada.
+                            // Mientras se barre, encima va la parte cantada recortada. (Recortar
+                            // todas las palabras impedía a Qt dibujar el texto por lotes y la
+                            // letra gastaba diez veces más CPU.)
+                            Text {
+                                id: dim
+                                text: word.modelData.text
+                                color: word.fill >= 1 ? Theme.text : Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.35)
+                                font.pixelSize: root.fontSize
+                                font.family: Theme.lyricsFamily
+                                font.weight: Theme.lyricsWeight
+                                font.letterSpacing: -0.3
+                            }
+
+                            Loader {
+                                active: word.fill > 0 && word.fill < 1
+                                sourceComponent: Item {
+                                    // Borde del barrido: una franja a media luz delante de lo cantado.
+                                    Item {
+                                        width: Math.min(word.width, word.fill * word.width + 0.12 * word.width)
+                                        height: word.height
+                                        clip: true
+                                        Text {
+                                            text: dim.text
+                                            font: dim.font
+                                            color: Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.65)
+                                        }
+                                    }
+                                    // Cantado: brillante.
+                                    Item {
+                                        width: word.fill * word.width
+                                        height: word.height
+                                        clip: true
+                                        Text {
+                                            text: dim.text
+                                            font: dim.font
+                                            color: Theme.text
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // ---- Pausa instrumental: tres puntos que se encienden con el tiempo ----
+                Row {
+                    id: dots
+                    visible: line.gapShown
+                    anchors.verticalCenter: parent.verticalCenter
+                    x: root.fontSize * 0.1
+                    spacing: root.fontSize * 0.22
+                    transformOrigin: Item.Left
+
+                    readonly property real progress: line.active
+                        ? Math.max(0, Math.min(1, (root.clock - line.start) / Math.max(0.1, line.end - line.start)))
+                        : 0
+
+                    Repeater {
+                        model: 3
+
+                        Rectangle {
+                            required property int index
+                            width: root.fontSize * 0.3
+                            height: width
+                            radius: width / 2
+                            color: Theme.text
+                            opacity: 0.35 + 0.65 * Math.max(0, Math.min(1, dots.progress * 3 - index))
+                        }
+                    }
+
+                    // Respira mientras dura la pausa.
+                    SequentialAnimation on scale {
+                        running: line.active && line.gapShown && root.visible
+                        loops: Animation.Infinite
+                        NumberAnimation { to: 1.15; duration: 1250; easing.type: Easing.InOutSine }
+                        NumberAnimation { to: 1; duration: 1250; easing.type: Easing.InOutSine }
                     }
                 }
             }

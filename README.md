@@ -14,8 +14,8 @@ carátula), letra sincronizada palabra a palabra, y tres formas de recorrer la b
 | **Muro** | Cuadrícula de carátulas por zonas | Inicio, Explorar |
 
 Cada sección puede usar cualquier vista (Opciones → «Vista de cada sección», el selector de
-arriba a la derecha o la tecla `V`). El estilo de ventana puede ser **Vidrio** (panel de letra
-y cola a la derecha) o **Escenario** (letra sobre el escenario y reproductor en píldora).
+arriba a la derecha o la tecla `V`). La letra y la cola van en un panel lateral que se puede
+poner a la izquierda o a la derecha, o cerrar con el botón de la barra.
 
 > Cliente **no oficial**: depende de cómo YouTube sirva su contenido. Cuando YouTube cambia
 > algo, suele bastar con actualizar yt-dlp.
@@ -26,7 +26,7 @@ y cola a la derecha) o **Escenario** (letra sobre el escenario y reproductor en 
   enfocado, lo que está bajo el ratón y la siguiente de la cola se preparan solos).
 - **Calidad**: «Alta» (por defecto) da Opus a ~160 kbps, lo máximo que ofrece YouTube Music sin
   Premium. Con **YouTube Premium** y la sesión iniciada, elige «Premium · 256 kbps» en
-  Opciones › Disposición › Calidad del audio. El panel muestra el formato real que suena.
+  Opciones › Reproducción › Calidad del audio. El panel muestra el formato real que suena.
 
 ## Personalización
 
@@ -35,7 +35,7 @@ En **Opciones**:
 - **Aspecto**: skins Vidrio, Medianoche, Grafito y Neón, más las tuyas.
 - **Disposición**: panel de letra y cola a la izquierda o a la derecha, modo ambiente,
   desenfoque (desactivarlo ahorra memoria y batería) y tamaño de las carátulas del Muro.
-- **Vista de cada sección** y estilo de ventana (Vidrio o Escenario).
+- **Vista de cada sección**: Lomos, Cubeta o Muro.
 
 ### Crear una skin
 
@@ -64,6 +64,58 @@ que falte toma el valor de Vidrio. `radio` es el redondeo de los paneles en píx
 `ambiente`, la intensidad del color de fondo (0 lo apaga). Una skin con el mismo nombre de
 archivo que una incluida la sustituye. Por ahora las skins son oscuras: los velos sobre el
 contenido asumen un fondo oscuro.
+
+### Skins con imagen de fondo
+
+Una skin también puede ser una **carpeta** (`skins/mi-skin/`) con un `skin.json` y sus
+imágenes (rutas relativas a la carpeta):
+
+```json
+{ "fondo": "fondo.jpg", "fondoOpacidad": 0.8, "fondoVelo": 0.4 }
+```
+
+`fondo` va detrás de todo, recortada para llenar la ventana; `fondoVelo` (0–1) pone encima un
+velo del color `fondo` para que el texto se lea sobre imágenes claras.
+
+## Mascotas
+
+Un personaje asomado sobre la barra de reproducción que cambia de pose según lo que pasa. Va
+aparte de las skins (cualquier mascota con cualquier skin) y se elige en **Opciones ›
+Mascota**. Cada mascota es una carpeta en `mascotas/` junto a la de skins
+(`~/Library/Application Support/musicplayer/mascotas/` en macOS,
+`~/.config/musicplayer/mascotas/` en Linux) con sus PNG y un `mascota.json`:
+
+```json
+{
+  "nombre": "Ralsei",
+  "descripcion": "De reojo siempre; feliz con la bufanda cuando suena música.",
+  "poses": {
+    "reposo":  { "imagen": "reojo.png",   "alto": 180 },
+    "sonando": { "imagen": "bufanda.png", "alto": 140 }
+  }
+}
+```
+
+Cada pose es el nombre del PNG (`"reposo": "quieta.png"`) o `{ "imagen", "alto" }` para darle
+su propio alto en píxeles (si unas son solo la cabeza y otras el busto). Con solo `reposo` y
+`sonando`, como en el ejemplo, la mascota está siempre en `reposo` salvo mientras suena música. `alto` en la raíz es
+el de las poses que no lo digan (160 si falta) y `"espejo": true` las voltea. Manda la primera
+que se cumpla:
+
+| Pose | Cuándo | Si falta, usa |
+|---|---|---|
+| `error` | Algo falla | `cargando` |
+| `cargando` | Una pista tarda más de 0,7 s en arrancar | `reposo` |
+| `clic` | Unos segundos tras pincharla | `nueva` |
+| `nueva` | Unos segundos al empezar una pista | `sonando` |
+| `sonando` | Mientras suena música | `reposo` |
+| `navegando` | Sin música, mientras recorres una sección o abres un álbum (4 s tras el último movimiento) | `pausa` |
+| `pausa` | Con una pista en pausa | `reposo` |
+| `reposo` | Nada de lo anterior (la única obligatoria) | — |
+
+Recorta las poses con un corte recto abajo: así parece apoyada en la barra. En macOS, Vista
+Previa quita el fondo blanco (Herramientas › Quitar fondo). Pulsa **Recargar** en Opciones tras
+añadir o editar una. Solo se carga la pose visible, a su tamaño en pantalla: unos cientos de KB.
 
 ## Plugins
 
@@ -160,9 +212,15 @@ siguientes, unos 10 s.
 | Opciones | `⌘,` / `Ctrl+,` o el botón de ajustes |
 | Mini reproductor | `M` o el botón junto al volumen; `Esc` o la flecha vuelven a la ventana completa |
 | Pantalla «Sonando» | Se abre sola al elegir una canción, o con un clic en la canción de la barra de reproducción: la carátula en grande sobre sus colores, y a la derecha la letra (si la hay) y la cola. Se cierra con un clic en la carátula, la flecha o `Esc` |
-| Letra desincronizada | Bajo la letra (o en su cabecera en «Sonando»): `−` la adelanta y `+` la atrasa medio segundo; se guarda para esa canción. Clic en el texto la deja en hora. Tamaño, fuente y grosor en Opciones › Disposición |
+| Letra | Al estilo de Better Lyrics: la línea que suena, grande y brillante a un tercio de la altura, con sus palabras rellenándose al cantarse; las demás, atenuadas, y en las pausas instrumentales tres puntos. Clic en una línea salta a ese momento. Si en «Sonando» no quieres letra ni cola, el botón del panel de la barra las quita y centra la carátula. Opciones › Apariencia › «Calidad de la letra»: Calidad (todo a 60 Hz, ~32 % de CPU), Equilibrado (~20 %, por defecto) o Bajo (~14 %, lo mismo que con la cola a la vista) |
+| Letra desincronizada | Bajo la letra (o en su cabecera en «Sonando»): `−` la adelanta y `+` la atrasa medio segundo; se guarda para esa canción. Clic en el texto la deja en hora. Tamaño, fuente y grosor en Opciones › Apariencia |
 | Lista temporal | Clic derecho en una canción, álbum o playlist › «Añadir a la lista temporal». Se ve en la pestaña «Temporal» del panel: «Reproducir en bucle», quitar canciones o vaciarla. No se guarda al cerrar la app |
-| Repetir la cola | Botón de repetir junto a «Siguiente» |
+| Repetir | Botón de repetir junto a «Siguiente»: cada pulsación pasa de desactivado a repetir la cola y a repetir solo la canción (el icono lleva un «1»), y vuelta a desactivado. «Siguiente» sigue saltando de canción |
+| Categorías de playlists | En Playlists, pestañas bajo la navegación (Todas, las tuyas y «+»). ↑/↓ o RePág/AvPág cambian de pestaña. Clic derecho en una playlist › «Categorías» › marca las suyas o «Nueva categoría…»; clic derecho en una pestaña para renombrarla o borrarla. Se guardan en este ordenador (YouTube Music no tiene carpetas) |
+| Cola | Clic derecho en una canción, álbum o playlist › «Reproducir a continuación» (justo detrás de la que suena) o «Añadir a la cola» (al final). En la pestaña «Cola» (panel o «Sonando») arrastra una canción para cambiarla de sitio; su clic derecho la sube a la siguiente o la quita |
+| Guardar en una playlist | Con sesión: clic derecho › «Guardar en una playlist» › elige una de tus playlists. Se guarda en tu cuenta (sin duplicar si ya estaba); un álbum o playlist añade todas sus canciones |
+| Registrar escuchas | Con sesión, lo que escuchas cuenta en YouTube Music: historial, recomendaciones y reproducciones para el artista. Opciones › Reproducción › «Registrar en YouTube Music» lo desactiva. YouTube puede pausar otro dispositivo que suene a la vez con tu cuenta |
+| Portada de una playlist | Clic derecho en una playlist tuya › «Cambiar portada…» (JPG o PNG de 360 × 360 o más). Se sube a tu cuenta y se ve también en la app del móvil |
 
 Las opciones se guardan en `~/Library/Application Support/musicplayer/settings.json`
 (macOS) o `~/.config/musicplayer/settings.json` (Linux).

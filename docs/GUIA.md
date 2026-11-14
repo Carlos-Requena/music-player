@@ -71,10 +71,10 @@ nombre desde cualquier archivo QML):
 
 | En QML | Archivo Rust | Para qué |
 |---|---|---|
-| `Player` | `src/player.rs` | Cola, canción actual, posición, play/pausa, lista temporal |
-| `Library` | `src/library.rs` | Secciones (Inicio, Álbumes…), búsqueda, detalle abierto |
+| `Player` | `src/player.rs` | Cola (añadir, mover, quitar), canción actual, posición, play/pausa, repetición, lista temporal |
+| `Library` | `src/library.rs` | Secciones (Inicio, Álbumes…), búsqueda, detalle abierto; portada de una playlist y guardar canciones en ella |
 | `Account` | `src/account.rs` | Iniciar/cerrar sesión |
-| `AppSettings` | `src/settings.rs` | Preferencias y skins |
+| `AppSettings` | `src/settings.rs` | Preferencias, skins y mascotas |
 | `Plugins` | `src/plugins.rs` | Discord, Last.fm, controles del sistema |
 
 Y dos singletons escritos en QML: `Theme` (colores y tamaños) y `Catalog` (convierte los datos
@@ -126,8 +126,17 @@ en la sección o estado que quieras:
 MUSICPLAYER_SILENT=1 ./target/release/musicplayer --shot /tmp/prueba.png --delay 8000 --section albumes --index 3
 ```
 
-`MUSICPLAYER_SILENT=1` hace que mpv no suene. Incluso puedes simular clics de ratón con
-`MUSICPLAYER_DEBUG_CLICK` (ver AGENTS.md). Así se prueba la interfaz sin tocarla.
+`MUSICPLAYER_SILENT=1` hace que mpv no suene. Incluso puedes simular clics y arrastres de
+ratón con `MUSICPLAYER_DEBUG_CLICK` (ver AGENTS.md). Así se prueba la interfaz sin tocarla.
+Por ejemplo, esto reproduce la primera canción de Inicio y, a los 10 s, arrastra la segunda
+fila de la cola dos puestos hacia abajo sin soltarla (`draghold`), para ver el gesto a medias:
+
+```bash
+MUSICPLAYER_SILENT=1 MUSICPLAYER_DEBUG_CLICK="1224,576,draghold,10000,1224,700" \
+  ./target/release/musicplayer --shot /tmp/cola.png --delay 11500 --autoplay --tab cola
+```
+
+Para las opciones, `--settings-cat apariencia` abre directamente esa categoría.
 
 ### Pruebas
 
@@ -404,6 +413,13 @@ ListView {
 `ListView` crea solo las filas visibles (bueno para listas largas); `Repeater` las crea
 todas.
 
+Un detalle que conviene saber: cuando el `model` es un array y le das otro array nuevo, la
+lista se reconstruye entera y vuelve arriba. Para la cola eso molestaba (al reordenar una
+canción, la lista saltaba al principio), así que
+[qml/QueueList.qml](../qml/QueueList.qml) usa como modelo **el número de pistas**
+(`model: Catalog.queue.length`) y cada fila lee su pista con `Catalog.queue[index]`. Si
+cambia el orden pero no el tamaño, las filas se quedan y solo cambia lo que muestran.
+
 ### 4.4 Animaciones
 
 ```qml
@@ -430,13 +446,16 @@ Main.qml (la ventana)
 ├── Ambient            fondo de color
 ├── SectionView        elige la vista de la sección: MuroView / LomosView / CubetaView
 ├── TopNav, SearchField, ViewSwitcher, botones de arriba
-├── NowPlayingPanel    panel derecho: carátula, Letra / Cola / Temporal
-├── NowPlayingView     pantalla «Sonando» (sube desde abajo)
+├── CategoryBar        pestañas de categorías (solo en Playlists)
+├── NowPlayingPanel    panel lateral: carátula, Letra / Cola / Temporal
+│   └── QueueList      la cola: clic, clic derecho, arrastrar para reordenar
+├── NowPlayingView     pantalla «Sonando» (sube desde abajo; también usa QueueList)
 ├── PlayerBar          barra de reproducción
+├── Mascot             mascota asomada a la barra (si hay una elegida)
 ├── DetailView         detalle de álbum/playlist/artista
 ├── InspectView        modo inspeccionar (caja 3D)
-├── ContextMenu        menú de clic derecho
-├── SettingsSheet      opciones
+├── ContextMenu        menú de clic derecho, con subpáginas («Guardar en una playlist ›»)
+├── SettingsSheet      opciones, por categorías en una barra lateral
 └── MiniPlayer         (otra ventana)
 ```
 
@@ -529,9 +548,16 @@ abierto.
 7. **De vuelta en `Player::on_event`**: `Started` → `set_playing(true)`, avisa a los plugins
    (Discord muestra la canción) y precarga las tres siguientes. `Position` → `set_position`
    cada pocos milisegundos: la barra de progreso y la letra se mueven solas.
+   Con sesión, `Started` además empieza a **registrar la escucha** en YouTube Music
+   ([src/history.rs](../src/history.rs)): en otro hilo pide a YouTube las direcciones de
+   registro y avisa del inicio; luego `Position` va contando lo escuchado y se envía cada 30 s.
+   Nada de esto retrasa el sonido: la canción ya suena cuando empieza.
 8. **La letra** ([src/lyrics.rs](../src/lyrics.rs)): en paralelo se pide a LRCLIB; llega como
-   JSON a `Player.lyrics`; `Catalog.lyrics` la convierte y `LyricsView` ilumina la línea de
-   `Catalog.lineAt(Catalog.lyricsTime)`.
+   JSON a `Player.lyrics` (las líneas vacías son pausas instrumentales); `Catalog.lyrics` la
+   convierte y [qml/LyricsView.qml](../qml/LyricsView.qml) ilumina la línea de
+   `Catalog.lineAt(…)` al estilo de Better Lyrics: la deja a un 37 % de la altura, desplaza
+   las demás en cascada y rellena las palabras con un barrido. El comentario de cabecera de
+   ese archivo explica cada efecto y lo que cuesta.
 
 Si entiendes este recorrido, entiendes el proyecto: todo lo demás son variaciones.
 
@@ -543,14 +569,16 @@ Si entiendes este recorrido, entiendes el proyecto: todo lo demás son variacion
 
 Ejemplo: una opción «Mostrar segundos en la barra» (sí/no).
 
-1. En [qml/SettingsSheet.qml](../qml/SettingsSheet.qml), sección «Disposición», añade al
-   `model` del `Repeater` una entrada como las que hay:
+1. En [qml/SettingsSheet.qml](../qml/SettingsSheet.qml), añade a la lista `optionRows` una
+   entrada como las que hay. `cat` dice en qué categoría de la barra lateral aparece
+   (`reproduccion`, `apariencia` o `vistas`):
    ```qml
-   { key: "segundos", label: "Mostrar segundos", fallback: "si",
+   { cat: "vistas", key: "segundos", label: "Mostrar segundos", fallback: "si",
      options: [{ id: "si", label: "Sí" }, { id: "no", label: "No" }] },
    ```
    Con eso ya aparece la fila y se guarda sola (en `settings.json`, vía
-   `AppSettings.setOpcion`). No hace falta tocar Rust.
+   `AppSettings.setOpcion`). No hace falta tocar Rust. Compruébalo con
+   `--shot /tmp/o.png --settings-cat vistas`.
 2. Léela donde la uses. El `void AppSettings.revision` hace que el binding se recalcule
    cuando cambie cualquier opción:
    ```qml
@@ -606,7 +634,34 @@ Ejemplo: una sección con tus «Subidas».
    el `case "subidas"` en `zonas()` y la entrada en `sections` (con `cuenta: true` si exige
    sesión). La pestaña aparece en la navegación y en «Vista de cada sección».
 
-### 7.6 Escribir una prueba
+### 7.6 Añadir una entrada al menú de clic derecho
+
+Ejemplo: «Mover al final» en las canciones de la cola.
+
+1. En [qml/ContextMenu.qml](../qml/ContextMenu.qml), la propiedad `entries` construye la lista
+   según lo que se ha pulsado. Las pistas de la cola llegan con `queueIndex` (lo añade
+   `QueueList`), así que dentro de `if (inQueue)`:
+   ```qml
+   out.push({ id: "final", label: "Mover al final", icon: Theme.iconAddQueue })
+   ```
+2. En `run(action)`, qué hace:
+   ```qml
+   } else if (action === "final") {
+       Player.moveInQueue(target.queueIndex, Catalog.queue.length - 1)
+       notify("«" + target.title + "» al final de la cola")
+   ```
+3. Si la lista va a ser larga (como las playlists donde guardar), no la metas en el menú
+   principal: haz una subpágina. Una entrada con `id: "page:loquesea"` y `more: true` abre
+   la página `loquesea`, y `entries` devuelve su contenido cuando `page === "loquesea"`.
+
+### 7.7 Crear una mascota
+
+No hace falta código: es una carpeta con un `mascota.json` y los PNG de las poses. El
+formato, las poses que existen y cuál sustituye a cuál están en el README, sección
+«Mascotas». La lógica que elige la pose vive en [qml/Mascot.qml](../qml/Mascot.qml)
+(propiedad `mood`): si quieres un estado nuevo, se añade ahí y en su tabla `fallback`.
+
+### 7.8 Escribir una prueba
 
 Al final del archivo Rust, dentro de `mod tests`:
 
@@ -630,6 +685,9 @@ fn quita_el_numero_de_reproducciones() {
 | Algo de la red no llega | Una sonda `--probe …` para aislar si es YouTube o la interfaz |
 | Una canción no suena | `--probe fast ID` (¿qué dice YouTube?), `--probe playable ID`, y las líneas de stderr del resolvedor |
 | Un clic «atraviesa» a lo de debajo | `gesturePolicy: TapHandler.ReleaseWithinBounds` (ver AGENTS.md) |
+| Arrastrar dentro de una lista la desplaza en vez de mover la fila | La lista se queda el gesto. Un `MouseArea` con `preventStealing: true` lo impide (así lo hace `QueueList`) |
+| Lo escuchado no aparece en el historial de YouTube Music | Las líneas `historial:` de la terminal dicen por qué; la opción está en Opciones › Reproducción |
+| «Guardar en una playlist» falla | La línea `guardar en …` de la terminal; solo funciona con playlists tuyas y con sesión |
 
 - En QML: `console.log("valor", algo)` escribe en la terminal.
 - En Rust: `eprintln!("valor: {algo:?}")` (`{:?}` imprime casi cualquier cosa).
@@ -657,6 +715,11 @@ Ordenados de menos a más. Cada uno toca una parte distinta.
    (`lyrics::fetch`) en otro hilo y la publique en una propiedad. Sigue el patrón de
    `search` en `library.rs`.
 6. **Prueba.** Escribe una prueba para `seconds("3:27")` en `ytm.rs` (debe dar 207).
+7. **Menú.** Añade «Mover al final» a las canciones de la cola (receta 7.6) y pruébalo con
+   `MUSICPLAYER_DEBUG_CLICK` haciendo clic derecho en una fila.
+8. **Teclado.** En `QueueList.qml`, haz que las filas se puedan enfocar con Tab y que
+   `Alt+↑` / `Alt+↓` las muevan con `Player.moveInQueue`. *Pista:* `activeFocusOnTab: true` y
+   `Keys.onPressed` mirando `event.modifiers & Qt.AltModifier`.
 
 Si te atascas, busca en el proyecto algo que ya haga algo parecido: casi todo tiene un vecino
 que puedes imitar.

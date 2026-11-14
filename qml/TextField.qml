@@ -12,6 +12,11 @@ Rectangle {
 
     signal committed(string text)
 
+    function forceFocus() {
+        input.forceActiveFocus()
+        input.selectAll()
+    }
+
     implicitHeight: Theme.hit
     radius: 12
     color: Qt.rgba(0, 0, 0, 0.3)

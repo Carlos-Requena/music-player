@@ -1,0 +1,205 @@
+\chapter{El puente entre Rust y QML (cxx-qt)}
+\label{cap:puente}
+
+QML sabe hablar con objetos de Qt (\cod{QObject}), que son C++. Rust no es C++. cxx-qt
+resuelve el problema: a partir de una descripción en Rust genera el código C++ necesario para
+que un \cod{struct} de Rust \emph{sea} un \cod{QObject}, con propiedades, señales y funciones
+que QML puede usar.
+
+\section{Anatomía de un objeto puente}
+
+Así es, recortado, el de \cod{Account} (\archivo{src/account.rs}). Los cinco objetos puente
+del proyecto siguen exactamente esta forma.
+
+\begin{rust}
+#[cxx_qt::bridge]                                   // (1) esto es un puente
+pub mod qobject {
+    unsafe extern "C++" {                           // (2) tipos de C++ que vamos a usar
+        include!("cxx-qt-lib/qstring.h");
+        type QString = cxx_qt_lib::QString;
+    }
+
+    #[auto_cxx_name]                                // (3) snake_case → camelCase en QML
+    extern "RustQt" {
+        #[qobject]                                  // (4) un QObject...
+        #[qml_element]                              //     ...registrado en QML...
+        #[qml_singleton]                            //     ...como singleton
+        #[qproperty(bool, signed_in)]               // (5) propiedades
+        #[qproperty(bool, busy)]
+        #[qproperty(QString, name)]
+        #[qproperty(QString, message)]
+        #[qproperty(bool, web_login)]
+        type Account = super::AccountRust;          // (6) los datos viven en AccountRust
+
+        #[qinvokable]                               // (7) funciones llamables desde QML
+        fn sign_in_web(self: Pin<&mut Account>);
+        #[qinvokable]
+        fn sign_out(self: Pin<&mut Account>);
+    }
+
+    impl cxx_qt::Threading for Account {}           // (8) permite qt_thread()
+}
+
+pub struct AccountRust {                            // (9) un campo por propiedad, mismo nombre
+    signed_in: bool,
+    busy: bool,
+    name: QString,
+    message: QString,
+    web_login: bool,
+}
+
+impl Default for AccountRust {                      // (10) estado inicial
+    fn default() -> Self { /* lee la sesión guardada... */ }
+}
+
+impl qobject::Account {                             // (11) el cuerpo de las funciones
+    fn sign_out(mut self: Pin<&mut Self>) {
+        forget();
+        self.as_mut().set_name(QString::default());
+        self.as_mut().set_signed_in(false);
+    }
+}
+\end{rust}
+
+\begin{enumerate}
+  \item \cod{#[cxx_qt::bridge]} marca el módulo que cxx-qt procesa al compilar.
+  \item Dentro de \cod{extern "C++"} se declaran los tipos de C++ que se usarán.
+  \cod{QString} es el texto de Qt; para pasar de \cod{String} a \cod{QString} se usa
+  \cod{QString::from(&texto)} y al revés \cod{qstring.to_string()}.
+  \item \cod{#[auto_cxx_name]}: los nombres de Rust (\cod{sign_in_web}, \cod{signed_in}) se
+  ven en QML en camelCase (\cod{signInWeb}, \cod{signedIn}).
+  \item \cod{#[qobject]}, \cod{#[qml_element]}, \cod{#[qml_singleton]}: un objeto de Qt,
+  visible en QML, del que hay uno solo y se usa por su nombre (\cod{Account}).
+  \item \cod{#[qproperty(tipo, nombre)]}: una propiedad. cxx-qt genera para cada una:
+  \begin{itemize}
+    \item \cod{nombre()} para leerla desde Rust (devuelve una referencia: \cod{*self.busy()}),
+    \item \cod{set_nombre(valor)} para escribirla, que además \textbf{avisa a QML} con la señal
+    \cod{nombreChanged},
+    \item y la propiedad \cod{Account.nombre} en QML, con su notificación.
+  \end{itemize}
+  \item \cod{type Account = super::AccountRust}: el objeto de Qt guarda dentro un
+  \cod{AccountRust}.
+  \item \cod{#[qinvokable]}: funciones que QML puede llamar. Aquí solo se \emph{declaran}.
+  \item \cod{impl cxx_qt::Threading}: habilita \cod{qt_thread()}, para volver al hilo de Qt
+  desde otro hilo.
+  \item El struct de datos: \textbf{un campo por cada propiedad, con el mismo nombre y tipo}.
+  Puede tener más campos (privados, que QML no ve), como los contadores de peticiones.
+  \item \cod{Default} da el estado inicial al crearse el objeto (al arrancar la app).
+  \item El cuerpo de las funciones, en un bloque \cod{impl qobject::Account} \textbf{fuera}
+  del puente.
+\end{enumerate}
+
+\begin{trampa}[«Unsupported verbatim input in ForeignItem»]
+Si escribes el cuerpo de una función dentro del bloque \cod{extern "RustQt"}, el generador
+falla con este mensaje. Dentro del puente solo van las \emph{firmas}; los cuerpos, en
+\cod{impl qobject::X}.
+\end{trampa}
+
+\section{\texttt{Pin<\&mut Self>}, \texttt{as\_mut()} y \texttt{rust\_mut()}}
+
+Los objetos de Qt no se pueden mover en memoria (Qt guarda punteros a ellos). Rust lo
+expresa con \cod{Pin}: un \cod{Pin<&mut Account>} es «una referencia modificable a un Account
+que no se moverá». Tres cosas prácticas:
+
+\begin{description}[leftmargin=1.2em]
+  \item[\cod{self.as_mut()}] Para llamar a varios métodos que consumen \cod{Pin<&mut Self>}
+  seguidos. Sin él, la primera llamada «se quedaría» con \cod{self}:
+\begin{rust}
+self.as_mut().set_busy(true);
+self.as_mut().set_message(QString::from("Conectando…"));
+self.set_name(QString::default());            // la última puede usar self directamente
+\end{rust}
+  \item[\cod{self.campo}] Leer un campo privado del struct (los que no son propiedades) funciona
+  directamente: \cod{self.tracks}, \cod{self.request}.
+  \item[\cod{self.as_mut().rust_mut()}] Para \emph{modificar} un campo privado:
+\begin{rust}
+self.as_mut().rust_mut().request = request;
+\end{rust}
+\end{description}
+
+En la práctica: copia la forma de las funciones vecinas del mismo archivo. Es mecánico.
+
+\section{Volver al hilo de Qt}
+
+Las propiedades solo se pueden tocar desde el hilo de Qt. El patrón completo, de
+\cod{Library::search}:
+
+\begin{rust}
+fn search(mut self: Pin<&mut Self>, query: &QString) {
+    let query = query.to_string();                     // QString → String (para el hilo)
+    let request = self.search_request + 1;
+    self.as_mut().rust_mut().search_request = request;
+    self.as_mut().set_searching(true);
+
+    let qt = self.qt_thread();                         // (1) el «buzón» del hilo de Qt
+    thread::spawn(move || {                            // (2) trabajo lento en otro hilo
+        let result = ytm::search(&query);
+        let _ = qt.queue(move |mut library| {          // (3) esto corre en el hilo de Qt
+            if library.search_request != request {     // (4) ¿sigue siendo la última?
+                return;
+            }
+            library.as_mut().set_searching(false);
+            match result {
+                Ok(zones) => library.as_mut().set_busqueda(QString::from(&to_json(&zones))),
+                Err(error) => library.as_mut().set_error(QString::from(&error)),
+            }
+        });
+    });
+}
+\end{rust}
+
+\begin{enumerate}
+  \item \cod{qt_thread()} devuelve un objeto que se puede mandar a otros hilos.
+  \item El hilo hace el trabajo lento. No puede tocar \cod{self}: no lo tiene (y el compilador
+  no le dejaría).
+  \item \cod{qt.queue(clausura)} pide a Qt que ejecute la clausura en su hilo, pasándole el
+  objeto (\cod{library}). Ahí ya se pueden cambiar propiedades.
+  \item El contador descarta respuestas que llegan tarde.
+\end{enumerate}
+
+\section{Del lado de QML}
+
+\begin{qml}
+import app.musicplayer
+
+Text {
+    text: Account.signedIn ? Account.name : "Sin sesión"   // lee propiedades
+}
+PillButton {
+    text: "Cerrar sesión"
+    onClicked: Account.signOut()                           // llama a una función
+}
+Connections {                                              // reacciona a un cambio
+    target: Account
+    function onSignedInChanged() { Library.load() }
+}
+\end{qml}
+
+\section{Las demás vías entre C++ y Rust}
+
+No todo pasa por cxx-qt. Tres funciones C++ propias y una de Objective-C++ se llaman como
+funciones C normales (\cod{extern "C"}), porque no son objetos de Qt sino utilidades:
+
+\begin{center}
+\begin{tabularx}{\linewidth}{@{}lX@{}}
+\toprule
+Función & Qué hace \\
+\midrule
+\cod{musicplayer_configure_network()} & Desactiva el proxy automático del sistema en Qt (\archivo{src/window.cpp}) \\
+\cod{musicplayer_tune_windows()} & Libera la memoria gráfica de las ventanas ocultas o minimizadas; programa los clics de depuración \\
+\cod{musicplayer_login(ruta)} & Ventana de inicio de sesión de macOS (\archivo{src/login\_mac.mm}) \\
+\cod{musicplayer_login_linux(ruta)} & Ventana de Linux (\archivo{login/src/login\_linux.cpp}) \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\section{Resumen: añadir algo al puente}
+
+\begin{enumerate}
+  \item Propiedad: \cod{#[qproperty(tipo, nombre)]} en el puente + campo en el struct + valor
+  inicial en \cod{Default}.
+  \item Función: firma con \cod{#[qinvokable]} en el puente + cuerpo en \cod{impl qobject::X}.
+  \item Objeto nuevo: archivo nuevo con su puente, añadirlo a \cod{.files([...])} de
+  \archivo{build.rs} y \cod{mod} en \archivo{src/main.rs}.
+  \item En QML: \cod{X.nombreEnCamelCase}.
+\end{enumerate}

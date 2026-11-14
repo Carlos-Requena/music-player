@@ -52,6 +52,25 @@ pub mod qobject {
         /// Busca canciones, álbumes y playlists y deja el resultado en `busqueda`.
         #[qinvokable]
         fn search(self: Pin<&mut Library>, query: &QString);
+
+        /// Sube la imagen `path` (ruta local o `file://`) como portada de la playlist
+        /// `playlist_id` de la cuenta. Termina con `portada_lista`.
+        #[qinvokable]
+        fn set_playlist_cover(self: Pin<&mut Library>, playlist_id: &QString, path: &QString);
+
+        /// Resultado de `set_playlist_cover`: `error` vacío si la portada cambió.
+        #[qsignal]
+        fn portada_lista(self: Pin<&mut Library>, playlist_id: QString, error: QString);
+
+        /// Guarda en la playlist propia `playlist_id` (de título `titulo`) una canción, o todas
+        /// las de un álbum o playlist (`item`: JSON de `ytm::Item` o de `ytm::Track`).
+        /// Termina con `guardado`.
+        #[qinvokable]
+        fn add_to_playlist(self: Pin<&mut Library>, playlist_id: &QString, titulo: &QString, item: &QString);
+
+        /// Resultado de `add_to_playlist`: el aviso para el usuario y si fue un error.
+        #[qsignal]
+        fn guardado(self: Pin<&mut Library>, mensaje: QString, error: bool);
     }
 
     impl cxx_qt::Threading for Library {}
@@ -176,8 +195,9 @@ impl qobject::Library {
             ),
             (
                 "playlists",
-                // Solo las de tu biblioteca de YouTube Music; sin sesión queda vacía.
-                || Ok(if signed_in() { personal(ytm::library_playlists()) } else { Vec::new() }),
+                // Solo las de tu biblioteca de YouTube Music; sin sesión queda vacía. Si falla la
+                // red se queda la copia guardada (y con ella sus categorías) en vez de vaciarse.
+                || if signed_in() { ytm::library_playlists() } else { Ok(Vec::new()) },
                 |library, json| library.set_playlists(json),
             ),
             // Secciones solo con sesión; sin ella quedan vacías y la interfaz lo explica.
@@ -257,6 +277,58 @@ impl qobject::Library {
         self.as_mut().rust_mut().detail_request += 1;
         self.as_mut().set_detalle_loading(false);
         self.set_detalle(QString::default());
+    }
+
+    fn set_playlist_cover(self: Pin<&mut Self>, playlist_id: &QString, path: &QString) {
+        let playlist_id = playlist_id.to_string();
+        let path = path.to_string();
+        let path = path.strip_prefix("file://").unwrap_or(&path).to_owned();
+        let qt = self.qt_thread();
+        thread::spawn(move || {
+            // YouTube rechaza imágenes enormes; con 10 MB sobra para una portada.
+            let result = match std::fs::read(&path) {
+                Ok(bytes) if bytes.len() > 10 * 1024 * 1024 => Err("La imagen pesa demasiado (máximo 10 MB).".to_owned()),
+                Ok(bytes) => ytm::set_playlist_cover(&playlist_id, &bytes),
+                Err(error) => Err(format!("No se pudo leer la imagen: {error}")),
+            };
+            if let Err(error) = &result {
+                eprintln!("portada de {playlist_id}: {error}");
+            }
+            let error = result.err().unwrap_or_default();
+            let _ = qt.queue(move |library| {
+                library.portada_lista(QString::from(&playlist_id), QString::from(&error));
+            });
+        });
+    }
+
+    fn add_to_playlist(self: Pin<&mut Self>, playlist_id: &QString, titulo: &QString, item: &QString) {
+        let playlist_id = playlist_id.to_string();
+        let titulo = titulo.to_string();
+        let Ok(value) = serde_json::from_str::<serde_json::Value>(&item.to_string()) else { return };
+        let field = |key: &str| value[key].as_str().unwrap_or_default().to_owned();
+        let (video_id, source, name) = (field("videoId"), field("playlistId"), field("title"));
+        // Una pista de la cola o una canción suelta llevan `videoId`; un álbum o playlist, solo
+        // su lista. (Las canciones de «Me gusta» llevan también `playlistId`: manda la canción.)
+        if video_id.is_empty() && source.is_empty() {
+            return;
+        }
+        let qt = self.qt_thread();
+        thread::spawn(move || {
+            let result = ytm::add_to_playlist(&playlist_id, &video_id, if video_id.is_empty() { &source } else { "" });
+            let (mensaje, error) = match result {
+                Ok(true) => {
+                    // La cola guardada de esa playlist ya no está completa.
+                    crate::player::forget_queue(&playlist_id);
+                    (format!("«{name}» guardada en «{titulo}»"), false)
+                }
+                Ok(false) => (format!("«{name}» ya estaba en «{titulo}»"), false),
+                Err(error) => {
+                    eprintln!("guardar en {playlist_id}: {error}");
+                    (error, true)
+                }
+            };
+            let _ = qt.queue(move |library| library.guardado(QString::from(&mensaje), error));
+        });
     }
 
     fn search(mut self: Pin<&mut Self>, query: &QString) {

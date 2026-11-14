@@ -68,6 +68,21 @@
   `Authorization: SAPISIDHASH <segundos>_<sha1("<segundos> <SAPISID> https://music.youtube.com")>`.
 - yt-dlp y mpv reciben una **copia** de las cookies (`account::cookies_copy`), porque yt-dlp
   reescribe el archivo al terminar.
+- **Registro de escuchas** (`history.rs`, opción `historial`, activada por defecto): pedir el audio
+  no cuenta como reproducción; lo cuentan los avisos del reproductor. Cuando una pista ya suena
+  (`Event::Started`, la primera vez de cada carga), un hilo pide `/player` con la sesión (cliente
+  `WEB_REMIX`), toma `playbackTracking.videostatsPlaybackUrl` y `videostatsWatchtimeUrl`, y avisa
+  del inicio con un `cpn` nuevo (16 caracteres, como yt-dlp `--mark-watched`). `player.rs`
+  (`Listen`) sigue la posición y envía el tramo escuchado (`st`/`et`/`cmt`) cada 30 s, al pausar,
+  al saltar y al cambiar de pista; con «repetir la canción» cada vuelta es una escucha nueva.
+  No toca el arranque: nada espera a esas peticiones y sus fallos solo van a stderr. Las cookies
+  solo se mandan a hosts `*.youtube.com`. Contrapartida: YouTube ve la escucha y aplica su límite
+  de un dispositivo a la vez por cuenta.
+- **Cola y playlists**: `Player.enqueue` (a continuación o al final; un álbum o playlist llega
+  por la red y se inserta al recibirlo), `moveInQueue` (la que suena conserva su índice) y
+  `removeFromQueue`. `Library.addToPlaylist` usa `browse/edit_playlist` con `ACTION_ADD_VIDEO`
+  (`DEDUPE_OPTION_CHECK`: si ya estaba, YouTube responde con un diálogo y no la duplica) o
+  `ACTION_ADD_PLAYLIST` para un álbum o playlist entero, y olvida la cola guardada de esa lista.
 - Al arrancar, `Account.verify` comprueba la sesión; si YouTube ya no la reconoce, la borra y
   avisa. Al iniciar o cerrar sesión se reinicia mpv (sus opciones de yt-dlp cambian) y se
   recarga la biblioteca.
@@ -182,8 +197,26 @@ Actividad):
   forma continua (la barra de progreso y la letra lo hacen mientras suena), el controlador
   gráfico de macOS reserva ~100 MB para sus fotogramas. Lo hace una ventana vacía con un
   cuadrado de 2 px girando. Con OpenGL en vez de Metal es el doble.
-- Lo que añade la app sobre ese mínimo (~130 MB reproduciendo): carátulas, capas de la letra con
-  desenfoque, el vidrio de la barra, el motor QML y el JSON del catálogo.
+- Lo que añade la app sobre ese mínimo (~130 MB reproduciendo): carátulas, la letra, el vidrio de
+  la barra, el motor QML y el JSON del catálogo.
+- **Letra al estilo Better Lyrics** (`LyricsView.qml`, 2026-11-14), con tres modos (opción
+  `letraCalidad`). CPU acumulada de la app en 25 s, reproduciendo la misma canción (ruido de
+  ±1 s entre ejecuciones; ×4 = % de un núcleo):
+
+  | | Panel lateral | «Sonando» | Memoria |
+  |---|---|---|---|
+  | Calidad (todo a 60 Hz) | 7,4–8,7 s | 9,2 s | ~286 MB |
+  | Equilibrado (barrido a 30 Hz) | 4,8–5,0 s | 6,4 s | ~285 MB |
+  | Bajo (10 Hz, sin cascada ni brillo) | 3,1–3,9 s | 4,2 s | ~276 MB |
+  | Referencia: pestaña Cola | 3,5 s | — | 274 MB |
+  | Referencia: letra anterior | 1,4 s | — | 241 MB |
+
+  La diferencia entre modos es de fotogramas: cada uno redibuja la ventana con su vidrio
+  desenfocado. Lo que se probó y se descartó: un gestor de «hover»/cursor/clic por línea (o uno
+  solo con «hover») subía la CPU a ~25 % incluso sin animaciones; dibujar el texto con curvas
+  (`Text.CurveRendering`) en «Calidad» costaba ~95 MB más; el brillo como `layer.effect` sobre
+  la línea hacía que el texto pasara por una textura y se viera borroso (ahora es una copia
+  desenfocada detrás); medios píxeles en la elevación de las palabras también emborronaban.
 - Medidas aplicadas: capas de la letra a media resolución; el Muro solo descarga las carátulas
   de las filas visibles o cercanas; mpv sin sus scripts de interfaz y con caché de 16 MB
   (44 → 20 MB en reposo).
@@ -215,8 +248,8 @@ Actividad):
   la que toque. Añadir una vista: un `XxxView.qml` con `zonas`, `currentItem` y
   `signal activated(var item)`, registrarlo en `build.rs`, en `SectionView.qml` y en
   `Catalog.views`.
-- **Estilo de ventana**: `AppSettings.ventana` (`vidrio` o `escenario`) cambia la disposición en
-  `Main.qml`; con el panel a la izquierda todo el escenario se desplaza con `stageX`.
+- **Disposición**: con el panel a la izquierda todo el escenario se desplaza con `stageX`.
+  (Hubo un segundo estilo de ventana, «Escenario», con la letra sobre la estantería; se quitó.)
 
 ## Plugins
 

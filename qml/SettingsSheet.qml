@@ -1,14 +1,63 @@
 import QtQuick
 import app.musicplayer
 
-// Opciones de apariencia: estilo de la ventana y vista por defecto de cada sección.
+// Opciones, agrupadas por categorías (barra lateral): cuenta, reproducción, apariencia, vistas
+// y plugins.
 Item {
     id: root
 
     property Item backdrop: null
     signal closed()
 
+    // Categoría que se ve (se recuerda mientras la app sigue abierta).
+    property string category: "cuenta"
+    readonly property var categories: [
+        { id: "cuenta", label: "Cuenta", icon: Theme.iconAccount },
+        { id: "reproduccion", label: "Reproducción", icon: Theme.iconPlay },
+        { id: "apariencia", label: "Apariencia", icon: Theme.iconImage },
+        { id: "vistas", label: "Vistas", icon: Theme.iconMuro },
+        { id: "plugins", label: "Plugins", icon: Theme.iconPlug }
+    ]
+    onCategoryChanged: settingsFlick.contentY = 0
+
+    function stepCategory(delta) {
+        const at = categories.findIndex(c => c.id === category)
+        category = categories[Math.max(0, Math.min(categories.length - 1, at + delta))].id
+    }
+
+    // Opciones sueltas (`AppSettings.opcion`), cada una en su categoría.
+    readonly property var optionRows: [
+        { cat: "reproduccion", key: "calidad", label: "Calidad del audio", hint: "Premium (256 kbps) necesita sesión y suscripción.", fallback: "alta",
+          options: [{ id: "alta", label: "Alta · 160 kbps" }, { id: "premium", label: "Premium · 256 kbps" }] },
+        { cat: "reproduccion", key: "historial", label: "Registrar en YouTube Music",
+          hint: "Con sesión, lo que escuchas cuenta como reproducción: entra en tu historial y tus recomendaciones, y suma para el artista. No retrasa el arranque. YouTube puede pausar otro dispositivo que suene a la vez con tu cuenta.",
+          fallback: "si", options: [{ id: "si", label: "Activado" }, { id: "no", label: "Desactivado" }] },
+        { cat: "reproduccion", key: "ytdlp", label: "yt-dlp residente", hint: "Suena ~1 s antes; ocupa ~120 MB mientras navegas.", fallback: "si",
+          options: [{ id: "si", label: "Activado" }, { id: "no", label: "Desactivado" }] },
+        { cat: "apariencia", key: "ambiente", label: "Modo ambiente", hint: "Suave y Tenue usan un solo color; Tenue, apenas un velo.", fallback: "si",
+          options: [{ id: "si", label: "Vivo" }, { id: "suave", label: "Suave" }, { id: "tenue", label: "Tenue" }, { id: "no", label: "No" }] },
+        { cat: "apariencia", key: "desenfoque", label: "Desenfoque", hint: "Desactivarlo ahorra memoria y batería.", fallback: "si",
+          options: [{ id: "si", label: "Activado" }, { id: "no", label: "Desactivado" }] },
+        { cat: "apariencia", key: "letraCalidad", label: "Calidad de la letra",
+          hint: "CPU con la letra a la vista: Calidad ~32 %, Equilibrado ~20 %, Bajo ~14 % (como con la cola).",
+          fallback: "equilibrado", options: [{ id: "calidad", label: "Calidad" }, { id: "equilibrado", label: "Equilibrado" }, { id: "bajo", label: "Bajo" }] },
+        { cat: "apariencia", key: "letraTamano", label: "Tamaño de la letra", hint: "El retraso se ajusta en cada canción, bajo su letra.", fallback: "mediana",
+          options: [{ id: "pequena", label: "Pequeña" }, { id: "mediana", label: "Mediana" }, { id: "grande", label: "Grande" }, { id: "enorme", label: "Enorme" }] },
+        { cat: "apariencia", key: "letraFuente", label: "Fuente de la letra", fallback: "sistema",
+          options: [{ id: "sistema", label: "Sistema" }, { id: "serif", label: "Serif" }, { id: "mono", label: "Mono" }] },
+        { cat: "apariencia", key: "letraPeso", label: "Grosor de la letra", fallback: "negrita",
+          options: [{ id: "negrita", label: "Negrita" }, { id: "normal", label: "Normal" }] },
+        { cat: "vistas", key: "panel", label: "Panel de letra y cola", fallback: "derecha",
+          options: [{ id: "izquierda", label: "Izquierda" }, { id: "derecha", label: "Derecha" }] },
+        { cat: "vistas", key: "caratulas", label: "Carátulas del Muro", fallback: "medianas",
+          options: [{ id: "pequenas", label: "Pequeñas" }, { id: "medianas", label: "Medianas" }, { id: "grandes", label: "Grandes" }] }
+    ]
+
     Keys.onEscapePressed: root.closed()
+
+    function scrollTo(y) {
+        settingsFlick.contentY = Math.max(0, Math.min(y, settingsFlick.contentHeight - settingsFlick.height))
+    }
 
     function scrollToEnd() {
         settingsFlick.contentY = Math.max(0, settingsFlick.contentHeight - settingsFlick.height)
@@ -102,49 +151,133 @@ Item {
     Glass {
         id: sheet
         anchors.centerIn: parent
-        width: Math.min(880, parent.width - 80)
-        height: Math.min(content.implicitHeight + 60, parent.height - 48)
+        width: Math.min(980, parent.width - 80)
+        // Alto fijo: no da saltos al cambiar de categoría.
+        height: Math.min(760, parent.height - 48)
         radius: 24
         tint: Theme.glassStrong
         backdrop: root.backdrop
 
+        Item {
+            id: header
+            x: 32
+            y: 24
+            width: parent.width - 64
+            height: Theme.hit
+
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+                text: "Opciones"
+                color: Theme.text
+                font.pixelSize: 30
+                font.weight: Font.Bold
+            }
+
+            IconButton {
+                anchors.right: parent.right
+                icon: Theme.iconClose
+                label: "Cerrar"
+                solid: true
+                onClicked: root.closed()
+            }
+        }
+
+        // Categorías, como en los ajustes del sistema. ↑/↓ cambian de una a otra.
+        Column {
+            id: sidebar
+            x: 20
+            anchors.top: header.bottom
+            anchors.topMargin: 22
+            width: 196
+            spacing: 4
+
+            Keys.onUpPressed: root.stepCategory(-1)
+            Keys.onDownPressed: root.stepCategory(1)
+
+            Repeater {
+                model: root.categories
+
+                Item {
+                    id: catItem
+                    required property var modelData
+                    readonly property bool chosen: modelData.id === root.category
+
+                    width: sidebar.width
+                    height: Theme.hit
+                    activeFocusOnTab: true
+
+                    Accessible.role: Accessible.PageTab
+                    Accessible.name: modelData.label
+                    Accessible.checked: chosen
+                    Accessible.onPressAction: root.category = modelData.id
+                    Keys.onReturnPressed: root.category = modelData.id
+                    Keys.onSpacePressed: root.category = modelData.id
+
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: 12
+                        color: catItem.chosen ? Theme.controlActive : (catHover.hovered ? Theme.control : "transparent")
+                        border.width: catItem.activeFocus ? 2 : 0
+                        border.color: Theme.text
+                    }
+
+                    Icon {
+                        x: 14
+                        anchors.verticalCenter: parent.verticalCenter
+                        path: catItem.modelData.icon
+                        size: 18
+                        color: catItem.chosen ? Theme.text : Theme.textMuted
+                    }
+
+                    Text {
+                        x: 44
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: catItem.modelData.label
+                        color: catItem.chosen ? Theme.text : Theme.textMuted
+                        font.pixelSize: 15
+                        font.weight: catItem.chosen ? Font.DemiBold : Font.Normal
+                    }
+
+                    HoverHandler {
+                        id: catHover
+                        cursorShape: Qt.PointingHandCursor
+                    }
+
+                    TapHandler {
+                        gesturePolicy: TapHandler.ReleaseWithinBounds
+                        onTapped: root.category = catItem.modelData.id
+                    }
+                }
+            }
+        }
+
+        Rectangle {
+            x: sidebar.x + sidebar.width + 16
+            anchors.top: sidebar.top
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: 24
+            width: 1
+            color: Theme.glassBorder
+        }
+
         Flickable {
             id: settingsFlick
-            anchors.fill: parent
-            anchors.topMargin: 28
-            anchors.bottomMargin: 28
+            x: sidebar.x + sidebar.width + 40
+            anchors.top: sidebar.top
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: 24
+            width: parent.width - x - 32
             contentHeight: content.implicitHeight
             clip: true
             boundsBehavior: Flickable.StopAtBounds
 
         Column {
             id: content
-            x: 32
-            width: parent.width - 64
+            width: parent.width
             spacing: 26
 
-            Item {
-                width: parent.width
-                height: Theme.hit
-
-                Text {
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: "Opciones"
-                    color: Theme.text
-                    font.pixelSize: 30
-                    font.weight: Font.Bold
-                }
-
-                IconButton {
-                    anchors.right: parent.right
-                    icon: Theme.iconClose
-                    label: "Cerrar"
-                    solid: true
-                    onClicked: root.closed()
-                }
-            }
-
             Column {
+                visible: root.category === "cuenta"
                 id: accountSection
                 width: parent.width
                 spacing: 12
@@ -311,75 +444,7 @@ Item {
             }
 
             Column {
-                width: parent.width
-                spacing: 12
-
-                Heading { text: "Ventana principal" }
-
-                Row {
-                    width: parent.width
-                    spacing: 16
-
-                    Repeater {
-                        model: [
-                            { id: "vidrio", label: "Vidrio", detail: "Panel de letra a la derecha y barra de reproducción completa." },
-                            { id: "escenario", label: "Escenario", detail: "Sin paneles: letra sobre el escenario y reproductor en píldora." }
-                        ]
-
-                        Rectangle {
-                            id: card
-                            required property var modelData
-                            readonly property bool chosen: AppSettings.ventana === modelData.id
-
-                            width: (parent.width - 16) / 2
-                            height: 92
-                            radius: 16
-                            color: cardHover.hovered ? Theme.controlActive : Theme.control
-                            border.width: chosen || activeFocus ? 2 : 1
-                            border.color: chosen || activeFocus ? Theme.text : Theme.glassBorder
-                            activeFocusOnTab: true
-
-                            Accessible.role: Accessible.RadioButton
-                            Accessible.name: modelData.label
-                            Accessible.checked: chosen
-                            Accessible.onPressAction: AppSettings.elegirVentana(modelData.id)
-                            Keys.onReturnPressed: AppSettings.elegirVentana(modelData.id)
-
-                            Column {
-                                anchors.fill: parent
-                                anchors.margins: 18
-                                spacing: 6
-
-                                Text {
-                                    text: card.modelData.label
-                                    color: Theme.text
-                                    font.pixelSize: 17
-                                    font.weight: Font.DemiBold
-                                }
-
-                                Text {
-                                    width: parent.width
-                                    text: card.modelData.detail
-                                    color: Theme.textMuted
-                                    font.pixelSize: 13
-                                    wrapMode: Text.WordWrap
-                                }
-                            }
-
-                            HoverHandler {
-                                id: cardHover
-                                cursorShape: Qt.PointingHandCursor
-                            }
-
-                            TapHandler {
-                                onTapped: AppSettings.elegirVentana(card.modelData.id)
-                            }
-                        }
-                    }
-                }
-            }
-
-            Column {
+                visible: root.category === "vistas"
                 width: parent.width
                 spacing: 12
 
@@ -426,13 +491,14 @@ Item {
             }
 
             Column {
+                visible: root.category === "apariencia"
                 id: skinSection
                 width: parent.width
                 spacing: 12
 
                 readonly property var skins: Catalog.parse(AppSettings.skins)
 
-                Heading { text: "Aspecto" }
+                Heading { text: "Skin" }
 
                 Grid {
                     width: parent.width
@@ -501,9 +567,10 @@ Item {
 
                 Item {
                     width: parent.width
-                    height: Theme.hit
+                    height: Math.max(Theme.hit, skinsHint.implicitHeight)
 
                     Text {
+                        id: skinsHint
                         anchors.verticalCenter: parent.verticalCenter
                         width: parent.width - reload.width - 16
                         text: "Tus skins: copia un archivo de la carpeta skins/ del proyecto en " + AppSettings.carpetaSkins() + " y cámbialo."
@@ -521,33 +588,117 @@ Item {
                 }
             }
 
+            // Mascotas: aparte de las skins, para combinarlas como se quiera.
             Column {
+                visible: root.category === "apariencia"
+                id: mascotSection
                 width: parent.width
                 spacing: 12
 
-                Heading { text: "Disposición" }
+                readonly property var mascots: [{ id: "", nombre: "Ninguna", descripcion: "Sin mascota sobre la barra." }]
+                    .concat(Catalog.parse(AppSettings.mascotas))
+
+                Heading { text: "Mascota" }
+
+                Grid {
+                    width: parent.width
+                    columns: 2
+                    columnSpacing: 16
+                    rowSpacing: 12
+
+                    Repeater {
+                        model: mascotSection.mascots
+
+                        Rectangle {
+                            id: mascotCard
+                            required property var modelData
+                            readonly property bool chosen: AppSettings.mascota === modelData.id
+
+                            width: (mascotSection.width - 16) / 2
+                            height: 76
+                            radius: 16
+                            color: mascotHover.hovered ? Theme.controlActive : Theme.control
+                            border.width: chosen || activeFocus ? 2 : 1
+                            border.color: chosen || activeFocus ? Theme.text : Theme.glassBorder
+                            activeFocusOnTab: true
+
+                            Accessible.role: Accessible.RadioButton
+                            Accessible.name: "Mascota " + modelData.nombre
+                            Accessible.checked: chosen
+                            Accessible.onPressAction: AppSettings.elegirMascota(modelData.id)
+                            Keys.onReturnPressed: AppSettings.elegirMascota(modelData.id)
+
+                            Column {
+                                anchors.fill: parent
+                                anchors.margins: 16
+                                spacing: 4
+
+                                Text {
+                                    text: mascotCard.modelData.nombre
+                                    color: Theme.text
+                                    font.pixelSize: 16
+                                    font.weight: Font.DemiBold
+                                }
+
+                                Text {
+                                    width: parent.width
+                                    text: mascotCard.modelData.descripcion || ""
+                                    color: Theme.textMuted
+                                    font.pixelSize: 13
+                                    elide: Text.ElideRight
+                                }
+                            }
+
+                            HoverHandler {
+                                id: mascotHover
+                                cursorShape: Qt.PointingHandCursor
+                            }
+
+                            TapHandler {
+                                gesturePolicy: TapHandler.ReleaseWithinBounds
+                                onTapped: AppSettings.elegirMascota(mascotCard.modelData.id)
+                            }
+                        }
+                    }
+                }
+
+                Item {
+                    width: parent.width
+                    height: Math.max(Theme.hit, mascotsHint.implicitHeight)
+
+                    Text {
+                        id: mascotsHint
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: parent.width - reloadMascots.width - 16
+                        text: "Tus mascotas: una carpeta con mascota.json y sus PNG en " + AppSettings.carpetaMascotas() + "."
+                        color: Theme.textMuted
+                        font.pixelSize: 13
+                        wrapMode: Text.WordWrap
+                    }
+
+                    PillButton {
+                        id: reloadMascots
+                        anchors.right: parent.right
+                        text: "Recargar"
+                        onClicked: AppSettings.recargarSkins()
+                    }
+                }
+            }
+
+            // Filas de opciones sueltas de la categoría elegida (ver `optionRows`).
+            Column {
+                readonly property var rows: root.optionRows.filter(row => row.cat === root.category)
+                readonly property var headings: ({ reproduccion: "Audio", apariencia: "Ambiente y letra", vistas: "Disposición" })
+
+                id: optionSection
+                visible: rows.length > 0
+                width: parent.width
+                spacing: 12
+
+                Heading { text: optionSection.headings[root.category] || "" }
 
                 Repeater {
-                    model: [
-                        { key: "panel", label: "Panel de letra y cola", fallback: "derecha",
-                          options: [{ id: "izquierda", label: "Izquierda" }, { id: "derecha", label: "Derecha" }] },
-                        { key: "ambiente", label: "Modo ambiente", hint: "Suave y Tenue usan un solo color; Tenue, apenas un velo.", fallback: "si",
-                          options: [{ id: "si", label: "Vivo" }, { id: "suave", label: "Suave" }, { id: "tenue", label: "Tenue" }, { id: "no", label: "No" }] },
-                        { key: "desenfoque", label: "Desenfoque", hint: "Desactivarlo ahorra memoria y batería.", fallback: "si",
-                          options: [{ id: "si", label: "Activado" }, { id: "no", label: "Desactivado" }] },
-                        { key: "calidad", label: "Calidad del audio", hint: "Premium (256 kbps) necesita sesión y suscripción.", fallback: "alta",
-                          options: [{ id: "alta", label: "Alta · 160 kbps" }, { id: "premium", label: "Premium · 256 kbps" }] },
-                        { key: "ytdlp", label: "yt-dlp residente", hint: "Suena ~1 s antes; ocupa ~120 MB mientras navegas.", fallback: "si",
-                          options: [{ id: "si", label: "Activado" }, { id: "no", label: "Desactivado" }] },
-                        { key: "letraTamano", label: "Tamaño de la letra", hint: "El retraso se ajusta en cada canción, bajo su letra.", fallback: "mediana",
-                          options: [{ id: "pequena", label: "Pequeña" }, { id: "mediana", label: "Mediana" }, { id: "grande", label: "Grande" }, { id: "enorme", label: "Enorme" }] },
-                        { key: "letraFuente", label: "Fuente de la letra", fallback: "sistema",
-                          options: [{ id: "sistema", label: "Sistema" }, { id: "serif", label: "Serif" }, { id: "mono", label: "Mono" }] },
-                        { key: "letraPeso", label: "Grosor de la letra", fallback: "negrita",
-                          options: [{ id: "negrita", label: "Negrita" }, { id: "normal", label: "Normal" }] },
-                        { key: "caratulas", label: "Carátulas del Muro", fallback: "medianas",
-                          options: [{ id: "pequenas", label: "Pequeñas" }, { id: "medianas", label: "Medianas" }, { id: "grandes", label: "Grandes" }] }
-                    ]
+                    model: optionSection.rows
 
                     Item {
                         id: layoutRow
@@ -559,29 +710,40 @@ Item {
                         }
 
                         width: parent.width
-                        height: Theme.hit + 8
+                        height: Math.max(Theme.hit + 8, labels.implicitHeight)
 
                         Column {
+                            id: labels
                             anchors.verticalCenter: parent.verticalCenter
+                            width: parent.width - segmented.width - 20
                             spacing: 2
 
                             Text {
+                                width: parent.width
                                 text: layoutRow.modelData.label
                                 color: Theme.text
                                 font.pixelSize: 15
                                 font.weight: Font.DemiBold
+                                wrapMode: Text.WordWrap
                             }
 
                             Text {
+                                width: parent.width
                                 visible: layoutRow.modelData.hint !== undefined
                                 text: layoutRow.modelData.hint || ""
                                 color: Theme.textMuted
                                 font.pixelSize: 12
+                                wrapMode: Text.WordWrap
                             }
                         }
 
                         Segmented {
+                            id: segmented
                             anchors.right: parent.right
+                            anchors.verticalCenter: parent.verticalCenter
+                            // Estrecho si los textos son cortos; ancho si alguno es largo.
+                            width: Math.min(380, layoutRow.modelData.options.length
+                                            * (layoutRow.modelData.options.some(o => o.label.length > 12) ? 190 : 110))
                             options: layoutRow.modelData.options
                             value: layoutRow.value
                             onPicked: id => AppSettings.setOpcion(layoutRow.modelData.key, id)
@@ -591,6 +753,7 @@ Item {
             }
 
             Column {
+                visible: root.category === "plugins"
                 id: pluginSection
                 width: parent.width
                 spacing: 12

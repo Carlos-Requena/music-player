@@ -66,10 +66,126 @@ QtObject {
         }
     }
 
+    // Categorías de playlists (OST, Gym…): `[{ nombre, ids: [playlistId…] }]`. YouTube Music
+    // no tiene carpetas, así que viven en las opciones locales (`categorias`). `categoria` es
+    // la pestaña elegida; vacía = «Todas».
+    readonly property var categorias: {
+        void AppSettings.revision
+        const list = parse(AppSettings.opcion("categorias"))
+        return Array.isArray(list) ? list : []
+    }
+    readonly property string categoria: {
+        void AppSettings.revision
+        const name = AppSettings.opcion("categoria")
+        return categorias.some(c => c.nombre === name) ? name : ""
+    }
+
+    // Portadas cambiadas en esta sesión (`playlistId` → imagen local), hasta que YouTube
+    // Music devuelva la nueva.
+    property var portadas: ({})
+
+    function setPortada(playlistId, source) {
+        const copy = Object.assign({}, portadas)
+        copy[playlistId] = source
+        portadas = copy
+    }
+
+    // Playlists de la sección con la categoría elegida y las portadas nuevas aplicadas.
+    readonly property var playlistsVista: {
+        const covers = portadas
+        const withCover = item => covers[item.playlistId] ? Object.assign({}, item, { thumb: covers[item.playlistId] }) : item
+        const all = playlists.map(zona => ({ titulo: zona.titulo, items: zona.items.map(withCover) }))
+        if (categoria === "")
+            return all
+        const cat = categorias.find(c => c.nombre === categoria)
+        const byId = {}
+        for (const zona of all)
+            for (const item of zona.items)
+                byId[item.playlistId] = item
+        return [{ titulo: categoria, items: cat.ids.filter(id => byId[id]).map(id => byId[id]) }]
+    }
+
+    // Playlist de la biblioteca de la cuenta (solo esas se pueden categorizar).
+    function isOwnPlaylist(item) {
+        if (!item || item.kind !== "playlist" || !item.playlistId)
+            return false
+        return playlists.some(zona => zona.items.some(i => i.playlistId === item.playlistId))
+    }
+
+    // Playlists en las que se puede guardar música: las de la biblioteca menos «Me gusta»
+    // (va por otro camino) y, si se sabe el nombre de la cuenta, solo las suyas: las guardadas
+    // de otras personas no se pueden editar.
+    readonly property var editablePlaylists: {
+        const all = []
+        for (const zona of playlists)
+            for (const item of zona.items)
+                if (item.playlistId && item.playlistId !== "LM" && !all.some(i => i.playlistId === item.playlistId))
+                    all.push(item)
+        const owner = Account.name
+        const mine = owner !== "" ? all.filter(i => i.subtitle.startsWith(owner + " •")) : []
+        return mine.length ? mine : all
+    }
+
+    function saveCategorias(list) {
+        AppSettings.setOpcion("categorias", list.length ? JSON.stringify(list) : "")
+    }
+
+    function chooseCategoria(name) {
+        AppSettings.setOpcion("categoria", name)
+    }
+
+    // Pasa a la pestaña vecina (`delta` = ±1), con «Todas» como la primera.
+    function stepCategoria(delta) {
+        const names = [""].concat(categorias.map(c => c.nombre))
+        const at = names.indexOf(categoria)
+        chooseCategoria(names[(at + delta + names.length) % names.length])
+    }
+
+    // Crea la categoría `name` (con `playlistId` dentro, si se da). Devuelve el nombre final
+    // o "" si no vale (vacío o repetido).
+    function createCategoria(name, playlistId) {
+        name = name.trim()
+        if (name === "" || categorias.some(c => c.nombre.toLowerCase() === name.toLowerCase()))
+            return ""
+        saveCategorias(categorias.concat([{ nombre: name, ids: playlistId ? [playlistId] : [] }]))
+        return name
+    }
+
+    function renameCategoria(oldName, newName) {
+        newName = newName.trim()
+        if (newName === "" || newName === oldName
+                || categorias.some(c => c.nombre !== oldName && c.nombre.toLowerCase() === newName.toLowerCase()))
+            return false
+        const wasCurrent = categoria === oldName
+        saveCategorias(categorias.map(c => c.nombre === oldName ? { nombre: newName, ids: c.ids } : c))
+        if (wasCurrent)
+            chooseCategoria(newName)
+        return true
+    }
+
+    function removeCategoria(name) {
+        saveCategorias(categorias.filter(c => c.nombre !== name))
+    }
+
+    function inCategoria(name, playlistId) {
+        const cat = categorias.find(c => c.nombre === name)
+        return cat !== undefined && cat.ids.indexOf(playlistId) >= 0
+    }
+
+    // Mete o saca `playlistId` de la categoría `name`.
+    function toggleInCategoria(name, playlistId) {
+        saveCategorias(categorias.map(c => {
+            if (c.nombre !== name)
+                return c
+            const ids = c.ids.indexOf(playlistId) >= 0 ? c.ids.filter(id => id !== playlistId) : c.ids.concat([playlistId])
+            return { nombre: c.nombre, ids: ids }
+        }))
+    }
+
     function zonas(section) {
         switch (section) {
         case "explorar": return explorar
-        case "playlists": return playlists
+        case "playlists": return playlistsVista
         case "albumes": return albumes
         case "buscar": return busqueda
         case "megusta": return megusta
@@ -97,6 +213,8 @@ QtObject {
     function label(section) {
         if (section === "buscar")
             return "Búsqueda"
+        if (section === "playlists" && categoria !== "")
+            return categoria
         for (const s of sections)
             if (s.id === section)
                 return s.label

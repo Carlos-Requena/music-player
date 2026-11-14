@@ -130,7 +130,7 @@ Glass {
         width: root.width - 2 * root.pad
     }
 
-    ListView {
+    QueueList {
         id: queue
         visible: root.tab === "cola"
         anchors.top: tabs.bottom
@@ -139,96 +139,6 @@ Glass {
         anchors.bottomMargin: root.pad
         x: root.pad
         width: root.width - 2 * root.pad
-        clip: true
-        boundsBehavior: Flickable.StopAtBounds
-        model: Catalog.queue
-
-        // Mantiene a la vista la pista que suena.
-        function follow() {
-            positionViewAtIndex(Player.index, ListView.Contain)
-        }
-        onVisibleChanged: if (visible) follow()
-        Connections {
-            target: Player
-            function onIndexChanged() { queue.follow() }
-        }
-
-        delegate: Item {
-            id: row
-            required property var modelData
-            required property int index
-            readonly property bool current: index === Player.index
-
-            width: queue.width
-            height: 56
-
-            Accessible.role: Accessible.Button
-            Accessible.name: modelData.title + ", " + modelData.artist
-            Accessible.onPressAction: Player.playIndex(index)
-
-            Rectangle {
-                anchors.fill: parent
-                radius: 10
-                color: row.current ? Theme.controlActive : (rowHover.hovered ? Theme.control : "transparent")
-            }
-
-            Cover {
-                x: 8
-                anchors.verticalCenter: parent.verticalCenter
-                width: 40
-                height: 40
-                thumb: row.modelData.thumb
-                pixels: 120
-            }
-
-            Column {
-                x: 58
-                anchors.verticalCenter: parent.verticalCenter
-                width: parent.width - 58 - 52
-                spacing: 1
-
-                Text {
-                    width: parent.width
-                    text: row.modelData.title
-                    color: Theme.text
-                    font.pixelSize: 14
-                    font.weight: row.current ? Font.DemiBold : Font.Normal
-                    elide: Text.ElideRight
-                }
-
-                Text {
-                    width: parent.width
-                    text: row.modelData.artist
-                    color: Theme.textMuted
-                    font.pixelSize: 12
-                    elide: Text.ElideRight
-                }
-            }
-
-            Text {
-                anchors.right: parent.right
-                anchors.rightMargin: 10
-                anchors.verticalCenter: parent.verticalCenter
-                text: Theme.mmss(row.modelData.duration)
-                color: Theme.textMuted
-                font.pixelSize: 12
-            }
-
-            HoverHandler {
-                id: rowHover
-                cursorShape: Qt.PointingHandCursor
-            }
-
-            TapHandler {
-                onTapped: Player.playIndex(row.index)
-            }
-
-            // Clic derecho: menú con «Añadir a la lista temporal».
-            TapHandler {
-                acceptedButtons: Qt.RightButton
-                onTapped: eventPoint => row.Window.window.openMenu(row.modelData, eventPoint.scenePosition)
-            }
-        }
     }
 
     // Lista temporal: canciones sueltas reunidas con el clic derecho, para oírlas en bucle.

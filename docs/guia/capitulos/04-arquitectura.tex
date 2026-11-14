@@ -1,0 +1,231 @@
+\chapter{Visión general y arquitectura}
+\label{cap:arquitectura}
+
+\section{Qué es y qué busca}
+
+Un reproductor de escritorio para YouTube Music, para macOS y Linux (probado en CachyOS). El
+propietario fijó cuatro prioridades, \emph{en este orden}, que explican casi todas las
+decisiones del código:
+
+\begin{enumerate}
+  \item \textbf{Consumo bajo de memoria.} Un cliente web empaquetado (Electron) gasta 400–800
+  MB; aquí el objetivo es moverse entre 150 y 330 MB.
+  \item \textbf{Respuesta instantánea.} Clic y suena. Todo lo que tarda se hace en segundo
+  plano o por adelantado.
+  \item \textbf{Personalización total.} Vistas por sección, disposición, skins (con imagen de
+  fondo si se quiere), mascotas, categorías de playlists, modo ambiente, tamaño de letra\dots
+  \item \textbf{Estética cuidada.} Vidrio, desenfoque, estanterías en 3D, animaciones.
+\end{enumerate}
+
+Cuando dos prioridades chocan, gana la de arriba. Por ejemplo: el desenfoque (estética) se
+puede desactivar porque gasta memoria (prioridad 1).
+
+\section{Las piezas}
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[node distance=7mm and 9mm]
+  \node[capa, minimum width=12.5cm] (ui) {\textbf{Interfaz (QML)} — \archivo{qml/}\\[2pt]
+    \footnotesize Main, vistas (Muro, Lomos, Cubeta), «Sonando», panel, barra, opciones\dots\\
+    \footnotesize singletons QML: \cod{Theme} (aspecto) y \cod{Catalog} (datos)};
+  \node[capa, below=of ui, minimum width=12.5cm, fill=tinta!6, draw=tinta] (bridge)
+    {\textbf{Puente cxx-qt} — objetos Rust visibles en QML como singletons\\[2pt]
+    \footnotesize \cod{Player} · \cod{Library} · \cod{Account} · \cod{AppSettings} · \cod{Plugins}};
+  \node[capa, below=of bridge, minimum width=12.5cm] (core) {\textbf{Núcleo (Rust)} — \archivo{src/}\\[2pt]
+    \footnotesize player · library · account · settings · plugins (discord, lastfm)\\
+    \footnotesize ytm (YouTube Music) · stream + resolver + daemon (URL del audio) · audio (mpv) · lyrics};
+  \node[externo, below left=12mm and -3cm of core, minimum width=3.3cm] (mpv) {\textbf{mpv}\\\footnotesize reproduce el audio};
+  \node[externo, below=12mm of core, minimum width=3.3cm] (ytdlp) {\textbf{yt-dlp}\\\footnotesize URL del audio\\\footnotesize (cuando hace falta)};
+  \node[externo, below right=12mm and -3cm of core, minimum width=3.3cm] (net) {\textbf{Internet}\\\footnotesize YouTube Music,\\\footnotesize LRCLIB, Last.fm};
+  \node[externo, right=8mm of bridge, minimum width=2.4cm] (discord) {\textbf{Discord}\\\footnotesize socket local};
+  \draw[doble] (ui) -- node[etiqueta,right]{propiedades / llamadas} (bridge);
+  \draw[doble] (bridge) -- (core);
+  \draw[flecha] (core) -- node[etiqueta,left]{socket JSON} (mpv);
+  \draw[flecha] (core) -- node[etiqueta]{proceso} (ytdlp);
+  \draw[flecha] (core) -- node[etiqueta,right]{HTTPS} (net);
+  \draw[flecha] (core.east) -| (discord.south);
+  \begin{scope}[on background layer]
+    \node[draw=borde, dashed, rounded corners=6pt, fit=(ui)(core), inner sep=8pt,
+      label={[font=\sffamily\scriptsize, text=comentario]north east:proceso \texttt{musicplayer}}] {};
+  \end{scope}
+\end{tikzpicture}
+\caption{Las piezas del programa y con quién habla cada una.}
+\label{fig:piezas}
+\end{figure}
+
+\begin{description}[style=nextline, leftmargin=0pt]
+  \item[Interfaz (QML)] Todo lo que se ve. Es declarativa: lee propiedades de los objetos de
+  Rust y, cuando cambian, se redibuja sola. Nunca habla con la red.
+  \item[Puente (cxx-qt)] Genera el código C++ que hace que un \cod{struct} de Rust se comporte
+  como un objeto de Qt, con propiedades, señales y funciones llamables desde QML.
+  \item[Núcleo (Rust)] Estado y decisiones: qué suena, qué hay en cada sección, la sesión, las
+  preferencias. Habla con YouTube, con mpv, con yt-dlp, con LRCLIB, con Discord y con Last.fm.
+  \item[mpv (proceso aparte)] Un reproductor de línea de comandos que se arranca sin ventana y
+  se controla por un socket. Sabe leer audio de una URL, decodificarlo y sacarlo por los
+  altavoces.
+  \item[yt-dlp (proceso aparte)] Programa en Python que sabe extraer la URL real del audio de
+  un vídeo. Lo usamos solo cuando nuestra vía rápida no basta (capítulo~\ref{cap:arquitectura}).
+\end{description}
+
+\section{Procesos}
+
+Cuando la app está abierta y sonando hay, como mucho, estos procesos:
+
+\begin{center}
+\begin{tabularx}{\linewidth}{@{}lX@{}}
+\toprule
+Proceso & Cuándo existe \\
+\midrule
+\texttt{musicplayer} & siempre: la interfaz y el núcleo \\
+\texttt{mpv} & desde el arranque (se calienta antes del primer clic); se reinicia al cambiar de sesión \\
+\texttt{python … ytdlp\_daemon.py} & yt-dlp residente: solo tras necesitar yt-dlp; se cierra solo tras 60 s sin uso \\
+\texttt{yt-dlp} & procesos sueltos, si el residente no está disponible \\
+\texttt{musicplayer --login} (macOS) / \texttt{musicplayer-login} (Linux) & solo mientras está abierta la ventana de inicio de sesión \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\begin{porque}[¿Por qué tantos procesos?]
+Cada uno aísla algo pesado. mpv decodifica audio y hace red: si se cuelga, el reproductor lo
+detecta y lo reinicia sin caerse. yt-dlp carga Python (unos 120 MB): fuera del proceso
+principal, se puede cerrar cuando no hace falta. La ventana de inicio de sesión carga un motor
+web entero: en otro proceso, esa memoria desaparece al cerrarla.
+\end{porque}
+
+\section{Hilos}
+
+Dentro de \texttt{musicplayer} hay un hilo principal (el de Qt, que dibuja y atiende al ratón)
+y muchos hilos de trabajo de corta vida.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[node distance=5mm]
+  \node[caja, minimum width=4.2cm, fill=acento!8] (qt) {\textbf{Hilo de Qt}\\\footnotesize interfaz, propiedades};
+  \node[caja, right=22mm of qt, minimum width=4.6cm] (w1) {hilo: búsqueda en YouTube};
+  \node[caja, below=of w1, minimum width=4.6cm] (w2) {hilo: resolver una URL};
+  \node[caja, below=of w2, minimum width=4.6cm] (w3) {hilo: lector de eventos de mpv};
+  \node[caja, below=of w3, minimum width=4.6cm] (w4) {hilo: plugins (Discord, Last.fm)};
+  \draw[flecha] (qt.east) to[bend left=10] node[etiqueta,above]{\cod{thread::spawn}} (w1.west);
+  \draw[flecha, draw=acento] (w1.south west) to[bend left=18] node[etiqueta,below,pos=0.45]{\cod{qt.queue(...)}} (qt.south east);
+  \draw[flecha, draw=acento] (w2.west) to[bend left=12] (qt.east);
+  \draw[flecha, draw=acento] (w3.west) to[bend left=12] (qt.south east);
+  \draw[flecha] (qt.south) |- node[etiqueta,pos=0.75]{\cod{plugins::emit}} (w4.west);
+\end{tikzpicture}
+\caption{El hilo de Qt lanza trabajo y recibe los resultados por su cola.}
+\end{figure}
+
+La regla es sencilla y no tiene excepciones: \textbf{el hilo de Qt nunca espera a la red ni a
+un proceso}. Todo lo lento va a un hilo, y el resultado vuelve encolado al hilo de Qt, que es
+el único que toca propiedades.
+
+\section{Cómo viajan los datos}
+
+\subsection{De Rust a QML: propiedades y JSON}
+
+Los valores simples (si suena, la posición, el título) son propiedades tipadas:
+\cod{Player.playing} es un \cod{bool}, \cod{Player.position} un \cod{double}. Los datos
+estructurados (las secciones, la cola, la letra, el detalle de un álbum) viajan como
+\textbf{texto JSON en una propiedad de tipo cadena}:
+
+\begin{codigo}
+Library.inicio = '[{"titulo":"Selecciones rápidas","items":[{"kind":"song","title":...}]}]'
+\end{codigo}
+
+y \cod{Catalog} los convierte con \cod{JSON.parse} en objetos de JavaScript que las vistas
+usan como \cod{model}.
+
+\begin{porque}[¿JSON y no modelos de Qt?]
+Lo «canónico» en Qt sería exponer un \cod{QAbstractListModel} por cada lista. Es más
+eficiente para listas enormes que cambian elemento a elemento, pero exige mucho más código en
+el puente. Aquí las listas tienen decenas o pocos cientos de elementos y se reemplazan enteras
+(llega la sección de la red, se sustituye). Convertir unos KB de JSON tarda microsegundos y el
+código es trivial. Si algún día hubiera listas de miles de elementos que cambian sueltos,
+convendría revisar esta decisión.
+\end{porque}
+
+\subsection{De QML a Rust: llamadas}
+
+QML llama a funciones marcadas como invocables: \cod{Player.playItem(json)},
+\cod{Library.search("texto")}, \cod{AppSettings.setOpcion("clave", "valor")}. Cuando hay que
+pasar un objeto, se pasa también como JSON (\cod{JSON.stringify(item)}).
+
+\subsection{Respuestas obsoletas}
+
+Como todo es asíncrono, una respuesta puede llegar cuando ya no interesa: buscas «a», luego
+«ab», y la respuesta de «a» llega la última. Para evitarlo, cada operación lleva un contador:
+
+\begin{rust}
+let request = self.search_request + 1;     // número de esta búsqueda
+self.as_mut().rust_mut().search_request = request;
+thread::spawn(move || {
+    let result = ytm::search(&query);
+    let _ = qt.queue(move |mut library| {
+        if library.search_request != request { return; }   // llegó tarde: se descarta
+        // ...
+    });
+});
+\end{rust}
+
+Verás este patrón con varios nombres: \cod{request} y \cod{load_token} en \cod{Player},
+\cod{search_request}, \cod{load_generation} y \cod{detail_request} en \cod{Library}.
+
+\section{Mapa de archivos}
+
+\begin{center}
+\small
+\begin{longtable}{@{}p{0.34\linewidth}p{0.6\linewidth}@{}}
+\toprule
+Archivo & Qué contiene \\
+\midrule
+\endhead
+\multicolumn{2}{@{}l}{\textbf{Raíz}} \\
+\archivo{Cargo.toml} & Paquete Rust, dependencias, perfil de compilación, espacio de trabajo \\
+\archivo{build.rs} & Compila el puente cxx-qt, registra los QML, compila el C++ y el Objective-C++ \\
+\midrule
+\multicolumn{2}{@{}l}{\textbf{Núcleo en Rust} (\archivo{src/})} \\
+\archivo{main.rs} & Arranque, sondas \texttt{--probe}, modo \texttt{--login} \\
+\archivo{ytm.rs} & Cliente de la API interna de YouTube Music \\
+\archivo{stream.rs} & Vía rápida para la URL del audio (cliente de visionOS) \\
+\archivo{resolver.rs} & Elige cómo obtener cada URL; caché y precarga \\
+\archivo{daemon.rs}, \archivo{ytdlp\_daemon.py} & yt-dlp residente \\
+\archivo{audio.rs} & Control de mpv \\
+\archivo{player.rs} & Singleton \cod{Player}: cola (añadir, mover, quitar), reproducción, repetición, lista temporal, controles del sistema \\
+\archivo{history.rs} & Registro de escuchas en la cuenta de YouTube Music (historial y reproducciones) \\
+\archivo{library.rs} & Singleton \cod{Library}: secciones, búsqueda, detalle, caché en disco; portada de una playlist y guardar canciones en ella \\
+\archivo{account.rs} & Singleton \cod{Account}: sesión, cookies, firma de peticiones \\
+\archivo{settings.rs} & Singleton \cod{AppSettings}: preferencias, skins y mascotas \\
+\archivo{lyrics.rs} & Letras sincronizadas de LRCLIB (líneas, pausas y, si las hay, palabras con tiempo) \\
+\archivo{plugins.rs} & Singleton \cod{Plugins}; reparto de eventos \\
+\archivo{plugins/discord.rs} & Presencia en Discord \\
+\archivo{plugins/lastfm.rs} & Scrobbling a Last.fm \\
+\archivo{window.cpp} & C++: memoria gráfica de ventanas ocultas, proxy, clics de depuración \\
+\archivo{login\_mac.mm} & Objective-C++: ventana de inicio de sesión de macOS \\
+\midrule
+\multicolumn{2}{@{}l}{\textbf{Ventana de inicio de sesión de Linux} (\archivo{login/})} \\
+\archivo{login/src/main.rs}, \archivo{login\_linux.cpp}, \archivo{build.rs} & Binario aparte con Qt WebEngine \\
+\midrule
+\multicolumn{2}{@{}l}{\textbf{Interfaz} (\archivo{qml/})} \\
+\archivo{Main.qml} & La ventana: compone todo, navegación, atajos, depuración \\
+\archivo{Theme.qml}, \archivo{Catalog.qml} & Singletons de aspecto y de datos \\
+\archivo{SectionView.qml} & Elige la vista de una sección \\
+\archivo{MuroView.qml}, \archivo{LomosView.qml}, \archivo{CubetaView.qml} & Las tres vistas \\
+\archivo{DetailView.qml}, \archivo{InspectView.qml} & Detalle de álbum/playlist/artista; caja 3D \\
+\archivo{NowPlayingView.qml}, \archivo{NowPlayingPanel.qml} & Pantalla «Sonando» y panel lateral \\
+\archivo{QueueList.qml} & La cola de los dos anteriores: saltar, menú y arrastrar para reordenar \\
+\archivo{CategoryBar.qml} & Pestañas de categorías de Playlists \\
+\archivo{Mascot.qml} & Mascota que cambia de pose según lo que suena \\
+\archivo{LyricsView.qml}, \archivo{LyricsTiming.qml} & Letra al estilo de Better Lyrics y su ajuste de retraso \\
+\archivo{PlayerBar.qml}, \archivo{MiniPlayer.qml} & Barra de reproducción y mini reproductor \\
+\archivo{SettingsSheet.qml} & Opciones, por categorías en una barra lateral \\
+\archivo{ContextMenu.qml} & Menú de clic derecho (con subpáginas) y avisos \\
+\archivo{Ambient.qml}, \archivo{Glass.qml}, \archivo{TintProbe.qml} & Fondo de color, vidrio, color dominante \\
+\archivo{Cover.qml}, \archivo{Icon.qml}, \archivo{IconButton.qml}, \archivo{PillButton.qml}, \archivo{Slider.qml}, \archivo{SearchField.qml}, \archivo{TextField.qml}, \archivo{TopNav.qml}, \archivo{ViewSwitcher.qml} & Piezas reutilizables \\
+\midrule
+\multicolumn{2}{@{}l}{\textbf{Otros}} \\
+\archivo{skins/*.json} & Las cuatro skins incluidas (las del usuario y las mascotas viven en su carpeta de configuración) \\
+\archivo{scripts/} & Crear la app de macOS, instalar en Linux \\
+\archivo{assets/} & Iconos de la aplicación \\
+\archivo{docs/} & Documentación, incluida esta guía \\
+\bottomrule
+\end{longtable}
+\end{center}

@@ -1,0 +1,300 @@
+\chapter{QML desde cero}
+\label{cap:qml}
+
+QML es el lenguaje con el que Qt describe interfaces. Si vienes de HTML/CSS/JavaScript te
+resultará familiar: es \emph{declarativo} (describes qué hay en pantalla) y la lógica se
+escribe en JavaScript. Si vienes de Java Swing o de Android, la diferencia principal es que en
+QML casi nunca «actualizas» la pantalla a mano: declaras de qué depende cada cosa y Qt la
+recalcula sola.
+
+\section{Un archivo QML}
+
+Cada archivo \archivo{qml/Nombre.qml} define un \emph{componente} que se usa en otros archivos
+como \cod{Nombre { ... }}. Dentro hay un árbol de objetos, cada uno con propiedades:
+
+\begin{qml}
+import QtQuick
+import app.musicplayer        // el módulo del proyecto: Theme, Player, Cover...
+
+Rectangle {
+    id: boton                 // nombre para referirse a este objeto desde otros
+    width: 160
+    height: 44
+    radius: height / 2        // binding: depende de height
+    color: Theme.control
+
+    Text {
+        anchors.centerIn: parent         // colócate en el centro de tu padre
+        text: "Reproducir"
+        color: Theme.text
+        font.pixelSize: 15
+    }
+}
+\end{qml}
+
+\begin{itemize}
+  \item \cod{import QtQuick} trae los tipos básicos (\cod{Item}, \cod{Rectangle},
+  \cod{Text}, \cod{Image}…). \cod{import app.musicplayer} trae los del proyecto, incluidos los
+  objetos escritos en Rust (\cod{Player}, \cod{Library}…).
+  \item \cod{id} es un nombre interno del archivo. No es una propiedad: no se puede cambiar.
+  \item Los hijos se declaran dentro de las llaves del padre y se dibujan encima de él, en
+  orden (el último, más arriba).
+\end{itemize}
+
+\section{Propiedades y \emph{bindings}}
+
+La idea más importante de QML: cuando escribes una expresión como valor de una propiedad,
+\textbf{no se evalúa una vez, se mantiene}. Si algo de lo que depende cambia, se recalcula.
+
+\begin{qml}
+Text {
+    text: Player.playing ? "Pausa" : "Reproducir"
+    color: Player.error !== "" ? Theme.accent : Theme.text
+}
+\end{qml}
+
+Cuando Rust cambia \cod{Player.playing}, el texto cambia solo. Por eso el núcleo en Rust nunca
+«dibuja»: solo cambia propiedades, y la interfaz las sigue.
+
+\subsection{Propiedades propias}
+
+\begin{qml}
+Item {
+    id: root
+    property string titulo: ""                        // propiedad con valor inicial
+    property int indice: 0
+    property var elementos: []                        // var: cualquier valor de JavaScript
+    readonly property bool vacio: elementos.length === 0   // calculada, de solo lectura
+}
+\end{qml}
+
+Tipos que verás: \cod{int}, \cod{real}, \cod{bool}, \cod{string}, \cod{color}, \cod{var}
+(objetos y listas de JavaScript) e \cod{Item} (una referencia a otro objeto visual).
+
+\subsection{Romper un binding}
+
+Si en código JavaScript \emph{asignas} un valor a una propiedad que tenía un binding
+(\cod{root.indice = 3}), el binding desaparece y queda el valor fijo. Es intencionado y el
+proyecto lo hace a menudo (por ejemplo, \cod{nowOpen} empieza ligado a un argumento de
+depuración y luego se asigna al abrir o cerrar la pantalla «Sonando»).
+
+\section{Colocar cosas}
+
+\begin{qml}
+Item {
+    width: 400; height: 200
+
+    Rectangle { x: 20; y: 10; width: 100; height: 100 }   // posición absoluta (relativa al padre)
+
+    Text {
+        anchors.right: parent.right                        // anclas: relativas a otros objetos
+        anchors.verticalCenter: parent.verticalCenter
+        anchors.rightMargin: 16
+    }
+
+    Row {                                                  // pone sus hijos en fila
+        spacing: 8
+        Rectangle { width: 30; height: 30 }
+        Rectangle { width: 30; height: 30 }
+    }
+}
+\end{qml}
+
+El proyecto mezcla las tres formas: \cod{x}/\cod{y} calculados para las vistas animadas (la
+estantería, la cubeta), \cod{anchors} para pegar cosas a bordes, y \cod{Row}/\cod{Column} para
+grupos de botones y textos.
+
+\section{Señales y manejadores}
+
+Una \emph{señal} es un evento que un objeto emite; quien lo usa la escucha con un
+\emph{manejador} \cod{on} + nombre con mayúscula:
+
+\begin{qml}
+// En IconButton.qml
+Item {
+    id: root
+    signal clicked()
+    TapHandler { onTapped: root.clicked() }
+}
+
+// Al usarlo
+IconButton {
+    icon: Theme.iconNext
+    onClicked: Player.next()
+}
+\end{qml}
+
+Toda propiedad tiene además una señal automática \cod{<propiedad>Changed}:
+
+\begin{qml}
+onIndexChanged: pos = index           // cada vez que cambia `index`
+\end{qml}
+
+Las señales pueden llevar datos; en el manejador se recogen con una función flecha:
+
+\begin{qml}
+SectionView { onActivated: item => win.choose(item) }
+\end{qml}
+
+\section{Funciones}
+
+Se escriben en JavaScript dentro del objeto:
+
+\begin{qml}
+function step(delta) {
+    if (items.length)
+        index = Math.max(0, Math.min(items.length - 1, index + delta))
+}
+\end{qml}
+
+Puedes llamar a funciones de otros objetos por su \cod{id} (\cod{sectionView.jump(3)}) y a las
+funciones que expone Rust (\cod{Player.playIndex(2)}).
+
+\section{Listas: \texttt{Repeater} y \texttt{ListView}}
+
+\begin{qml}
+ListView {
+    width: 300; height: 400
+    model: Catalog.queue                  // un array de JavaScript
+    delegate: Text {
+        required property var modelData  // el elemento de esta fila
+        required property int index      // su posición
+        text: (index + 1) + ". " + modelData.title
+    }
+}
+\end{qml}
+
+\begin{itemize}
+  \item \cod{model} es la lista de datos; \cod{delegate}, la plantilla de cada fila.
+  \item \cod{ListView} solo crea las filas visibles y se puede desplazar: para listas largas.
+  \item \cod{Repeater} crea un objeto por elemento, sin desplazamiento: para listas cortas o
+  cuando quieres colocarlos tú (los botones de pestaña, las cajas de la estantería).
+\end{itemize}
+
+\section{Interacción: los \emph{handlers}}
+
+Qt Quick tiene dos generaciones de objetos para el ratón. El proyecto usa la moderna, los
+\emph{pointer handlers}, salvo en casos concretos:
+
+\begin{qml}
+Item {
+    HoverHandler { id: raton; cursorShape: Qt.PointingHandCursor }   // ¿está el ratón encima?
+    TapHandler { onTapped: hacerAlgo(); onDoubleTapped: abrir() }   // clic, doble clic
+    TapHandler { acceptedButtons: Qt.RightButton; onTapped: menu() }  // clic derecho
+    WheelHandler { onWheel: event => desplazar(event.angleDelta.y) }  // rueda
+}
+\end{qml}
+
+\begin{trampa}[Los clics que atraviesan]
+Un \cod{TapHandler} normal no «se queda» el clic: lo que hay debajo también lo recibe. En los
+botones y en las capas que tapan la pantalla hay que pedir que lo agarre en exclusiva con
+\cod{gesturePolicy: TapHandler.ReleaseWithinBounds}. Lo verás en el
+capítulo~\ref{cap:trampas}; ya nos pasó tres veces.
+\end{trampa}
+
+\section{Animaciones}
+
+La forma más sencilla: \cod{Behavior}, que anima cualquier cambio de una propiedad.
+
+\begin{qml}
+Rectangle {
+    x: abierto ? 0 : -300
+    opacity: visible ? 1 : 0
+    Behavior on x { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
+    Behavior on opacity { NumberAnimation { duration: 160 } }
+}
+\end{qml}
+
+Cambias \cod{abierto} y el rectángulo se desliza. Las duraciones comunes del proyecto están en
+\cod{Theme.animFast} (160 ms) y \cod{Theme.animMove} (320 ms). Para animaciones continuas
+(el disco que gira) se usa \cod{RotationAnimation} con \cod{loops: Animation.Infinite}.
+
+\section{Componentes reutilizables y \texttt{required}}
+
+Cualquier archivo QML es un componente. Sus \cod{property} son su «interfaz pública»:
+
+\begin{qml}
+// PillButton.qml
+Item {
+    id: root
+    property string text
+    property bool primary: false
+    signal clicked()
+    // ...
+}
+
+// Uso
+PillButton { text: "Aleatorio"; onClicked: root.play(0, true) }
+\end{qml}
+
+\section{Singletons}
+
+Un \emph{singleton} es un objeto del que solo hay uno y que se usa por su nombre desde
+cualquier archivo, sin crearlo. El proyecto tiene siete:
+
+\begin{center}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Nombre & Escrito en & Archivo \\
+\midrule
+\cod{Player}, \cod{Library}, \cod{Account}, \cod{AppSettings}, \cod{Plugins} & Rust & \archivo{src/*.rs} \\
+\cod{Theme}, \cod{Catalog} & QML & \archivo{qml/Theme.qml}, \archivo{qml/Catalog.qml} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Un singleton QML empieza con \cod{pragma Singleton} y se registra en \archivo{build.rs} en
+\cod{QML_SINGLETONS}.
+
+\section{\texttt{Loader}: crear y destruir a demanda}
+
+\begin{qml}
+Loader {
+    sourceComponent: vista === "lomos" ? lomos : (vista === "cubeta" ? cubeta : muro)
+}
+Component { id: lomos; LomosView { } }
+\end{qml}
+
+Un \cod{Loader} crea su contenido solo cuando hace falta y lo destruye al cambiar. El
+proyecto lo usa para la vista de cada sección (\archivo{qml/SectionView.qml}) y para recrear
+los iconos (lo verás en el capítulo~\ref{cap:trampas}).
+
+\section{Efectos gráficos}
+
+\begin{description}[leftmargin=1.2em]
+  \item[\cod{MultiEffect}] (de \cod{QtQuick.Effects}): desenfoque, saturación, brillo,
+  sombras y máscaras sobre cualquier elemento. Lo usan los paneles de vidrio, la letra
+  desenfocada y los reflejos de la estantería.
+  \item[\cod{layer.enabled}] Dibuja un elemento en una textura aparte (necesario para
+  aplicarle efectos). Cuesta memoria de GPU: se activa solo donde hace falta.
+  \item[\cod{ShaderEffectSource}] Copia en una textura lo que hay en otra parte de la escena:
+  así los paneles de vidrio «ven» lo que tienen detrás para desenfocarlo.
+  \item[\cod{Shape}] Dibujo vectorial (los iconos, a partir de trazos SVG).
+  \item[\cod{Canvas}] Dibujo con una API como la de \texttt{<canvas>} de HTML. Solo se usa para
+  leer los píxeles de una carátula pequeña y calcular su color dominante.
+\end{description}
+
+\section{Depurar QML}
+
+\begin{itemize}
+  \item \cod{console.log("valor", algo)} escribe en la terminal desde la que lanzaste el
+  programa.
+  \item Los errores de QML también salen ahí, con archivo y línea:
+\begin{terminal}
+qrc:/qt/qml/app/musicplayer/qml/LomosView.qml:312:25: Cannot override FINAL property
+\end{terminal}
+  \item Un error de sintaxis o de tipos en un componente hace que \emph{ese componente} no se
+  cargue (y a menudo los que lo usan): si «desaparece» algo de la pantalla, mira la terminal.
+\end{itemize}
+
+\section{Para aprender más}
+
+La documentación oficial de Qt es muy buena: \url{https://doc.qt.io/qt-6/qmlapplications.html}.
+Lee en especial «QML Syntax Basics», «Property Binding», «Signal and Handler Event System» y
+«Positioning with Anchors».
+
+\begin{ejercicio}
+Abre \archivo{qml/PillButton.qml} y léelo entero. Identifica: sus propiedades públicas, su
+señal, el binding que decide el color de fondo y el manejador que emite la señal. Después haz
+lo mismo con \archivo{qml/Slider.qml}, que es algo más complejo (arrastrar).
+\end{ejercicio}

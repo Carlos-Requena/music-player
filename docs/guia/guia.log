@@ -1,4 +1,4 @@
-This is XeTeX, Version 3.141592653-2.6-0.999997 (TeX Live 2025) (preloaded format=xelatex 2026.2.23)  13 NOV 2026 23:32
+This is XeTeX, Version 3.141592653-2.6-0.999997 (TeX Live 2025) (preloaded format=xelatex 2026.2.23)  14 NOV 2026 14:18
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -1233,7 +1233,15 @@ Underfull \vbox (badness 1122) has occurred while \output is active []
 
 [2
 
-])
+]
+
+LaTeX Info: Redefining \. on input line 65.
+LaTeX Info: Redefining \% on input line 65.
+[3]
+
+LaTeX Info: Redefining \. on input line 93.
+LaTeX Info: Redefining \% on input line 93.
+[4])
 \tf@toc=\write4
 \openout4 = `guia.toc'.
 
@@ -1241,23 +1249,17 @@ Underfull \vbox (badness 1122) has occurred while \output is active []
 
 LaTeX Info: Redefining \. on input line 158.
 LaTeX Info: Redefining \% on input line 158.
-[3]
+[5]
 
 LaTeX Info: Redefining \. on input line 158.
 LaTeX Info: Redefining \% on input line 158.
-[4
+[6
 
 ] (./capitulos/01-como-leer.tex
 Capítulo 1.
 
 Package enumitem Warning: Negative labelwidth. This does not make much
 (enumitem)                sense, on input line 11.
-
-
-LaTeX Warning: Reference `cap:qml' on page 1 undefined on input line 14.
-
-
-LaTeX Warning: Reference `cap:qml' on page 1 undefined on input line 15.
 
 
 
@@ -1340,10 +1342,6 @@ LaTeX Info: Redefining \. on input line 624.
 LaTeX Info: Redefining \% on input line 624.
 [14]
 
-LaTeX Warning: Reference `cap:puente' on page 15 undefined on input line 646.
-
-
-
 LaTeX Info: Redefining \. on input line 678.
 LaTeX Info: Redefining \% on input line 678.
 [15]
@@ -1359,28 +1357,364 @@ Underfull \hbox (badness 10000) in paragraph at lines 764--766
 0)/m/n/10.95 iter().max_by(|a, b|
  []
 
-) (./capitulos/03-qml.tex)
+) (./capitulos/03-qml.tex
 
-LaTeX Info: Redefining \. on input line 163.
-LaTeX Info: Redefining \% on input line 163.
+LaTeX Info: Redefining \. on input line 1.
+LaTeX Info: Redefining \% on input line 1.
 [17]
+Capítulo 3.
+
+Overfull \hbox (23.16026pt too wide) in paragraph at lines 36--39
+[]\TU/Menlo(0)/m/n/10.95 import QtQuick \TU/texgyrepagella(0)/m/n/10.95 trae lo
+s tipos básicos (\TU/Menlo(0)/m/n/10.95 Item\TU/texgyrepagella(0)/m/n/10.95 , \
+TU/Menlo(0)/m/n/10.95 Rectangle\TU/texgyrepagella(0)/m/n/10.95 , \TU/Menlo(0)/m
+/n/10.95 Text\TU/texgyrepagella(0)/m/n/10.95 , \TU/Menlo(0)/m/n/10.95 Image\TU/
+texgyrepagella(0)/m/n/10.95 …). \TU/Menlo(0)/m/n/10.95 import app.musicplayer
+ []
+
+
 
 [18
 
-] (./capitulos/04-arquitectura.tex) (./capitulos/05-herramientas.tex)
-(./capitulos/06-puente.tex) (./capitulos/07-nucleo.tex)
-(./capitulos/08-nativo.tex) (./capitulos/09-interfaz.tex)
-(./capitulos/10-datos.tex) (./capitulos/11-flujos.tex)
+]
 
-[19
+LaTeX Info: Redefining \. on input line 107.
+LaTeX Info: Redefining \% on input line 107.
+[19]
 
-] (./capitulos/12-decisiones.tex) (./capitulos/13-rendimiento.tex)
-(./capitulos/14-trampas.tex)
+LaTeX Info: Redefining \. on input line 165.
+LaTeX Info: Redefining \% on input line 165.
+[20]
 
-[20
+LaTeX Info: Redefining \. on input line 218.
+LaTeX Info: Redefining \% on input line 218.
+[21]
+Overfull \hbox (3.55894pt too wide) in paragraph at lines 236--244
+ [] 
+ []
 
-] (./capitulos/15-recetas.tex) (./capitulos/16-depurar.tex)
-(./capitulos/17-ejercicios.tex) (./capitulos/18-apendices.tex) (./guia.aux
+
+
+LaTeX Info: Redefining \. on input line 275.
+LaTeX Info: Redefining \% on input line 275.
+[22])
+
+LaTeX Info: Redefining \. on input line 163.
+LaTeX Info: Redefining \% on input line 163.
+[23]
+
+[24
+
+] (./capitulos/04-arquitectura.tex
+Capítulo 4.
+LaTeX Font Info:    Font shape `TU/Menlo(0)/m/n' will be
+(Font)              scaled to size 7.38007pt on input line 30.
+LaTeX Font Info:    Font shape `TU/Menlo(0)/m/n' will be
+(Font)              scaled to size 6.56006pt on input line 49.
+
+Overfull \hbox (12.00029pt too wide) in paragraph at lines 51--52
+ [][] 
+ []
+
+
+Package enumitem Warning: Negative labelwidth. This does not make much
+(enumitem)                sense, on input line 56.
+
+
+Underfull \hbox (badness 2418) in paragraph at lines 85--85
+[]|\TU/texgyrepagella(0)/m/n/10.95 solo mientras está abierta la
+ []
+
+
+
+[25
+
+]
+
+LaTeX Info: Redefining \. on input line 120.
+LaTeX Info: Redefining \% on input line 120.
+[26]
+Overfull \hbox (32.47699pt too wide) in paragraph at lines 148--151
+[]\TU/texgyrepagella(0)/m/n/10.95 QML llama a funciones marcadas como invocable
+s: \TU/Menlo(0)/m/n/10.95 Player.playItem(json)\TU/texgyrepagella(0)/m/n/10.95 
+, \TU/Menlo(0)/m/n/10.95 Library.search("texto")\TU/texgyrepagella(0)/m/n/10.95
+ ,
+ []
+
+
+Underfull \vbox (badness 1371) has occurred while \output is active []
+
+
+
+LaTeX Info: Redefining \. on input line 157.
+LaTeX Info: Redefining \% on input line 157.
+[27]
+Overfull \hbox (39.49942pt too wide) in paragraph at lines 169--171
+[]\TU/texgyrepagella(0)/m/n/10.95 Verás este patrón con varios nombres: \TU/Men
+lo(0)/m/n/10.95 request \TU/texgyrepagella(0)/m/n/10.95 y \TU/Menlo(0)/m/n/10.9
+5 load_token \TU/texgyrepagella(0)/m/n/10.95 en \TU/Menlo(0)/m/n/10.95 Player\T
+U/texgyrepagella(0)/m/n/10.95 , \TU/Menlo(0)/m/n/10.95 search_request\TU/texgyr
+epagella(0)/m/n/10.95 , \TU/Menlo(0)/m/n/10.95 load_generation
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 205--205
+[]|[]\TU/texgyreheros(0)/m/n/10 login/src/main.rs[]\TU/texgyrepagella(0)/m/n/10
+ , []\TU/texgyreheros(0)/m/n/10 login_linux.cpp[]\TU/texgyrepagella(0)/m/n/10 ,
+
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 211--211
+[]|[]\TU/texgyreheros(0)/m/n/10 MuroView.qml[]\TU/texgyrepagella(0)/m/n/10 , []
+\TU/texgyreheros(0)/m/n/10 LomosView.qml[]\TU/texgyrepagella(0)/m/n/10 ,
+ []
+
+
+Underfull \hbox (badness 1796) in paragraph at lines 213--213
+[]|[]\TU/texgyreheros(0)/m/n/10 NowPlayingView.qml[]\TU/texgyrepagella(0)/m/n/1
+0 , []\TU/texgyreheros(0)/m/n/10 NowPlaying-
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 221--221
+[]|[]\TU/texgyreheros(0)/m/n/10 Ambient.qml[]\TU/texgyrepagella(0)/m/n/10 , []\
+TU/texgyreheros(0)/m/n/10 Glass.qml[]\TU/texgyrepagella(0)/m/n/10 , []\TU/texgy
+reheros(0)/m/n/10 TintPro-
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 222--222
+[]|[]\TU/texgyreheros(0)/m/n/10 Cover.qml[]\TU/texgyrepagella(0)/m/n/10 , []\TU
+/texgyreheros(0)/m/n/10 Icon.qml[]\TU/texgyrepagella(0)/m/n/10 , []\TU/texgyreh
+eros(0)/m/n/10 IconBut-
+ []
+
+
+Underfull \hbox (badness 1418) in paragraph at lines 222--222
+\TU/texgyreheros(0)/m/n/10 ton.qml[]\TU/texgyrepagella(0)/m/n/10 , []\TU/texgyr
+eheros(0)/m/n/10 PillButton.qml[]\TU/texgyrepagella(0)/m/n/10 , []\TU/texgyrehe
+ros(0)/m/n/10 Slider.qml[]\TU/texgyrepagella(0)/m/n/10 ,
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 222--222
+[]\TU/texgyreheros(0)/m/n/10 SearchField.qml[]\TU/texgyrepagella(0)/m/n/10 , []
+\TU/texgyreheros(0)/m/n/10 TextField.qml[]\TU/texgyrepagella(0)/m/n/10 ,
+ []
+
+LaTeX Info: Redefining \. on input line 230.
+LaTeX Info: Redefining \% on input line 230.
+[28]) (./capitulos/05-herramientas.tex
+
+LaTeX Info: Redefining \. on input line 1.
+LaTeX Info: Redefining \% on input line 1.
+[29]
+Capítulo 5.
+
+
+[30
+
+]
+
+LaTeX Info: Redefining \. on input line 108.
+LaTeX Info: Redefining \% on input line 108.
+[31]
+Overfull \hbox (12.0237pt too wide) in paragraph at lines 138--140
+[]\TU/texgyrepagella(0)/m/n/10.95 El módulo se llama \TU/Menlo(0)/m/n/10.95 app
+.musicplayer\TU/texgyrepagella(0)/m/n/10.95 : es lo que importan los QML (\TU/M
+enlo(0)/m/n/10.95 import app.musicplayer\TU/texgyrepagella(0)/m/n/10.95 ). 
+ []
+
+
+Overfull \hbox (7.76439pt too wide) in paragraph at lines 164--168
+[]\TU/texgyrepagella(0)/m/n/10.95 Compila, crea \TU/Menlo(0)/m/n/10.95 Reproduc
+tor.app \TU/texgyrepagella(0)/m/n/10.95 con su icono e \TU/Menlo(0)/m/n/10.95 I
+nfo.plist\TU/texgyrepagella(0)/m/n/10.95 ,
+ []
+
+
+
+LaTeX Info: Redefining \. on input line 168.
+LaTeX Info: Redefining \% on input line 168.
+[32]
+Overfull \hbox (9.43002pt too wide) in paragraph at lines 168--172
+\TU/texgyrepagella(0)/m/n/10.95 trada de menú, icono y, si se compiló con WebEn
+gine, \TU/Menlo(0)/m/n/10.95 musicplayer-login\TU/texgyrepagella(0)/m/n/10.95 )
+. Con \TU/Menlo(0)/m/n/10.95 --dependencias
+ []
+
+
+Underfull \hbox (badness 1122) in paragraph at lines 236--237
+[]|\TU/texgyrepagella(0)/m/n/10 Abre las opciones en una categoría: \TU/Menlo(0
+)/m/n/10 cuenta\TU/texgyrepagella(0)/m/n/10 , \TU/Menlo(0)/m/n/10 reproduccion\
+TU/texgyrepagella(0)/m/n/10 ,
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 238--238
+[]|\TU/Menlo(0)/m/n/10 --minimize ms \TU/texgyrepagella(0)/m/n/10 [\TU/Menlo(0)
+/m/n/10 --hide\TU/texgyrepagella(0)/m/n/10 |\TU/Menlo(0)/m/n/10 --mini\TU/texgy
+repagella(0)/m/n/10 ]
+ []
+
+LaTeX Info: Redefining \. on input line 241.
+LaTeX Info: Redefining \% on input line 241.
+[33]
+Underfull \hbox (badness 10000) in paragraph at lines 254--255
+[]|\TU/texgyrepagella(0)/m/n/10 Clics de ratón reales: \TU/Menlo(0)/m/n/10 "x,y
+,left|right,ms;…"\TU/texgyrepagella(0)/m/n/10 . Arrastres:
+ []
+
+
+
+LaTeX Info: Redefining \. on input line 282.
+LaTeX Info: Redefining \% on input line 282.
+[34]) (./capitulos/06-puente.tex
+
+LaTeX Info: Redefining \. on input line 1.
+LaTeX Info: Redefining \% on input line 1.
+[35]
+Capítulo 6.
+
+
+[36
+
+]
+Overfull \hbox (29.88647pt too wide) in paragraph at lines 66--69
+\TU/texgyrepagella(0)/m/n/10.95 Qt; para pasar de \TU/Menlo(0)/m/n/10.95 String
+ \TU/texgyrepagella(0)/m/n/10.95 a \TU/Menlo(0)/m/n/10.95 QString \TU/texgyrepa
+gella(0)/m/n/10.95 se usa \TU/Menlo(0)/m/n/10.95 QString::from(&texto) \TU/texg
+yrepagella(0)/m/n/10.95 y al revés \TU/Menlo(0)/m/n/10.95 qstring.to_string()\T
+U/texgyrepagella(0)/m/n/10.95 . 
+ []
+
+
+Overfull \hbox (11.88173pt too wide) in paragraph at lines 76--78
+[]\TU/Menlo(0)/m/n/10.95 set_nombre(valor) \TU/texgyrepagella(0)/m/n/10.95 para
+ escribirla, que además \TU/texgyrepagella(0)/b/n/10.95 avisa a QML \TU/texgyre
+pagella(0)/m/n/10.95 con la señal \TU/Menlo(0)/m/n/10.95 nombreChanged\TU/texgy
+repagella(0)/m/n/10.95 , 
+ []
+
+
+
+LaTeX Info: Redefining \. on input line 108.
+LaTeX Info: Redefining \% on input line 108.
+[37]
+Overfull \hbox (6.58167pt too wide) in paragraph at lines 124--126
+[]\TU/texgyrepagella(0)/m/n/10.95 Las propiedades solo se pueden tocar desde el
+ hilo de Qt. El patrón completo, de \TU/Menlo(0)/m/n/10.95 Library::search\TU/t
+exgyrepagella(0)/m/n/10.95 : 
+ []
+
+
+Overfull \hbox (15.56818pt too wide) in paragraph at lines 155--157
+[]\TU/Menlo(0)/m/n/10.95 qt.queue(clausura) \TU/texgyrepagella(0)/m/n/10.95 pid
+e a Qt que ejecute la clausura en su hilo, pasándole el objeto (\TU/Menlo(0)/m/
+n/10.95 library\TU/texgyrepagella(0)/m/n/10.95 ).
+ []
+
+
+
+LaTeX Info: Redefining \. on input line 162.
+LaTeX Info: Redefining \% on input line 162.
+[38]
+Underfull \hbox (badness 10000) in paragraph at lines 193--193
+[]|\TU/texgyrepagella(0)/m/n/10.95 Desactiva el proxy automático del sistema en
+ Qt
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 193--193
+[]|\TU/texgyrepagella(0)/m/n/10.95 Ventana de inicio de sesión de macOS
+ []
+
+) (./capitulos/07-nucleo.tex
+
+LaTeX Info: Redefining \. on input line 1.
+LaTeX Info: Redefining \% on input line 1.
+[39]
+Capítulo 7.
+) (./capitulos/08-nativo.tex
+
+[40
+
+]
+Capítulo 8.
+) (./capitulos/09-interfaz.tex
+
+[41
+
+]
+Capítulo 9.
+) (./capitulos/10-datos.tex
+
+[42
+
+]
+Capítulo 10.
+) (./capitulos/11-flujos.tex
+
+[43
+
+]
+Capítulo 11.
+)
+
+[44
+
+]
+
+[45
+
+] (./capitulos/12-decisiones.tex
+Capítulo 12.
+) (./capitulos/13-rendimiento.tex
+
+[46
+
+]
+Capítulo 13.
+) (./capitulos/14-trampas.tex
+
+[47
+
+]
+Capítulo 14.
+)
+
+[48
+
+]
+
+[49
+
+] (./capitulos/15-recetas.tex
+Capítulo 15.
+) (./capitulos/16-depurar.tex
+
+[50
+
+]
+Capítulo 16.
+) (./capitulos/17-ejercicios.tex
+
+[51
+
+]
+Capítulo 17.
+) (./capitulos/18-apendices.tex
+
+[52
+
+]
+Apéndice A.
+)
+
+[53
+
+] (./guia.aux
 LaTeX Info: Redefining \. on input line 8.
 LaTeX Info: Redefining \% on input line 8.
 )
@@ -1388,18 +1722,14 @@ LaTeX Info: Redefining \% on input line 8.
 LaTeX2e <2024-11-01> patch level 2
 L3 programming layer <2025-01-18>
  ***********
-
-
-LaTeX Warning: There were undefined references.
-
  ) 
 Here is how much of TeX's memory you used:
- 34935 strings out of 473832
- 745141 string characters out of 5729481
- 1526031 words of memory out of 5000000
- 57395 multiletter control sequences out of 15000+600000
- 563042 words of font info for 103 fonts, out of 8000000 for 9000
+ 35467 strings out of 473832
+ 753149 string characters out of 5729481
+ 1677273 words of memory out of 5000000
+ 57918 multiletter control sequences out of 15000+600000
+ 563114 words of font info for 112 fonts, out of 8000000 for 9000
  1348 hyphenation exceptions out of 8191
- 86i,13n,98p,1001b,2139s stack positions out of 10000i,1000n,20000p,200000b,200000s
+ 86i,13n,98p,1001b,2245s stack positions out of 10000i,1000n,20000p,200000b,200000s
 
-Output written on guia.xdv (24 pages, 658472 bytes).
+Output written on guia.xdv (59 pages, 1463000 bytes).

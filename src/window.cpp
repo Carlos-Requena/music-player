@@ -52,9 +52,38 @@ extern "C" void musicplayer_configure_network()
     QNetworkProxy::setApplicationProxy(QNetworkProxy::NoProxy);
 }
 
+static void sendMouse(QQuickWindow *window, QEvent::Type type, QPointF at, Qt::MouseButton button,
+                      Qt::MouseButtons buttons)
+{
+    QMouseEvent event(type, at, window->mapToGlobal(at), button, buttons, Qt::NoModifier);
+    QGuiApplication::sendEvent(window, &event);
+}
+
+// Arrastre con el botón izquierdo de `from` a `to` en ~400 ms; con `hold` no suelta (para
+// capturar a mitad del gesto).
+static void scheduleDebugDrag(QQuickWindow *window, QPointF from, QPointF to, int at, bool hold)
+{
+    QTimer::singleShot(at, window, [window, from]() {
+        sendMouse(window, QEvent::MouseMove, from, Qt::NoButton, Qt::NoButton);
+        sendMouse(window, QEvent::MouseButtonPress, from, Qt::LeftButton, Qt::LeftButton);
+    });
+    const int steps = 20;
+    for (int i = 1; i <= steps; ++i) {
+        const QPointF point = from + (to - from) * (double(i) / steps);
+        QTimer::singleShot(at + 20 * i, window, [window, point]() {
+            sendMouse(window, QEvent::MouseMove, point, Qt::NoButton, Qt::LeftButton);
+        });
+    }
+    if (!hold)
+        QTimer::singleShot(at + 20 * steps + 60, window, [window, to]() {
+            sendMouse(window, QEvent::MouseButtonRelease, to, Qt::LeftButton, Qt::NoButton);
+        });
+}
+
 // Depuración: MUSICPLAYER_DEBUG_CLICK="x,y,boton,ms[;x,y,boton,ms…]" envía clics de ratón de
 // verdad a la ventana principal (boton: left o right; ms desde el arranque). Sirve para
-// probar menús y gestos en capturas automáticas sin tocar el ratón.
+// probar menús y gestos en capturas automáticas sin tocar el ratón. «x,y,drag,ms,x2,y2»
+// arrastra hasta (x2, y2) y «x,y,draghold,ms,x2,y2» lo mismo sin soltar.
 static void scheduleDebugClicks(QQuickWindow *window)
 {
     const QByteArray spec = qgetenv("MUSICPLAYER_DEBUG_CLICK");
@@ -62,6 +91,12 @@ static void scheduleDebugClicks(QQuickWindow *window)
         return;
     for (const QByteArray &click : spec.split(';')) {
         const QList<QByteArray> parts = click.split(',');
+        if (parts.size() == 6 && (parts[2] == "drag" || parts[2] == "draghold")) {
+            scheduleDebugDrag(window, QPointF(parts[0].toDouble(), parts[1].toDouble()),
+                              QPointF(parts[4].toDouble(), parts[5].toDouble()), parts[3].toInt(),
+                              parts[2] == "draghold");
+            continue;
+        }
         if (parts.size() != 4)
             continue;
         const QPointF at(parts[0].toDouble(), parts[1].toDouble());

@@ -16,6 +16,27 @@ FocusScope {
 
     signal activated(var item)
 
+    // Playlists con categorías: ↑/↓ (si la vista no los usa, como Lomos) y RePág/AvPág
+    // cambian de pestaña. La estantería vuelve al principio al cambiar.
+    Keys.onPressed: event => {
+        if (section !== "playlists" || Catalog.categorias.length === 0)
+            return
+        const back = event.key === Qt.Key_Up || event.key === Qt.Key_PageUp
+        const forward = event.key === Qt.Key_Down || event.key === Qt.Key_PageDown
+        if (back || forward) {
+            Catalog.stepCategoria(back ? -1 : 1)
+            event.accepted = true
+        }
+    }
+
+    Connections {
+        target: Catalog
+        function onCategoriaChanged() {
+            if (root.section === "playlists")
+                root.jump(0)
+        }
+    }
+
     // Lleva la vista al elemento `n` (solo las vistas lineales tienen índice).
     function jump(n) {
         if (loader.item && loader.item.index !== undefined)

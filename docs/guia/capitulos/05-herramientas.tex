@@ -1,0 +1,282 @@
+\chapter{Herramientas, compilación y pruebas}
+\label{cap:herramientas}
+
+\section{Lo que hace falta}
+
+\begin{center}
+\begin{tabularx}{\linewidth}{@{}lXl@{}}
+\toprule
+Pieza & Para qué & Cuándo \\
+\midrule
+Rust (cargo) & compilar el núcleo & al compilar \\
+Compilador de C++ & el puente y el código nativo & al compilar \\
+Qt 6.8+ (base, declarative, shadertools) & la interfaz & al compilar y al usar \\
+mpv & reproducir & al usar \\
+yt-dlp + deno (o Node.js) & obtener audio cuando la vía rápida no basta & al usar \\
+qt6-webengine (solo Linux, opcional) & ventana de inicio de sesión & al compilar y al usar \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+Los comandos exactos para macOS y Arch están en \archivo{COMPILAR.md}.
+
+\section{\texttt{Cargo.toml}: el paquete}
+
+\begin{codigo}
+[package]
+name = "musicplayer"
+edition = "2021"
+
+[workspace]
+members = ["login"]
+default-members = [".", "login"]
+
+[dependencies]
+cxx = "1.0.95"
+cxx-qt = "0.10"
+cxx-qt-lib = { version = "0.10", features = ["qt_gui", "qt_qml"] }
+dirs = "6"
+md5 = "0.8"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha1 = "0.10"
+souvlaki = { version = "0.9", default-features = false, features = ["use_zbus"] }
+ureq = { version = "3", features = ["json"] }
+
+[build-dependencies]
+cc = "1"
+cxx-qt-build = { version = "0.10", features = ["link_qt_object_files"] }
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+strip = true
+\end{codigo}
+
+\subsection{Las dependencias, una por una}
+
+Cada una está por un motivo; el proyecto evita dependencias que no se ganen su sitio.
+
+\begin{description}[leftmargin=1.2em]
+  \item[\cod{cxx}, \cod{cxx-qt}, \cod{cxx-qt-lib}] El puente con Qt
+  (capítulo~\ref{cap:puente}). \cod{cxx-qt-lib} trae los tipos de Qt (\cod{QString},
+  \cod{QGuiApplication}, \cod{QQmlApplicationEngine}…).
+  \item[\cod{serde}, \cod{serde_json}] Convertir structs a JSON y desde JSON. Se usan para hablar
+  con YouTube, con mpv, con Discord y con la interfaz.
+  \item[\cod{ureq}] Cliente HTTP \emph{síncrono} y pequeño. Síncrono a propósito: el proyecto
+  usa hilos normales en vez de programación asíncrona (\cod{async}/\cod{tokio}), que añadiría un
+  motor entero y bastante complejidad para un número de peticiones muy pequeño.
+  \item[\cod{dirs}] Rutas estándar de cada sistema: configuración
+  (\texttt{\textasciitilde/Library/Application Support} en macOS, \texttt{\textasciitilde/.config}
+  en Linux) y caché.
+  \item[\cod{sha1}] La firma de las peticiones con sesión a YouTube (SAPISIDHASH).
+  \item[\cod{md5}] La firma de las peticiones a Last.fm (su API la exige).
+  \item[\cod{souvlaki}] Controles multimedia del sistema: el «Ahora suena» del Centro de
+  control de macOS y MPRIS en Linux (las teclas multimedia, el widget del escritorio). Se
+  compila con \cod{use_zbus} para no depender de las bibliotecas de D-Bus en C.
+  \item[\cod{cc}] (al compilar) Compilar el C++ y el Objective-C++ propios.
+  \item[\cod{cxx-qt-build}] (al compilar) Generar el código del puente y enlazar con Qt.
+\end{description}
+
+\subsection{El perfil \texttt{release}}
+
+\cod{opt-level = 3} optimiza al máximo; \cod{lto = "thin"} permite optimizar entre crates (algo
+más lento de compilar, binario más rápido y pequeño); \cod{strip = true} quita los símbolos de
+depuración del binario (pesa menos y carga antes).
+
+\subsection{El espacio de trabajo}
+
+El repositorio tiene dos paquetes: el reproductor (la raíz) y \archivo{login/}
+(\cod{musicplayer-login}, la ventana de inicio de sesión de Linux). \cod{[workspace]} los
+compila juntos con un solo \cod{cargo build}; \cod{default-members} hace que se compilen los
+dos por defecto.
+
+\begin{porque}[¿Por qué un binario aparte para el inicio de sesión de Linux?]
+La ventana de Linux usa Qt WebEngine, que es Chromium entero. Si el reproductor lo enlazara,
+lo cargaría al arrancar aunque nunca se use. En un binario aparte, solo ocupa memoria
+mientras la ventana está abierta. Además, si falta \texttt{qt6-webengine} el reproductor se
+compila igual.
+\end{porque}
+
+\section{\texttt{build.rs}: lo que pasa antes de compilar}
+
+Un \archivo{build.rs} es un programa en Rust que cargo ejecuta \emph{antes} de compilar el
+paquete. El del reproductor hace tres cosas:
+
+\begin{rust}
+const QML_FILES: &[&str] = &["qml/Main.qml", "qml/Ambient.qml", /* ... */];
+const QML_SINGLETONS: &[&str] = &["qml/Theme.qml", "qml/Catalog.qml"];
+
+fn main() {
+    // 1) Un módulo QML «app.musicplayer» con todos los archivos QML.
+    let module = QmlModule::new("app.musicplayer")
+        .qml_files(QML_FILES.iter().copied())
+        .qml_files(QML_SINGLETONS.iter().map(|path| QmlFile::from(path).singleton(true)));
+
+    // 2) El puente: genera C++ para cada archivo Rust con #[cxx_qt::bridge] y enlaza Qt.
+    CxxQtBuilder::new_qml_module(module)
+        .qt_module("Gui").qt_module("Quick").qt_module("Network")
+        .cpp_file("src/window.cpp")
+        .files(["src/account.rs", "src/library.rs", "src/player.rs",
+                "src/plugins.rs", "src/settings.rs"])
+        .build();
+
+    // 3) Solo en macOS: la ventana de inicio de sesión en Objective-C++.
+    if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("macos") {
+        cc::Build::new().cpp(true).file("src/login_mac.mm").flag("-fobjc-arc")
+            .flag("-std=c++17").compile("musicplayer_login");
+        println!("cargo::rustc-link-lib=framework=Cocoa");
+        println!("cargo::rustc-link-lib=framework=WebKit");
+    }
+}
+\end{rust}
+
+\begin{itemize}
+  \item Los archivos QML se \textbf{compilan dentro del binario} (como recursos
+  \texttt{qrc:/}). No hay que copiar nada junto al ejecutable, y QML los precompila, así que
+  arranca antes.
+  \item El módulo se llama \cod{app.musicplayer}: es lo que importan los QML
+  (\cod{import app.musicplayer}).
+  \item Las líneas \cod{println!("cargo::...")} son instrucciones para cargo: enlazar una
+  biblioteca, recompilar si cambia un archivo o una variable de entorno, etc.
+\end{itemize}
+
+\begin{trampa}
+Un archivo QML nuevo que no se añade a \cod{QML_FILES} \emph{no existe} para QML («Type X
+unavailable»). Un archivo Rust nuevo con \cod{#[cxx_qt::bridge]} hay que añadirlo a
+\cod{.files([...])} y como \cod{mod} en \archivo{src/main.rs}.
+\end{trampa}
+
+\section{Compilar y ejecutar}
+
+\begin{terminal}
+cargo build --release          # compila (la primera vez, unos minutos; luego ~15 s)
+./target/release/musicplayer   # ejecuta
+cargo run --release            # las dos cosas
+\end{terminal}
+
+Compila siempre en \texttt{release} si vas a medir velocidad o memoria: la versión de
+depuración (\texttt{cargo build}) es varias veces más lenta.
+
+Para tenerla como aplicación:
+
+\begin{description}[leftmargin=1.2em]
+  \item[macOS: \archivo{scripts/crear-app-macos.sh}] Compila, crea \texttt{Reproductor.app}
+  con su icono e \texttt{Info.plist}, la firma con una firma local (Apple Silicon no abre apps
+  sin firmar) y la copia a \texttt{/Applications}. Con \texttt{--independiente} mete Qt dentro
+  de la app (\texttt{macdeployqt}), para que no dependa de Homebrew.
+  \item[Linux: \archivo{scripts/instalar-linux.sh}] Compila e instala para tu usuario en
+  \texttt{\textasciitilde/.local} (programa, entrada de menú, icono y, si se compiló con
+  WebEngine, \texttt{musicplayer-login}). Con \texttt{--dependencias} instala antes los paquetes
+  con pacman.
+\end{description}
+
+\section{Probar sin abrir la ventana: las sondas}
+
+\archivo{src/main.rs} tiene un modo «sonda»: hace una consulta, imprime el resultado y sale,
+sin crear la interfaz. Es la forma más rápida de saber si un problema es de la red o de la
+interfaz.
+
+\begin{center}
+\small
+\begin{longtable}{@{}p{0.42\linewidth}p{0.52\linewidth}@{}}
+\toprule
+Orden & Qué hace \\
+\midrule
+\endhead
+\texttt{--probe home} / \texttt{explore} / \texttt{albums} & Secciones de YouTube Music \\
+\texttt{--probe playlists} & Playlists por estado de ánimo \\
+\texttt{--probe search "texto"} & Búsqueda \\
+\texttt{--probe queue ID} & Radio de una canción \\
+\texttt{--probe album ID} & Canciones de un álbum o playlist (página real) \\
+\texttt{--probe lyrics "título" "artista"} & Letra sincronizada \\
+\texttt{--probe play ID} & Resuelve y reproduce 25 s, con tiempos \\
+\texttt{--probe resolve id1,id2} & Mide la resolución (con el yt-dlp residente) \\
+\texttt{--probe fast id1,id2} & Solo la vía rápida, y por qué falla cada una \\
+\texttt{--probe url ID} & La URL de la vía rápida \\
+\texttt{--probe playable ID} & Qué dice el reproductor de YouTube Music de una pista \\
+\texttt{--probe account} & Si YouTube reconoce la sesión guardada \\
+\texttt{--probe cookies chrome} & Diagnóstico de importar la sesión de un navegador \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+\section{Capturas automáticas}
+
+\archivo{qml/Main.qml} acepta argumentos de depuración. El principal es \texttt{--shot}: abre
+la ventana, espera, guarda una captura, escribe una línea \texttt{estado:} con el estado del
+reproductor y sale.
+
+\begin{terminal}
+MUSICPLAYER_SILENT=1 ./target/release/musicplayer --shot /tmp/c.png --delay 12000 \
+  --section albumes --index 3 --autoplay --autoplay-delay 4000 --now
+\end{terminal}
+
+\begin{center}
+\small
+\begin{longtable}{@{}p{0.34\linewidth}p{0.6\linewidth}@{}}
+\toprule
+Argumento & Efecto \\
+\midrule
+\endhead
+\texttt{--shot ruta.png} & Captura la ventana y sale \\
+\texttt{--delay ms} & Espera antes de capturar \\
+\texttt{--section id} & \texttt{inicio}, \texttt{explorar}, \texttt{playlists}, \texttt{albumes}, \texttt{megusta} o \texttt{buscar} \\
+\texttt{--index n} & Lleva la vista al elemento \texttt{n} \\
+\texttt{--step n} (\texttt{--step-delay ms}) & Mueve la vista \texttt{n} elementos (capturar en movimiento) \\
+\texttt{--search texto} & Busca al arrancar \\
+\texttt{--autoplay} (\texttt{--autoplay-delay ms}) & Reproduce el elemento enfocado \\
+\texttt{--then-next ms} & Pasa a la siguiente pista \\
+\texttt{--open} (\texttt{--shuffle}) & Abre el detalle (y pulsa «Aleatorio») \\
+\texttt{--inspect [flip|open|disc]} & Modo inspeccionar \\
+\texttt{--now} & Abre la pantalla «Sonando» \\
+\texttt{--tab letra|cola|temporal} & Pestaña del panel derecho \\
+\texttt{--temporal} & Añade a la lista temporal y abre el menú contextual \\
+\texttt{--settings}, \texttt{--settings-end} & Abre las opciones (al principio o al final) \\
+\texttt{--settings-cat id} & Abre las opciones en una categoría: \texttt{cuenta}, \texttt{reproduccion}, \texttt{apariencia}, \texttt{vistas}, \texttt{plugins} \\
+\texttt{--settings-at y} & Abre las opciones desplazadas \texttt{y} píxeles \\
+\texttt{--minimize ms} [\texttt{--hide}|\texttt{--mini}] [\texttt{--restore ms}] & Minimiza, oculta o abre el mini; y vuelve \\
+\texttt{--no-panel} & Sin panel derecho \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+Variables de entorno útiles:
+
+\begin{center}
+\small
+\begin{longtable}{@{}p{0.34\linewidth}p{0.6\linewidth}@{}}
+\toprule
+Variable & Efecto \\
+\midrule
+\endhead
+\texttt{MUSICPLAYER\_SILENT=1} & mpv no saca sonido (pruebas) \\
+\texttt{MUSICPLAYER\_DEBUG\_CLICK} & Clics de ratón reales: \texttt{"x,y,left|right,ms;…"}. Arrastres: \texttt{"x,y,drag,ms,x2,y2"}, o \texttt{draghold} para no soltar y capturar a mitad del gesto \\
+\texttt{MUSICPLAYER\_LOGIN\_SHOT}, \texttt{\_URL} & Captura y página inicial de la ventana de inicio de sesión (macOS) \\
+\texttt{MUSICPLAYER\_YTDLP\_CLIENTS} & Fuerza los clientes de YouTube de yt-dlp (experimentos) \\
+\texttt{MUSICPLAYER\_DISCORD\_ID} & (al compilar) Otra aplicación de Discord \\
+\texttt{HOME=/carpeta} & Aísla preferencias, sesión y caché de las tuyas \\
+\texttt{HTTPS\_PROXY} & Proxy para la red \\
+\texttt{QT\_QPA\_PLATFORM=offscreen} & Sin ventana visible \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+\section{Pruebas}
+
+\begin{terminal}
+cargo test --release
+\end{terminal}
+
+Hay pruebas para lo que es lógica pura y se puede comprobar sin red: el formato de las
+cookies, la firma de la sesión, la elección del mejor formato de audio, el protocolo de
+Discord (contra un Discord simulado), la firma de Last.fm y sus reglas de scrobble, cómo se
+convierten las tarjetas en pistas, cómo se arman los avisos de escucha para YouTube Music (y
+que las cookies solo vayan a servidores de YouTube)\dots{} La interfaz se prueba con capturas y clics simulados.
+
+\begin{trampa}[No castigues a YouTube]
+Cada prueba que va a la red hace peticiones reales. Si se encadenan muchas, YouTube rechaza
+la IP un rato («Requested format is not available», 403, «Sign in to confirm you're not a
+bot»). Agrupa las pruebas, espera unos minutos si aparecen esos errores y no los tomes por
+fallos del código sin comprobarlo antes con \texttt{yt-dlp} directamente.
+\end{trampa}

@@ -17,7 +17,7 @@ use cxx_qt_lib::QString;
 
 use crate::{
     audio::{Event, Mpv},
-    lyrics, plugins, resolver,
+    history, lyrics, plugins, resolver,
     ytm::{self, Item, Track},
 };
 
@@ -49,6 +49,8 @@ pub mod qobject {
         #[qproperty(QString, calidad)]
         /// Al acabar la cola vuelve a empezar.
         #[qproperty(bool, repetir)]
+        /// Repite la canción que suena (mpv `loop-file`).
+        #[qproperty(bool, repetir_una)]
         /// Lista temporal (JSON de `[ytm::Track]`): canciones sueltas reunidas a mano.
         #[qproperty(QString, temporal)]
         type Player = super::PlayerRust;
@@ -123,9 +125,27 @@ pub mod qobject {
         #[qinvokable]
         fn clear_temporal(self: Pin<&mut Player>);
 
+        /// Pasa al siguiente modo de repetición, como en cualquier reproductor:
+        /// desactivada → repetir la cola → repetir la canción → desactivada.
+        #[qinvokable]
+        fn cycle_repeat(self: Pin<&mut Player>);
+
         /// Reproduce la lista temporal desde `index`, en bucle.
         #[qinvokable]
         fn play_temporal(self: Pin<&mut Player>, index: i32);
+
+        /// Pone una canción, o todas las de un álbum o playlist, justo detrás de la que suena
+        /// (con `next`) o al final de la cola. Sin nada sonando, empiezan a sonar.
+        #[qinvokable]
+        fn enqueue(self: Pin<&mut Player>, item: &QString, next: bool);
+
+        /// Mueve la pista `from` de la cola a la posición `to`; la que suena sigue sonando.
+        #[qinvokable]
+        fn move_in_queue(self: Pin<&mut Player>, from: i32, to: i32);
+
+        /// Quita de la cola la pista `index` (no la que suena).
+        #[qinvokable]
+        fn remove_from_queue(self: Pin<&mut Player>, index: i32);
     }
 
     impl cxx_qt::Threading for Player {}
@@ -167,9 +187,25 @@ pub struct PlayerRust {
     codec: String,
     kbps: f64,
     repetir: bool,
+    repetir_una: bool,
     temporal: QString,
     /// Pistas de la lista temporal (`temporal` es su JSON).
     temporal_tracks: Vec<Track>,
+    /// Escucha que se está registrando en la cuenta (opción `historial`).
+    listen: Option<Listen>,
+}
+
+/// Escucha en curso que se registra en la cuenta. Los tramos escuchados se envían cada 30 s,
+/// al pausar, al saltar a otro punto y al cambiar de pista.
+struct Listen {
+    /// `load_token` de la carga a la que pertenece.
+    token: u64,
+    /// Llega del hilo de red poco después de empezar a sonar.
+    report: Option<history::Report>,
+    /// Inicio del tramo aún sin enviar.
+    from: f64,
+    /// Última posición conocida.
+    last: f64,
 }
 
 /// Pista a partir del JSON de una tarjeta del catálogo (`Item`) o de una pista (`Track`).
@@ -223,6 +259,13 @@ fn cached_queue(playlist_id: &str) -> Option<Vec<Track>> {
     QUEUES.lock().ok()?.get(playlist_id).cloned()
 }
 
+/// Olvida la cola guardada de una playlist (p. ej. tras añadirle canciones).
+pub fn forget_queue(playlist_id: &str) {
+    if let Ok(mut queues) = QUEUES.lock() {
+        queues.remove(playlist_id);
+    }
+}
+
 /// Cola de un álbum o playlist, desde la caché o la red.
 fn album_queue(playlist_id: &str) -> ytm::Result<Vec<Track>> {
     if let Some(tracks) = cached_queue(playlist_id) {
@@ -268,8 +311,10 @@ impl Default for PlayerRust {
             codec: String::new(),
             kbps: 0.0,
             repetir: false,
+            repetir_una: false,
             temporal: QString::from("[]"),
             temporal_tracks: Vec::new(),
+            listen: None,
         }
     }
 }
@@ -516,6 +561,7 @@ impl qobject::Player {
     }
 
     fn restart_engine(mut self: Pin<&mut Self>) {
+        self.as_mut().end_listen();
         self.as_mut().rust_mut().mpv = None;
         self.as_mut().set_playing(false);
         self.as_mut().set_loading(false);
@@ -526,6 +572,9 @@ impl qobject::Player {
     /// Resuelve de antemano las tres pistas siguientes de la cola (con repetición, dando la
     /// vuelta). Las que necesitan la sesión tardan ~2 s en resolverse: así ya están listas.
     fn prefetch_next(&self) {
+        if *self.repetir_una() {
+            return;
+        }
         let len = self.tracks.len();
         let at = *self.index() as usize;
         for step in 1..=3 {
@@ -590,6 +639,20 @@ impl qobject::Player {
         self.set_temporal_tracks(Vec::new());
     }
 
+    fn cycle_repeat(mut self: Pin<&mut Self>) {
+        let (cola, una) = match (*self.repetir(), *self.repetir_una()) {
+            (false, false) => (true, false),
+            (true, false) => (false, true),
+            _ => (false, false),
+        };
+        self.as_mut().set_repetir(cola);
+        self.as_mut().set_repetir_una(una);
+        if let Some(mpv) = self.as_mut().rust_mut().mpv.as_mut() {
+            let _ = mpv.set_loop_file(una);
+        }
+        self.prefetch_next();
+    }
+
     fn play_temporal(mut self: Pin<&mut Self>, index: i32) {
         let tracks = self.temporal_tracks.clone();
         if tracks.is_empty() {
@@ -600,6 +663,10 @@ impl qobject::Player {
         self.as_mut().rust_mut().request = request;
         self.as_mut().set_error(QString::default());
         self.as_mut().set_repetir(true);
+        self.as_mut().set_repetir_una(false);
+        if let Some(mpv) = self.as_mut().rust_mut().mpv.as_mut() {
+            let _ = mpv.set_loop_file(false);
+        }
         self.as_mut().set_tracks(tracks);
         self.load(start);
     }
@@ -610,6 +677,155 @@ impl qobject::Player {
             let _ = mpv.set_volume(volume);
         }
         self.set_volume(volume);
+    }
+
+    fn enqueue(self: Pin<&mut Self>, item: &QString, next: bool) {
+        let Ok(value) = serde_json::from_str::<serde_json::Value>(&item.to_string()) else { return };
+        if let Some(track) = track_from(&value) {
+            self.insert_tracks(vec![track], next);
+            return;
+        }
+        let Ok(item) = serde_json::from_value::<Item>(value) else { return };
+        if item.playlist_id.is_empty() {
+            return;
+        }
+        let qt = self.qt_thread();
+        thread::spawn(move || {
+            let result = album_queue(&item.playlist_id);
+            let _ = qt.queue(move |player| match result {
+                Ok(tracks) if !tracks.is_empty() => player.insert_tracks(tracks, next),
+                Ok(_) => player.fail("No se encontraron canciones."),
+                Err(error) => player.fail(&error),
+            });
+        });
+    }
+
+    /// Mete `added` detrás de la pista que suena (`next`) o al final de la cola.
+    fn insert_tracks(mut self: Pin<&mut Self>, added: Vec<Track>, next: bool) {
+        for track in added.iter().take(3) {
+            resolver::prefetch(&track.video_id);
+        }
+        if self.tracks.is_empty() {
+            let request = self.request + 1;
+            self.as_mut().rust_mut().request = request;
+            self.as_mut().set_tracks(added);
+            self.load(0);
+            return;
+        }
+        let mut tracks = self.tracks.clone();
+        let at = if next { (*self.index() as usize + 1).min(tracks.len()) } else { tracks.len() };
+        tracks.splice(at..at, added);
+        self.as_mut().set_tracks(tracks);
+        self.prefetch_next();
+    }
+
+    fn move_in_queue(mut self: Pin<&mut Self>, from: i32, to: i32) {
+        let len = self.tracks.len() as i32;
+        if from == to || from < 0 || to < 0 || from >= len || to >= len {
+            return;
+        }
+        let (from, to) = (from as usize, to as usize);
+        let current = *self.index() as usize;
+        let mut tracks = self.tracks.clone();
+        let moved = tracks.remove(from);
+        tracks.insert(to, moved);
+        // La pista que suena conserva su sitio en la cola aunque cambie de posición.
+        let current = if from == current {
+            to
+        } else if from < current && to >= current {
+            current - 1
+        } else if from > current && to <= current {
+            current + 1
+        } else {
+            current
+        };
+        self.as_mut().set_tracks(tracks);
+        self.as_mut().set_index(current as i32);
+        self.prefetch_next();
+    }
+
+    fn remove_from_queue(mut self: Pin<&mut Self>, index: i32) {
+        let current = *self.index();
+        if index < 0 || index as usize >= self.tracks.len() || index == current {
+            return;
+        }
+        let mut tracks = self.tracks.clone();
+        tracks.remove(index as usize);
+        self.as_mut().set_tracks(tracks);
+        if index < current {
+            self.as_mut().set_index(current - 1);
+        }
+        self.prefetch_next();
+    }
+
+    /// Empieza a registrar la pista que acaba de arrancar. La petición a YouTube va en un
+    /// hilo: el arranque de la pista no la espera.
+    fn begin_listen(mut self: Pin<&mut Self>) {
+        let token = self.load_token;
+        let position = *self.position();
+        let video_id = self.tracks.get(*self.index() as usize).map(|track| track.video_id.clone());
+        let Some(video_id) = video_id.filter(|_| history::active()) else {
+            self.as_mut().rust_mut().listen = None;
+            return;
+        };
+        self.as_mut().rust_mut().listen = Some(Listen { token, report: None, from: position, last: position });
+        let qt = self.qt_thread();
+        thread::spawn(move || match history::start(&video_id) {
+            Ok(report) => {
+                let _ = qt.queue(move |mut player| {
+                    if let Some(listen) = player.as_mut().rust_mut().listen.as_mut().filter(|l| l.token == token) {
+                        listen.report = Some(report);
+                    }
+                });
+            }
+            Err(error) => eprintln!("historial de {video_id}: {error}"),
+        });
+    }
+
+    /// Sigue la posición para saber qué tramos se escucharon de verdad.
+    fn track_listen(mut self: Pin<&mut Self>, position: f64) {
+        let duration = *self.duration();
+        let one = *self.repetir_una();
+        let Some(listen) = self.listen.as_ref() else { return };
+        let (from, last) = (listen.from, listen.last);
+        // Con «repetir la canción», cada vuelta es una escucha nueva.
+        if one && position < 2.0 && duration > 0.0 && last > duration - 5.0 {
+            self.as_mut().end_listen();
+            self.as_mut().begin_listen();
+            return;
+        }
+        let jumped = position < last - 1.0 || position > last + 5.0;
+        if jumped || last - from >= 30.0 {
+            self.as_mut().flush_listen();
+        }
+        if let Some(listen) = self.as_mut().rust_mut().listen.as_mut() {
+            if jumped {
+                listen.from = position;
+            }
+            listen.last = position;
+        }
+    }
+
+    /// Envía el tramo escuchado desde el último aviso.
+    fn flush_listen(mut self: Pin<&mut Self>) {
+        let mut rust = self.as_mut().rust_mut();
+        let Some(listen) = rust.listen.as_mut() else { return };
+        let Some(report) = listen.report.clone() else { return };
+        let (from, to) = (listen.from, listen.last);
+        if to - from < 1.0 {
+            return;
+        }
+        listen.from = to;
+        thread::spawn(move || {
+            if let Err(error) = history::watched(&report, from, to) {
+                eprintln!("historial: {error}");
+            }
+        });
+    }
+
+    fn end_listen(mut self: Pin<&mut Self>) {
+        self.as_mut().flush_listen();
+        self.as_mut().rust_mut().listen = None;
     }
 
     fn fail(mut self: Pin<&mut Self>, message: &str) {
@@ -655,6 +871,9 @@ impl qobject::Player {
         match engine {
             Ok(mut mpv) => {
                 let _ = mpv.set_volume(*self.volume());
+                if *self.repetir_una() {
+                    let _ = mpv.set_loop_file(true);
+                }
                 self.as_mut().rust_mut().mpv = Some(mpv);
                 true
             }
@@ -674,6 +893,7 @@ impl qobject::Player {
             self.as_mut().rust_mut().retried = None;
         }
 
+        self.as_mut().end_listen();
         self.as_mut().set_index(index as i32);
         self.as_mut().set_title(QString::from(&track.title));
         self.as_mut().set_artist(QString::from(&track.artist));
@@ -751,6 +971,7 @@ impl qobject::Player {
         match event {
             Event::Position(position) => {
                 plugins::emit(plugins::Event::Position(position));
+                self.as_mut().track_listen(position);
                 self.set_position(position);
             }
             Event::Duration(duration) if duration > 0.0 => self.set_duration(duration),
@@ -773,6 +994,9 @@ impl qobject::Player {
                     plugins::emit(plugins::Event::Playing(playing, *self.position()));
                 }
                 self.as_mut().set_playing(playing);
+                if paused {
+                    self.as_mut().flush_listen();
+                }
                 self.publish_media();
             }
             Event::Started => {
@@ -785,12 +1009,23 @@ impl qobject::Player {
                 let playing = !self.mpv_paused;
                 self.as_mut().set_playing(playing);
                 self.as_mut().announce();
+                // mpv también avisa tras cada salto: solo cuenta la primera vez de cada carga.
+                if self.listen.as_ref().map(|listen| listen.token) != Some(self.load_token) {
+                    self.as_mut().begin_listen();
+                }
                 self.prefetch_next();
+            }
+            // Con `loop-file` mpv no llega a terminar la pista; esto cubre el caso raro de que
+            // la opción no se aplicara (motor reiniciado a medias).
+            Event::Ended if *self.repetir_una() => {
+                let index = *self.index() as usize;
+                self.load(index);
             }
             Event::Ended => {
                 if (*self.index() as usize) + 1 < self.tracks.len() || *self.repetir() {
                     self.next();
                 } else {
+                    self.as_mut().end_listen();
                     plugins::emit(plugins::Event::Stopped);
                     self.as_mut().set_playing(false);
                     self.publish_media();

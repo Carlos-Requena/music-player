@@ -13,6 +13,11 @@ FocusScope {
     // Alto de la barra de reproducción (y su margen), que queda por encima.
     property real bottomInset: 100
     property color tint: "#3A3F4B"
+    // Letra y cola a la derecha. El botón del panel de la barra las quita y la carátula se
+    // centra.
+    property bool side: true
+    property real sideShown: side ? 1 : 0
+    Behavior on sideShown { NumberAnimation { duration: 420; easing.type: Easing.InOutCubic } }
 
     signal closeRequested()
 
@@ -22,16 +27,21 @@ FocusScope {
 
     // Carátula grande con su borde derecho algo pasado el centro de la pantalla; a la derecha,
     // más estrecha, la letra o la cola (pestañas).
-    readonly property real artRight: width * 0.505
-    readonly property real art: Math.max(200, Math.min((height - bottomInset) * 0.68, artRight - 80, 680))
-    readonly property real sideX: artRight + 44
-    readonly property real sideWidth: width - sideX - 32
+    readonly property real art: Math.max(200, Math.min((height - bottomInset) * 0.68, width * 0.45 - 80, 680))
+    // Sin letra ni cola, la carátula va al centro.
+    // (`root.art`: dentro de este archivo, `art` a secas es la carátula, que tiene ese id.)
+    readonly property real artRight: width * 0.45 + (width / 2 + root.art / 2 - width * 0.45) * (1 - sideShown)
+    readonly property real sideX: width * 0.45 + 100 + 60 * (1 - sideShown)
+    readonly property real sideWidth: width * 0.55 - 200
     readonly property real tabsHeight: Theme.hit + 8
     // Pestaña de la derecha. Sin letra solo existe «Cola».
     property string tab: "letra"
     readonly property string shownTab: hasLyrics ? tab : "cola"
-    readonly property real sideTop: 84
-    readonly property real sideBottom: height - bottomInset - 12
+    // Letra/Cola con el mismo hueco arriba (hasta el borde de la ventana) que abajo (hasta la
+    // barra de reproducción, que empieza un `Theme.gap` por encima de `bottomInset`).
+    readonly property real sideMargin: 32
+    readonly property real sideTop: sideMargin
+    readonly property real sideBottom: height - bottomInset + Theme.gap - sideMargin
     readonly property bool hasLyrics: Catalog.lyrics.length > 0
     readonly property string bigThumb: Player.thumb.replace("w544-h544", "w1080-h1080")
 
@@ -215,6 +225,8 @@ FocusScope {
 
         Rectangle {
             id: tabs
+            opacity: root.sideShown
+            visible: opacity > 0.01
             x: root.sideX
             y: root.sideTop
             width: root.sideWidth
@@ -279,7 +291,8 @@ FocusScope {
 
         Rectangle {
             id: lyricsBox
-            visible: root.shownTab === "letra"
+            opacity: root.sideShown
+            visible: root.shownTab === "letra" && opacity > 0.01
             x: root.sideX
             y: root.sideTop + root.tabsHeight + 12
             width: root.sideWidth
@@ -300,14 +313,15 @@ FocusScope {
                 y: 62
                 width: parent.width - 48
                 height: parent.height - 62 - 12
-                baseSize: 30
+                baseSize: 34
                 showTiming: false
             }
         }
 
         Rectangle {
             id: queueBox
-            visible: root.shownTab === "cola"
+            opacity: root.sideShown
+            visible: root.shownTab === "cola" && opacity > 0.01
             x: root.sideX
             y: root.sideTop + root.tabsHeight + 12
             width: root.sideWidth
@@ -317,103 +331,18 @@ FocusScope {
             border.width: 1
             border.color: Theme.glassBorder
 
-            ListView {
+            QueueList {
                 id: queueList
                 x: 12
                 y: 12
                 width: parent.width - 24
                 height: parent.height - 24
-                clip: true
-                boundsBehavior: Flickable.StopAtBounds
-                model: Catalog.queue
-
-                // Mantiene a la vista la pista que suena, arriba del todo.
-                function follow() {
-                    positionViewAtIndex(Math.max(0, Player.index), ListView.Beginning)
-                }
-                onCountChanged: follow()
-                onVisibleChanged: if (visible) follow()
-                Connections {
-                    target: Player
-                    function onIndexChanged() { queueList.follow() }
-                }
-
-                delegate: Item {
-                    id: row
-                    required property var modelData
-                    required property int index
-                    readonly property bool current: index === Player.index
-
-                    width: queueList.width
-                    height: 58
-
-                    Accessible.role: Accessible.Button
-                    Accessible.name: modelData.title + ", " + modelData.artist
-                    Accessible.onPressAction: Player.playIndex(index)
-
-                    Rectangle {
-                        anchors.fill: parent
-                        radius: 12
-                        color: row.current ? Theme.controlActive : (rowHover.hovered ? Theme.control : "transparent")
-                    }
-
-                    Cover {
-                        x: 10
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: 42
-                        height: 42
-                        thumb: row.modelData.thumb
-                        pixels: 120
-                    }
-
-                    Column {
-                        x: 64
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: parent.width - 64 - 60
-                        spacing: 1
-
-                        Text {
-                            width: parent.width
-                            text: row.modelData.title
-                            color: Theme.text
-                            font.pixelSize: 15
-                            font.weight: row.current ? Font.DemiBold : Font.Normal
-                            elide: Text.ElideRight
-                        }
-
-                        Text {
-                            width: parent.width
-                            text: row.modelData.artist
-                            color: Theme.textMuted
-                            font.pixelSize: 12
-                            elide: Text.ElideRight
-                        }
-                    }
-
-                    Text {
-                        anchors.right: parent.right
-                        anchors.rightMargin: 14
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: row.current ? "Sonando" : Theme.mmss(row.modelData.duration)
-                        color: row.current ? Theme.accent : Theme.textMuted
-                        font.pixelSize: 12
-                    }
-
-                    HoverHandler {
-                        id: rowHover
-                        cursorShape: Qt.PointingHandCursor
-                    }
-
-                    TapHandler {
-                        gesturePolicy: TapHandler.ReleaseWithinBounds
-                        onTapped: Player.playIndex(row.index)
-                    }
-
-                    TapHandler {
-                        acceptedButtons: Qt.RightButton
-                        onTapped: eventPoint => row.Window.window.openMenu(row.modelData, eventPoint.scenePosition)
-                    }
-                }
+                rowHeight: 46
+                coverSize: 42
+                titleSize: 15
+                rowRadius: 12
+                followTop: true
+                showPlaying: true
             }
         }
     }

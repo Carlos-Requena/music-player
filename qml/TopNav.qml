@@ -1,7 +1,7 @@
 import QtQuick
 import app.musicplayer
 
-// Navegación principal: pestañas en píldora, como en la dirección "Escenario".
+// Navegación principal: pestañas en píldora.
 Glass {
     id: root
 

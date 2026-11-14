@@ -28,6 +28,9 @@ const QML_FILES: &[&str] = &[
     "qml/TextField.qml",
     "qml/NowPlayingView.qml",
     "qml/ContextMenu.qml",
+    "qml/CategoryBar.qml",
+    "qml/Mascot.qml",
+    "qml/QueueList.qml",
     "qml/LyricsTiming.qml",
 ];
 

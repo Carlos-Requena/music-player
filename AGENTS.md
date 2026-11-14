@@ -31,9 +31,12 @@ src/
   resolver.rs   URL de audio de cada pista (vía rápida → yt-dlp residente → yt-dlp), con
                 caché y precarga.
   audio.rs      Proceso mpv controlado por su socket IPC JSON.
-  lyrics.rs     Letra sincronizada de LRCLIB.
+  lyrics.rs     Letra sincronizada de LRCLIB: líneas (las vacías son pausas instrumentales) y,
+                si el LRC las trae, palabras con su tiempo.
   player.rs     Singleton QML `Player`: cola, estado de reproducción, letra.
   library.rs    Singleton QML `Library`: secciones, búsqueda y detalle abierto (JSON).
+  history.rs    Registro de escuchas en la cuenta (opción `historial`): avisos de inicio y de
+                tiempo escuchado de YouTube, en hilos, sin retrasar el arranque.
   daemon.rs     yt-dlp residente (`ytdlp_daemon.py`): resuelve sin arrancar Python cada vez.
   plugins.rs    Singleton QML `Plugins` y reparto de eventos a Discord y Last.fm
                 (`plugins/discord.rs`, `plugins/lastfm.rs`). Los controles del sistema
@@ -43,7 +46,10 @@ src/
                 opciones de disposición (mapa clave → valor genérico, `opcion`/`setOpcion`).
 login/          Crate aparte `musicplayer-login`: ventana de inicio de sesión de Linux (Qt
                 WebEngine, opcional). Un binario propio para que el reproductor no cargue Chromium.
-skins/          Skins incluidas (JSON, se compilan dentro del binario con `include_str!`).
+skins/          Skins incluidas (JSON, se compilan dentro del binario con `include_str!`). Las
+                del usuario pueden ser carpetas con imagen de fondo: `settings.rs` les añade
+                `carpeta` y `Theme.skinImage` resuelve las rutas. Igual con las mascotas
+                (`AppSettings.mascotaData`, `Theme.mascotImage`).
 qml/
   Main.qml          Ventana: escenario, navegación, panel, barra, opciones.
   Theme.qml         Singleton con los tokens visuales: lee los colores de la skin activa y las
@@ -58,10 +64,17 @@ qml/
   NowPlayingView.qml  Pantalla «Sonando»: sube desde la barra; carátula grande y sus colores.
   LyricsTiming.qml  Ajuste del retraso de la letra (por canción: opción `retraso:<videoId>`,
                     `Catalog.lyricsDelay` / `Catalog.lyricsTime`).
-  ContextMenu.qml   Menú de clic derecho (`Main.openMenu`) y aviso breve; lista temporal.
+  QueueList.qml     Cola (panel y «Sonando»): clic, clic derecho y arrastrar para reordenar.
+  ContextMenu.qml   Menú de clic derecho (`Main.openMenu`) y aviso breve: cola, lista temporal,
+                    guardar en playlist y categorías (subpáginas `page`) y portada.
+  Mascot.qml        Mascota (aparte de las skins, `<config>/musicplayer/mascotas/<id>/`): pose
+                    según el estado del reproductor; `Main` le avisa al navegar (`browsed`).
+  CategoryBar.qml   Pestañas de categorías de Playlists (opción `categorias`, JSON; los datos
+                    y operaciones están en `Catalog`). Portada: `Library.setPlaylistCover`.
   Glass.qml, Ambient.qml, TintProbe.qml          Vidrio, modo ambiente y color dominante.
   Cover.qml, Icon.qml, IconButton.qml, PillButton.qml, Slider.qml, SearchField.qml, TopNav.qml,
-  ViewSwitcher.qml, SettingsSheet.qml            Piezas reutilizables.
+  ViewSwitcher.qml                               Piezas reutilizables.
+  SettingsSheet.qml Opciones por categorías (barra lateral); las filas sueltas en `optionRows`.
 build.rs        Registra los archivos QML y los puentes Rust en el módulo `app.musicplayer`.
 ```
 
@@ -109,6 +122,8 @@ MUSICPLAYER_SILENT=1 ./target/release/musicplayer \
 | `--search texto` | Busca al arrancar |
 | `--settings` | Abre las opciones |
 | `--settings-end` | Abre las opciones desplazadas hasta el final |
+| `--settings-cat id` | Abre las opciones en esa categoría (`cuenta`, `reproduccion`, `apariencia`, `vistas`, `plugins`) |
+| `--settings-at y` | Abre las opciones desplazadas `y` píxeles (para capturar secciones intermedias) |
 | `--minimize ms` | Minimiza la ventana tras ese tiempo; con `--hide` la oculta y con `--mini` abre el mini reproductor (la captura toma entonces el mini) |
 | `--restore ms` | (con `--minimize`) vuelve a la ventana grande tras ese tiempo; con `--mini`, como el botón del mini |
 | `--now` | Arranca con la pantalla «Sonando» abierta |
@@ -125,7 +140,9 @@ MUSICPLAYER_SILENT=1 ./target/release/musicplayer \
 - `MUSICPLAYER_DEBUG_CLICK="x,y,boton,ms;…"` envía clics de ratón de verdad a la ventana
   (`boton`: `left` o `right`; coordenadas lógicas, `ms` desde el arranque). Sirve para probar
   menús y botones en capturas: p. ej. `"120,250,right,5000;245,348,left,5500"` abre el menú de
-  la primera tarjeta de Inicio y pulsa «Añadir a la lista temporal».
+  la primera tarjeta de Inicio y pulsa «Reproducir a continuación». `"x,y,drag,ms,x2,y2"` arrastra con el
+  botón izquierdo hasta `(x2, y2)` y `draghold` lo hace sin soltar (para capturar a mitad del
+  gesto, p. ej. reordenando la cola).
 - `MUSICPLAYER_SILENT=1` hace que mpv reproduzca sin sonido (`--ao=null`). Úsalo siempre en
   pruebas automáticas.
 - `HOME=/ruta/temporal` aísla las preferencias de las del usuario.
@@ -163,7 +180,8 @@ fallos del código sin comprobarlo con `yt-dlp` directamente.
   skins de `skins/`.
 - **Opciones nuevas de disposición**: usa `AppSettings.opcion("clave")` (vacío = valor por
   defecto) y `setOpcion`; léelas con `void AppSettings.revision` delante para que el enlace se
-  actualice, y añade la fila en la sección «Disposición» de `SettingsSheet.qml`. Botones con 44 px de área como mínimo, `Accessible.name` en los de solo icono, y
+  actualice, y añade la fila a `optionRows` de `SettingsSheet.qml` con su categoría (`cat`: `reproduccion`,
+  `apariencia` o `vistas`). Botones con 44 px de área como mínimo, `Accessible.name` en los de solo icono, y
   foco por teclado visible.
 - **Errores**: en la interfaz, mensajes cortos en español (`Player.error`, `Library.error`);
   el detalle técnico va a stderr.
@@ -198,6 +216,16 @@ fallos del código sin comprobarlo con `yt-dlp` directamente.
 - **mpv solo avisa de la pausa cuando cambia**: al empezar una pista se aplica la última
   conocida (`mpv_paused`); si no, «sonando» se queda desfasado.
 - **Minimizar no libera memoria gráfica en macOS**; ocultar la ventana sí (`window.cpp`).
+- **«Hover» sobre algo que se mueve**: un `HoverHandler`, un `MouseArea` con `cursorShape` o un
+  `TapHandler` encima de contenido animado obligan a Qt a repasar esa parte de la escena en cada
+  fotograma. En la letra (cientos de palabras) llevaba la CPU de ~5 % a ~25 %. Un solo gestor
+  para toda la vista que calcula la línea con `childAt`, y sin «hover».
+- **Un `id` tapa una propiedad con el mismo nombre**: en `NowPlayingView`, `art` era a la vez una
+  propiedad de la raíz y el `id` de la carátula; en los enlaces de la raíz `art` daba el
+  elemento y la cuenta salía `NaN` (la carátula y el rótulo se iban a x = 0). Usa `root.art`.
+- **Mide la CPU con tiempo acumulado**: `ps -o time=` al principio y al final de 25 s, y
+  comprueba en la línea `estado:` que sonaba la canción esperada (Inicio cambia de una
+  ejecución a otra). `ps %cpu` es una foto de un instante y engaña.
 - **Clics que atraviesan**: un `TapHandler` normal solo toma un agarre pasivo y el clic sigue
   hacia lo que hay debajo (cerrar «Sonando» abría las opciones; elegir una opción del menú
   seleccionaba la tarjeta de debajo). En botones y opciones usa

@@ -196,6 +196,8 @@ FocusScope {
         anchors.horizontalCenter: parent.horizontalCenter
         width: parent.width - 2 * root.margin
         height: 92
+        // Separado de la última fila de carátulas.
+        topPadding: 16
         spacing: 4
 
         Text {

@@ -1,6 +1,7 @@
 mod account;
 mod audio;
 mod daemon;
+mod history;
 mod library;
 mod lyrics;
 mod player;

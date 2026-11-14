@@ -1,11 +1,10 @@
 import QtQuick
 import app.musicplayer
 
-// Barra de reproducción flotante. En `compact` (estilo "Escenario") se reduce a una píldora.
+// Barra de reproducción flotante.
 Glass {
     id: root
 
-    property bool compact: false
     property bool lyricsOn: true
     signal lyricsToggled()
     signal miniRequested()
@@ -13,14 +12,14 @@ Glass {
     signal expandRequested()
 
     tint: Theme.glassStrong
-    radius: compact ? height / 2 : 22
+    radius: 22
 
     Row {
         id: nowPlaying
         anchors.left: parent.left
         anchors.leftMargin: 14
         anchors.verticalCenter: parent.verticalCenter
-        width: root.compact ? 230 : 300
+        width: 300
         spacing: 12
 
         HoverHandler {
@@ -109,11 +108,13 @@ Glass {
             }
 
             IconButton {
-                icon: Theme.iconRepeat
-                label: Player.repetir ? "Repetir la cola: activado" : "Repetir la cola"
+                icon: Player.repetirUna ? Theme.iconRepeatOne : Theme.iconRepeat
+                label: Player.repetirUna ? "Repetir esta canción (pulsa para desactivar)"
+                     : Player.repetir ? "Repetir la cola (pulsa para repetir solo esta canción)"
+                     : "Repetir"
                 iconSize: 18
-                foreground: Player.repetir ? Theme.accent : Theme.textMuted
-                onClicked: Player.repetir = !Player.repetir
+                foreground: Player.repetir || Player.repetirUna ? Theme.accent : Theme.textMuted
+                onClicked: Player.cycleRepeat()
             }
         }
 
@@ -167,7 +168,6 @@ Glass {
             icon: Theme.iconLyrics
             label: "Panel de letra y cola"
             solid: root.lyricsOn
-            visible: !root.compact
             onClicked: root.lyricsToggled()
         }
 
@@ -179,7 +179,7 @@ Glass {
 
         Slider {
             anchors.verticalCenter: parent.verticalCenter
-            width: root.compact ? 72 : 96
+            width: 96
             label: "Volumen"
             fill: Theme.text
             value: Player.volume / 100

@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Window
+import QtQuick.Dialogs
 import app.musicplayer
 
 Window {
@@ -14,17 +15,15 @@ Window {
     // Pantalla «Sonando» (sube desde la barra de reproducción).
     property bool nowOpen: args.indexOf("--now") >= 0
 
-    readonly property bool vidrio: AppSettings.ventana !== "escenario"
     // En ventanas estrechas el panel se oculta para que quepa la navegación.
-    readonly property bool showPanel: vidrio && lyricsOn && width >= 1280
+    readonly property bool showPanel: lyricsOn && width >= 1280
     readonly property real panelWidth: 344
     // Opciones › Disposición: el panel de letra a la derecha (por defecto) o a la izquierda.
     readonly property bool panelLeft: { void AppSettings.revision; return AppSettings.opcion("panel") === "izquierda" }
     readonly property real panelX: panelLeft ? Theme.gap : width - panelWidth - Theme.gap
     readonly property real stageX: showPanel && panelLeft ? panelWidth + 2 * Theme.gap : 0
     readonly property real stageWidth: showPanel ? width - panelWidth - 2 * Theme.gap : width
-    readonly property real barHeight: vidrio ? 84 : 80
-    readonly property real stageLyricHeight: vidrio ? 0 : 118
+    readonly property real barHeight: 84
     readonly property string view: {
         void AppSettings.revision
         return AppSettings.vista(section)
@@ -51,6 +50,8 @@ Window {
     function choose(item) {
         if (!item)
             return
+        if (mascotLoader.item && item.kind !== "song")
+            mascotLoader.item.browsed()
         // Una canción suena y abre la pantalla «Sonando» con su letra y su cola.
         if (item.kind === "song") {
             Player.playItem(JSON.stringify(item))
@@ -148,8 +149,16 @@ Window {
         if (arg("--search") !== "")
             search(arg("--search"))
         settingsOpen = args.indexOf("--settings") >= 0 || args.indexOf("--settings-end") >= 0
+            || args.indexOf("--settings-at") >= 0 || args.indexOf("--settings-cat") >= 0
+        if (arg("--settings-cat") !== "")
+            settingsSheet.category = arg("--settings-cat")
+        // Con un retraso: la hoja recoloca su contenido al hacerse visible.
         if (args.indexOf("--settings-end") >= 0)
-            Qt.callLater(settingsSheet.scrollToEnd)
+            settingsScroll.start()
+        if (arg("--settings-at") !== "") {
+            settingsScroll.at = parseInt(arg("--settings-at"))
+            settingsScroll.start()
+        }
         if (!settingsOpen)
             sectionView.forceActiveFocus()
     }
@@ -225,12 +234,31 @@ Window {
             playingCenter: win.showPanel ? win.panelX + win.panelWidth / 2 : win.width * 0.9
         }
 
+        // Fondo de imagen de la skin (si lo trae), sobre el modo ambiente. Se decodifica al
+        // tamaño de la ventana, no al de la imagen original.
+        Image {
+            anchors.fill: parent
+            visible: Theme.backdrop !== ""
+            source: Theme.backdrop
+            sourceSize: Qt.size(win.width * Screen.devicePixelRatio, win.height * Screen.devicePixelRatio)
+            fillMode: Image.PreserveAspectCrop
+            asynchronous: true
+            opacity: Theme.backdropOpacity
+
+            Rectangle {
+                anchors.fill: parent
+                visible: Theme.backdropVeil > 0
+                color: Theme.ground
+                opacity: Theme.backdropVeil
+            }
+        }
+
         SectionView {
             id: sectionView
             x: win.stageX
-            y: 84
+            y: categoryBar.visible ? 84 + categoryBar.height + 8 : 84
             width: win.stageWidth
-            height: win.height - y - win.barHeight - 2 * Theme.gap - win.stageLyricHeight
+            height: win.height - y - win.barHeight - 2 * Theme.gap
             section: win.section
             view: win.view
             focus: true
@@ -241,6 +269,8 @@ Window {
 
             onCurrentItemChanged: {
                 prefetchTimer.restart()
+                if (mascotLoader.item)
+                    mascotLoader.item.browsed()
                 if ((win.autoplayPending || win.indexPending) && currentItem) {
                     const play = win.autoplayPending
                     win.autoplayPending = false
@@ -336,6 +366,8 @@ Window {
             wrapMode: Text.WordWrap
             text: Catalog.needsAccount(win.section) && !Account.signedIn
                 ? "Inicia sesión con el botón de cuenta (arriba a la derecha) para ver " + Catalog.ownLabel(win.section) + "."
+                : win.section === "playlists" && Catalog.categoria !== "" && Catalog.playlists.length > 0
+                ? "«" + Catalog.categoria + "» está vacía. En «Todas», haz clic derecho en una playlist y elige «Añadir a " + Catalog.categoria + "»."
                 : Library.loading || Library.searching ? "Cargando…"
                 : Library.error !== "" ? Library.error
                 : "No hay nada que mostrar aquí."
@@ -377,6 +409,78 @@ Window {
         }
 
         Behavior on x { NumberAnimation { duration: Theme.animMove; easing.type: Easing.OutCubic } }
+    }
+
+    // Categorías de playlists (OST, Gym…), bajo la navegación y solo en Playlists.
+    CategoryBar {
+        id: categoryBar
+        x: win.stageX + (win.stageWidth - width) / 2
+        y: nav.y + nav.height + 8
+        visible: win.section === "playlists" && Account.signedIn && !win.detailOpen && !win.nowOpen
+        onDone: sectionView.forceActiveFocus()
+
+        Behavior on x { NumberAnimation { duration: Theme.animMove; easing.type: Easing.OutCubic } }
+    }
+
+    // Cambiar la portada de una playlist: se elige una imagen, se comprueba su tamaño (YouTube
+    // pide al menos 360×360) y se sube a la cuenta. El selector solo existe mientras se usa.
+    property var coverTarget: null
+
+    function changeCover(item) {
+        coverTarget = item
+        coverDialogLoader.active = true
+        coverDialogLoader.item.open()
+    }
+
+    Loader {
+        id: coverDialogLoader
+        active: false
+        sourceComponent: FileDialog {
+            title: "Portada de «" + (win.coverTarget ? win.coverTarget.title : "") + "»"
+            nameFilters: ["Imágenes (*.jpg *.jpeg *.png)"]
+            onAccepted: coverCheck.source = selectedFile
+            onRejected: coverDialogLoader.active = false
+        }
+    }
+
+    // Solo mide la imagen elegida (no se dibuja).
+    Image {
+        id: coverCheck
+        visible: false
+        asynchronous: true
+        onStatusChanged: {
+            if (status === Image.Null || status === Image.Loading)
+                return
+            const file = source
+            const target = win.coverTarget
+            const small = status === Image.Ready && Math.min(implicitWidth, implicitHeight) < 360
+            source = ""
+            coverDialogLoader.active = false
+            if (!target)
+                return
+            if (status === Image.Error)
+                contextMenu.notify("No se pudo abrir la imagen.")
+            else if (small)
+                contextMenu.notify("La imagen es pequeña: YouTube pide al menos 360 × 360 píxeles.")
+            else {
+                contextMenu.notify("Subiendo la portada de «" + target.title + "»…")
+                win.coverFiles[target.playlistId] = file.toString()
+                Library.setPlaylistCover(target.playlistId, file.toString())
+            }
+        }
+    }
+    property var coverFiles: ({})
+
+    Connections {
+        target: Library
+        function onPortadaLista(playlistId, error) {
+            if (error === "") {
+                Catalog.setPortada(playlistId, win.coverFiles[playlistId])
+                contextMenu.notify("Portada cambiada en tu cuenta de YouTube Music")
+            } else {
+                contextMenu.notify(error)
+            }
+        }
     }
 
     // Cuenta: abre las opciones; relleno cuando hay sesión.
@@ -431,80 +535,35 @@ Window {
         Behavior on opacity { NumberAnimation { duration: Theme.animFast } }
     }
 
-    // Estilo "Escenario": la letra vive sobre el escenario, encima del reproductor.
-    Column {
-        id: stageLyric
-
-        readonly property int line: Catalog.lineAt(Catalog.lyricsTime)
-        readonly property real progress: Catalog.lineProgress(line, Catalog.lyricsTime)
-        readonly property var words: line >= 0 ? Catalog.lyrics[line].text.split(" ") : []
-        readonly property string upcoming: line >= 0 && line + 1 < Catalog.lyrics.length ? Catalog.lyrics[line + 1].text : ""
-
-        visible: !win.vidrio && Player.title !== ""
-        anchors.horizontalCenter: parent.horizontalCenter
-        y: win.height - win.barHeight - 2 * Theme.gap - win.stageLyricHeight + 8
-        width: parent.width - 160
-        spacing: 6
-
-        Text {
-            anchors.horizontalCenter: parent.horizontalCenter
-            text: "Sonando · " + Player.title + " — " + Player.artist
-            color: Theme.textMuted
-            font.pixelSize: 11
-            font.letterSpacing: 1.8
-            font.capitalization: Font.AllUppercase
-        }
-
-        Row {
-            anchors.horizontalCenter: parent.horizontalCenter
-            spacing: 9
-
-            Repeater {
-                model: stageLyric.words
-
-                Text {
-                    required property string modelData
-                    required property int index
-                    readonly property real sung: Math.max(0, Math.min(1, stageLyric.progress * stageLyric.words.length - index))
-
-                    text: modelData
-                    color: Qt.rgba(1, 1, 1, 0.5 + 0.5 * sung)
-                    font.pixelSize: Math.round(34 * Theme.lyricsScale)
-                    font.family: Theme.lyricsFamily
-                    font.weight: Theme.lyricsWeight
-                    font.letterSpacing: -0.4
-                }
-            }
-        }
-
-        Text {
-            anchors.horizontalCenter: parent.horizontalCenter
-            text: stageLyric.upcoming
-            color: Theme.textFaint
-            font.pixelSize: 20
-            font.weight: Font.Bold
-        }
-    }
-
     NowPlayingView {
         id: nowPlayingView
         anchors.fill: parent
         z: 5
         open: win.nowOpen
         tint: playingProbe.tint
+        side: win.lyricsOn
         bottomInset: win.barHeight + 2 * Theme.gap
         onCloseRequested: win.nowOpen = false
     }
 
+    // Mascota (Opciones › Mascota), asomada sobre el borde izquierdo de la barra.
+    Loader {
+        id: mascotLoader
+        z: 6
+        active: Theme.mascotOn
+        x: playerBar.x + 18
+        y: playerBar.y - height
+        sourceComponent: Mascot {}
+    }
+
     PlayerBar {
-        readonly property real fullWidth: win.width - 2 * Theme.gap
+        id: playerBar
         z: 6
 
-        width: win.vidrio ? fullWidth : Math.min(920, fullWidth)
+        width: win.width - 2 * Theme.gap
         height: win.barHeight
         x: (win.width - width) / 2
         y: win.height - height - Theme.gap
-        compact: !win.vidrio
         backdrop: win.nowOpen ? nowPlayingView : stage
         lyricsOn: win.lyricsOn
         onExpandRequested: win.nowOpen = !win.nowOpen
@@ -517,7 +576,7 @@ Window {
         x: win.stageX
         y: 84
         width: win.stageWidth
-        height: win.height - y - win.barHeight - 2 * Theme.gap - win.stageLyricHeight
+        height: win.height - y - win.barHeight - 2 * Theme.gap
         visible: win.detailOpen && !win.inspecting
         focus: visible
         onVisibleChanged: if (visible) forceActiveFocus()
@@ -549,6 +608,20 @@ Window {
         anchors.fill: parent
         z: 9
         backdrop: stage
+        onNewCategoryRequested: playlistId => {
+            win.section = "playlists"
+            categoryBar.create(playlistId)
+        }
+        onRenameCategoryRequested: name => categoryBar.rename(name)
+        onCoverRequested: item => win.changeCover(item)
+    }
+
+    // Depuración: `--settings-end` / `--settings-at y` desplazan las opciones ya abiertas.
+    Timer {
+        id: settingsScroll
+        property real at: -1
+        interval: 500
+        onTriggered: at < 0 ? settingsSheet.scrollToEnd() : settingsSheet.scrollTo(at)
     }
 
     SettingsSheet {

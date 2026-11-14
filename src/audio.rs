@@ -150,6 +150,12 @@ impl Mpv {
         self.command(json!(["seek", seconds, "absolute"]))
     }
 
+    /// Repite el archivo actual sin fin (sin huecos ni volver a resolver la URL). Es una
+    /// opción global de mpv: sigue puesta al cargar otra pista hasta que se quite.
+    pub fn set_loop_file(&mut self, on: bool) -> io::Result<()> {
+        self.command(json!(["set_property", "loop-file", if on { "inf" } else { "no" }]))
+    }
+
     /// Volumen de 0 a 100.
     pub fn set_volume(&mut self, volume: f64) -> io::Result<()> {
         self.command(json!(["set_property", "volume", volume]))
