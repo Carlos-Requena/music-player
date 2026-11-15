@@ -55,8 +55,9 @@ Stderr escribe `arranque de pista: N ms` en cada una.
 
 ## Interfaz
 
-- `PlayerBar.qml`: barra flotante; pulsar la canción abre «Sonando» ([ventana](ventana.md)); late
-  mientras la pista se resuelve.
+- `PlayerBar.qml`: barra flotante; pulsar en cualquier sitio de ella que no sea un botón o un
+  deslizador abre «Sonando» ([ventana](ventana.md)), preferencia del propietario. Los controles se quedan su clic porque
+  usan `ReleaseWithinBounds`. El botón de reproducir late mientras la pista se resuelve.
 - `QueueList.qml`: la cola del panel y de «Sonando». Clic salta, clic derecho abre su menú (lleva
   `queueIndex`) y arrastrar reordena; un `MouseArea` con `preventStealing: true` impide que la
   lista se quede el gesto.
@@ -85,6 +86,7 @@ Stderr escribe `arranque de pista: N ms` en cada una.
 | Colas en caché | [`QUEUES`](../../src/player.rs) |
 | Precarga de las siguientes | [`prefetch_next`](../../src/player.rs) |
 | Órdenes del sistema | [`on_media_command`](../../src/player.rs) |
+| Siguiente pedida por el usuario (`saltada`) o al acabar la pista | [`next`](../../src/player.rs), [`advance`](../../src/player.rs) |
 | Lanzar mpv | [`spawn`](../../src/audio.rs) |
 | Eventos de mpv | [`read_events`](../../src/audio.rs) |
 | `PATH` ampliado | [`search_path`](../../src/audio.rs) |
@@ -105,7 +107,7 @@ Stderr escribe `arranque de pista: N ms` en cada una.
 
 ## Estado actual
 
-- **Última verificación:** sin registrar.
+- **Última verificación:** 2026-11-15 (barra y `saltada`, sin audio: ver historial).
 - **Pruebas:** ninguna en `player.rs` ni `audio.rs`; se prueban con `--autoplay` y
   `--probe play` ([verificar-reproduccion](../runbooks/verificar-reproduccion.md)).
 - **Sin verificar:** MPRIS en GNOME y KDE con Wayland.

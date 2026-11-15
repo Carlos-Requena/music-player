@@ -546,13 +546,15 @@ Window {
         onCloseRequested: win.nowOpen = false
     }
 
-    // Mascota (Opciones › Mascota), asomada sobre el borde izquierdo de la barra.
+    // Mascota (Opciones › Mascota), asomada sobre el borde izquierdo de la barra. Con las
+    // opciones abiertas se pasa a la esquina inferior izquierda de su panel, bajo las
+    // categorías (la misma mascota: no pierde lo que estaba haciendo).
     Loader {
         id: mascotLoader
-        z: 6
+        z: win.settingsOpen ? 11 : 6
         active: Theme.mascotOn
-        x: playerBar.x + 18
-        y: playerBar.y - height
+        x: win.settingsOpen ? settingsSheet.panel.x + 28 : playerBar.x + 18
+        y: win.settingsOpen ? settingsSheet.panel.y + settingsSheet.panel.height - height : playerBar.y - height
         sourceComponent: Mascot {}
     }
 

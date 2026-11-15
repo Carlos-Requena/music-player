@@ -222,6 +222,11 @@ añadas más casos, y actualiza la lista.
   Lomos; cualquier sección puede usar cualquier vista ([vistas](areas/vistas.md)).
 - **Diseño con alternativas**: mockups y decisiones visuales con 2–4 opciones a elegir, no una sola
   propuesta (§6).
+- **Mascota que participa**: pincharla con música da «Me gusta» (si su `mascota.json` lo pide),
+  reacciona a pasar canción y a guardar en playlists, y en Opciones se pasa a la esquina inferior
+  izquierda ([mascotas](areas/mascotas.md)).
+- **Pulsar la barra de reproducción** en cualquier sitio que no sea un control abre «Sonando»
+  ([reproduccion](areas/reproduccion.md)).
 - **Registrar las escuchas en YouTube Music**, activado por defecto y desactivable
   ([historial](areas/historial.md)).
 - **Iniciar sesión con una ventana propia** (WebKit del sistema en macOS, Qt WebEngine opcional en

@@ -5,19 +5,25 @@ import app.musicplayer
 // reproductor y da un saltito al cambiar. Las poses son PNG con transparencia de la carpeta de
 // la mascota. De más a menos prioridad:
 //
-//   error      si algo falla                          → si falta, cargando
-//   cargando   si una pista tarda en arrancar         → reposo
-//   clic       unos segundos al pincharla             → nueva
-//   nueva      unos segundos al empezar una pista     → sonando
-//   sonando    mientras suena                         → reposo
+//   reacciones breves (unos segundos; `segundos` en la pose cambia cuánto):
+//     clic       al pincharla                                  → nueva
+//     megusta    tras `clic`, si el pinchazo dio «Me gusta»     → clic
+//     fallo      si el «Me gusta» no se pudo dar                → error
+//     enfado     al pincharla 5 veces seguidas                  → clic
+//     saltada    al pasar a la siguiente canción                → sonando
+//     playlist   al guardar algo en una playlist                → megusta
+//   error      si algo falla                                   → cargando
+//   cargando   si una pista tarda en arrancar                  → reposo
+//   nueva      unos segundos al empezar una pista              → sonando
+//   sonando    mientras suena                                  → reposo
 //   navegando  sin música, mientras recorres la estantería o abres un álbum → pausa
-//   pausa      con una pista en pausa                 → reposo
+//   pausa      con una pista en pausa                          → reposo
 //   reposo     sin nada sonando (la única obligatoria)
 //
-// Cada pose es el nombre del PNG o `{ "imagen": "x.png", "alto": 120 }` para darle su propio
-// alto (p. ej. si una pose es solo la cabeza y otra el busto entero).
-//
-// Es decorativa: no tapa los clics de lo que hay debajo (los gestores solo escuchan).
+// Cada pose es el nombre del PNG o `{ "imagen": "x.png", "alto": 120, "segundos": 2 }` para
+// darle su propio alto (p. ej. si una pose es solo la cabeza y otra el busto entero) y, en las
+// breves, su duración. Con `"pincharDaMeGusta": true` en `mascota.json`, pincharla mientras
+// suena una canción le da «Me gusta».
 Item {
     id: root
 
@@ -26,14 +32,23 @@ Item {
 
     // Estados breves.
     property bool fresh: false
-    property bool poked: false
     property bool slow: false
 
     property bool browsing: false
 
-    readonly property string mood: Player.error !== "" ? "error"
+    // Reacción breve en curso ("" = ninguna) y la que viene detrás.
+    property string flash: ""
+    property string queued: ""
+
+    readonly property bool likes: Theme.mascot ? Theme.mascot.pincharDaMeGusta === true : false
+    // Última canción a la que se dio «Me gusta» desde aquí: pincharla otra vez no repite la petición.
+    property string likedId: ""
+    // Momentos de los últimos pinchazos, para el enfado.
+    property var pokes: []
+
+    readonly property string mood: flash !== "" ? flash
+        : Player.error !== "" ? "error"
         : slow ? "cargando"
-        : poked ? "clic"
         : fresh && Player.playing ? "nueva"
         : Player.playing ? "sonando"
         : browsing ? "navegando"
@@ -41,9 +56,53 @@ Item {
         : "reposo"
 
     readonly property var fallback: ({
-        error: "cargando", cargando: "reposo", clic: "nueva", nueva: "sonando",
+        clic: "nueva", megusta: "clic", fallo: "error", enfado: "clic", saltada: "sonando",
+        playlist: "megusta", error: "cargando", cargando: "reposo", nueva: "sonando",
         sonando: "reposo", navegando: "pausa", pausa: "reposo"
     })
+
+    // Duración de cada reacción breve si su pose no dice `segundos`.
+    readonly property var seconds: ({ clic: 1.5, megusta: 2.5, fallo: 2.5, enfado: 3, saltada: 2.5, playlist: 3 })
+
+    // Muestra la reacción `name` y, al acabar, `then` (si la hay).
+    function react(name, then) {
+        flash = name
+        queued = then || ""
+        flashTimer.interval = 1000 * (pose(name).segundos || seconds[name] || 2.5)
+        flashTimer.restart()
+        hop.restart()
+    }
+    Timer {
+        id: flashTimer
+        onTriggered: {
+            if (root.queued !== "")
+                root.react(root.queued)
+            else
+                root.flash = ""
+        }
+    }
+
+    // Pincharla: vergüenza; si suena una canción (y la mascota lo pide), además «Me gusta» y
+    // después alegría. Cinco pinchazos en cuatro segundos la enfadan.
+    function poke() {
+        const now = Date.now()
+        pokes = pokes.filter(at => now - at < 4000).concat([now])
+        if (pokes.length >= 5) {
+            pokes = []
+            react("enfado")
+            return
+        }
+        const id = Catalog.currentVideoId
+        if (likes && Player.playing && id !== "") {
+            if (likedId !== id) {
+                likedId = id
+                Library.like(id, Player.title)
+            }
+            react("clic", "megusta")
+        } else {
+            react("clic")
+        }
+    }
 
     // La ventana avisa cada vez que el usuario se mueve por el catálogo. Lo que pasa al
     // arrancar (la vista coloca su primer elemento) no cuenta.
@@ -80,7 +139,9 @@ Item {
     implicitWidth: image.status === Image.Ready ? tall * image.implicitWidth / image.implicitHeight : tall
     implicitHeight: tall
 
-    Accessible.ignored: true
+    Accessible.role: Accessible.Button
+    Accessible.name: likes && Player.playing ? "Mascota: dar «Me gusta» a la canción" : "Mascota"
+    Accessible.onPressAction: poke()
 
     // «Cargando» solo si tarda: las pistas suelen arrancar en décimas y la pose parpadearía.
     Timer {
@@ -94,6 +155,9 @@ Item {
             if (!Player.loading)
                 root.slow = false
         }
+        function onSaltada() {
+            root.react("saltada")
+        }
         // Pista nueva (el índice no basta: la primera pista no lo cambia).
         function onTitleChanged() {
             if (Player.title === "")
@@ -102,17 +166,24 @@ Item {
             freshTimer.restart()
         }
     }
+    Connections {
+        target: Library
+        function onGuardado(mensaje, error) {
+            if (!error)
+                root.react("playlist")
+        }
+        function onGustado(mensaje, error) {
+            if (!error)
+                return
+            root.likedId = ""
+            root.react("fallo")
+        }
+    }
     Timer {
         id: freshTimer
         interval: 4000
         onTriggered: root.fresh = false
     }
-    Timer {
-        id: pokeTimer
-        interval: 2500
-        onTriggered: root.poked = false
-    }
-
     Image {
         id: image
         width: parent.width
@@ -139,12 +210,10 @@ Item {
         NumberAnimation { target: lift; property: "y"; to: 0; duration: 260; easing.type: Easing.OutBounce }
     }
 
+    // Se queda el clic: lo que haya debajo (una tarjeta) no lo recibe.
     TapHandler {
-        onTapped: {
-            root.poked = true
-            pokeTimer.restart()
-            hop.restart()
-        }
+        gesturePolicy: TapHandler.ReleaseWithinBounds
+        onTapped: root.poke()
     }
 
     HoverHandler {

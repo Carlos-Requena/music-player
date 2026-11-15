@@ -73,9 +73,13 @@ pub mod qobject {
         #[qinvokable]
         fn toggle(self: Pin<&mut Player>);
 
-        /// Salta a la pista siguiente de la cola.
+        /// Salta a la pista siguiente de la cola (lo pide el usuario: termina con `saltada`).
         #[qinvokable]
         fn next(self: Pin<&mut Player>);
+
+        /// El usuario ha pasado a la siguiente (no cuando una pista termina sola).
+        #[qsignal]
+        fn saltada(self: Pin<&mut Player>);
 
         /// Vuelve al inicio de la pista o a la anterior si acaba de empezar.
         #[qinvokable]
@@ -405,13 +409,23 @@ impl qobject::Player {
         }
     }
 
-    fn next(self: Pin<&mut Self>) {
+    fn next(mut self: Pin<&mut Self>) {
+        if self.as_mut().advance() {
+            self.saltada();
+        }
+    }
+
+    /// Carga la pista siguiente (o la primera si se repite la cola); `false` si no hay.
+    fn advance(self: Pin<&mut Self>) -> bool {
         let next = *self.index() as usize + 1;
         if next < self.tracks.len() {
             self.load(next);
         } else if *self.repetir() && !self.tracks.is_empty() {
             self.load(0);
+        } else {
+            return false;
         }
+        true
     }
 
     fn previous(mut self: Pin<&mut Self>) {
@@ -1023,7 +1037,7 @@ impl qobject::Player {
             }
             Event::Ended => {
                 if (*self.index() as usize) + 1 < self.tracks.len() || *self.repetir() {
-                    self.next();
+                    self.advance();
                 } else {
                     self.as_mut().end_listen();
                     plugins::emit(plugins::Event::Stopped);

@@ -8,11 +8,18 @@ Glass {
     property bool lyricsOn: true
     signal lyricsToggled()
     signal miniRequested()
-    // Pulsar la canción (carátula o título) abre la pantalla «Sonando».
+    // Pulsar en cualquier sitio de la barra que no sea un control abre la pantalla «Sonando».
     signal expandRequested()
 
     tint: Theme.glassStrong
     radius: 22
+
+    // Los botones y deslizadores se quedan su clic; este solo recibe el resto de la barra.
+    TapHandler {
+        enabled: Player.title !== ""
+        gesturePolicy: TapHandler.ReleaseWithinBounds
+        onTapped: root.expandRequested()
+    }
 
     Row {
         id: nowPlaying
@@ -25,10 +32,6 @@ Glass {
         HoverHandler {
             enabled: Player.title !== ""
             cursorShape: Qt.PointingHandCursor
-        }
-        TapHandler {
-            enabled: Player.title !== ""
-            onTapped: root.expandRequested()
         }
         Accessible.role: Accessible.Button
         Accessible.name: "Abrir la pantalla Sonando"

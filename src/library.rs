@@ -71,6 +71,15 @@ pub mod qobject {
         /// Resultado de `add_to_playlist`: el aviso para el usuario y si fue un error.
         #[qsignal]
         fn guardado(self: Pin<&mut Library>, mensaje: QString, error: bool);
+
+        /// Marca con «Me gusta» la canción `video_id` (de título `titulo`) y vuelve a pedir la
+        /// sección «Me gusta». Termina con `gustado`.
+        #[qinvokable]
+        fn like(self: Pin<&mut Library>, video_id: &QString, titulo: &QString);
+
+        /// Resultado de `like`: el aviso para el usuario y si fue un error.
+        #[qsignal]
+        fn gustado(self: Pin<&mut Library>, mensaje: QString, error: bool);
     }
 
     impl cxx_qt::Threading for Library {}
@@ -328,6 +337,36 @@ impl qobject::Library {
                 }
             };
             let _ = qt.queue(move |library| library.guardado(QString::from(&mensaje), error));
+        });
+    }
+
+    fn like(self: Pin<&mut Self>, video_id: &QString, titulo: &QString) {
+        let video_id = video_id.to_string();
+        let titulo = titulo.to_string();
+        let generation = self.load_generation;
+        let qt = self.qt_thread();
+        thread::spawn(move || {
+            let result = ytm::like(&video_id);
+            if let Err(error) = &result {
+                eprintln!("me gusta {video_id}: {error}");
+            }
+            let (mensaje, error) = match &result {
+                Ok(()) => (format!("«{titulo}» está en tus «Me gusta»"), false),
+                Err(error) => (error.clone(), true),
+            };
+            let _ = qt.queue(move |library| library.gustado(QString::from(&mensaje), error));
+            if result.is_err() {
+                return;
+            }
+            // La sección «Me gusta» ya no está completa: se pide otra vez.
+            let Ok(zones) = ytm::liked_songs() else { return };
+            let json = to_json(&zones);
+            cache::write("megusta", true, &json);
+            let _ = qt.queue(move |library| {
+                if library.load_generation == generation {
+                    library.set_megusta(QString::from(&json));
+                }
+            });
         });
     }
 

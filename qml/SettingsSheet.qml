@@ -9,6 +9,9 @@ Item {
     property Item backdrop: null
     signal closed()
 
+    // El panel de la hoja (la mascota se apoya en su borde inferior izquierdo).
+    readonly property Item panel: sheet
+
     // Categoría que se ve (se recuerda mientras la app sigue abierta).
     property string category: "cuenta"
     readonly property var categories: [

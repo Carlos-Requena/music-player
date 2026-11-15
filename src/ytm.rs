@@ -143,6 +143,18 @@ pub fn add_to_playlist(playlist_id: &str, video_id: &str, source_playlist: &str)
     }
 }
 
+/// Marca la canción `video_id` con «Me gusta» en la cuenta. Repetirlo no cambia nada.
+pub fn like(video_id: &str) -> Result<()> {
+    if crate::account::with_session(|_| ()).is_none() {
+        return Err("Hace falta iniciar sesión para dar «Me gusta».".to_owned());
+    }
+    if video_id.is_empty() {
+        return Err("No hay ninguna canción sonando.".to_owned());
+    }
+    post("like/like", json!({ "target": { "videoId": video_id } }))?;
+    Ok(())
+}
+
 /// Primera aparición de `key` en profundidad.
 fn find<'a>(value: &'a Value, key: &str) -> Option<&'a Value> {
     match value {

@@ -25,6 +25,8 @@ búsqueda y el detalle de un álbum, playlist o artista. Cómo se pinta cada sec
   estantería. Son locales (opción `categorias`, JSON) y la elegida se recuerda (`categoria`).
 - **Guardar en una playlist** (`Library.addToPlaylist`) y **portada propia** de una playlist
   (`Library.setPlaylistCover`).
+- **«Me gusta» a una canción** (`Library.like` → `ytm::like`, termina con `gustado`); después
+  vuelve a pedir la sección Me gusta. Lo usa la mascota al pincharla ([mascotas](mascotas.md)).
 
 ## Reglas y decisiones
 
@@ -76,6 +78,7 @@ búsqueda y el detalle de un álbum, playlist o artista. Cómo se pinta cada sec
 | Canciones de un álbum o playlist | [`playlist_tracks`](../../src/ytm.rs) |
 | Radio de una canción | [`queue`](../../src/ytm.rs) |
 | Biblioteca de la cuenta | [`library_playlists`](../../src/ytm.rs), [`liked_songs`](../../src/ytm.rs) |
+| «Me gusta» a una canción | [`like`](../../src/ytm.rs), [`like`](../../src/library.rs) |
 | Límite de cada zona | [`ZONE_LIMIT`](../../src/library.rs) |
 | Qué secciones hay y cuáles exigen sesión | [`sections`](../../qml/Catalog.qml) |
 | Zonas de una sección para su vista | [`zonas`](../../qml/Catalog.qml) |
@@ -101,9 +104,10 @@ búsqueda y el detalle de un álbum, playlist o artista. Cómo se pinta cada sec
   está en el changelog).
 - **Pruebas:** ninguna en `ytm.rs` ni `library.rs` (dependen de la red); se prueban con
   `--probe home|explore|albums|playlists|search|album|queue`.
-- **Sin verificar:** biblioteca con sesión en Linux.
+- **Sin verificar:** biblioteca con sesión en Linux; `like/like` con una sesión real.
 - **Historial:** [docs/history/verificacion/catalogo.md](../history/verificacion/catalogo.md).
 
 ## Pendiente
 
-- Guardar en la biblioteca y marcar «Me gusta» desde la app ([ROADMAP](../ROADMAP.md)).
+- Guardar álbumes en la biblioteca, quitar un «Me gusta» y darlo desde el menú contextual
+  (hoy solo desde la mascota) ([ROADMAP](../ROADMAP.md)).

@@ -79,40 +79,58 @@ velo del color `fondo` para que el texto se lea sobre imágenes claras.
 
 ## Mascotas
 
-Un personaje asomado sobre la barra de reproducción que cambia de pose según lo que pasa. Va
-aparte de las skins (cualquier mascota con cualquier skin) y se elige en **Opciones ›
-Mascota**. Cada mascota es una carpeta en `mascotas/` junto a la de skins
+Un personaje asomado sobre la barra de reproducción que cambia de pose según lo que pasa y
+reacciona unos segundos a lo que haces. Va aparte de las skins (cualquier mascota con cualquier
+skin) y se elige en **Opciones › Mascota**; con las opciones abiertas se pasa a la esquina
+inferior izquierda de su panel. Cada mascota es una carpeta en `mascotas/` junto a la de skins
 (`~/Library/Application Support/musicplayer/mascotas/` en macOS,
 `~/.config/musicplayer/mascotas/` en Linux) con sus PNG y un `mascota.json`:
 
 ```json
 {
   "nombre": "Ralsei",
-  "descripcion": "De reojo siempre; feliz con la bufanda cuando suena música.",
+  "descripcion": "Pínchalo mientras suena una canción para darle «Me gusta».",
+  "pincharDaMeGusta": true,
   "poses": {
-    "reposo":  { "imagen": "reojo.png",   "alto": 180 },
-    "sonando": { "imagen": "bufanda.png", "alto": 140 }
+    "reposo":  { "imagen": "reojo.png",      "alto": 180 },
+    "sonando": { "imagen": "bufanda.png",    "alto": 140 },
+    "clic":    { "imagen": "verguenza.png",  "alto": 129, "segundos": 1.5 },
+    "megusta": { "imagen": "alegria.png",    "alto": 147 },
+    "saltada": { "imagen": "desilusion.png", "alto": 145 }
   }
 }
 ```
 
-Cada pose es el nombre del PNG (`"reposo": "quieta.png"`) o `{ "imagen", "alto" }` para darle
-su propio alto en píxeles (si unas son solo la cabeza y otras el busto). Con solo `reposo` y
-`sonando`, como en el ejemplo, la mascota está siempre en `reposo` salvo mientras suena música. `alto` en la raíz es
-el de las poses que no lo digan (160 si falta) y `"espejo": true` las voltea. Manda la primera
-que se cumpla:
+Cada pose es el nombre del PNG (`"reposo": "quieta.png"`) o `{ "imagen", "alto", "segundos" }`:
+`alto` es su alto en píxeles (si unas son solo la cabeza y otras el busto) y `segundos`, cuánto
+dura si es una reacción. `alto` en la raíz es el de las poses que no lo digan (160 si falta),
+`"espejo": true` las voltea y `"pincharDaMeGusta": true` hace que pincharla mientras suena una
+canción le dé «Me gusta» (hace falta sesión).
+
+**Reacciones**: duran unos segundos y mandan sobre todo lo demás.
+
+| Pose | Cuándo | Dura | Si falta, usa |
+|---|---|---|---|
+| `clic` | Al pincharla | 1,5 s | `nueva` |
+| `megusta` | Tras `clic`, si el pinchazo dio «Me gusta» | 2,5 s | `clic` |
+| `fallo` | Si el «Me gusta» no se pudo dar (sin sesión, sin red) | 2,5 s | `error` |
+| `enfado` | Al pincharla 5 veces en 4 segundos | 3 s | `clic` |
+| `saltada` | Al pasar a la siguiente canción (no cuando termina sola) | 2,5 s | `sonando` |
+| `playlist` | Al guardar algo en una playlist | 3 s | `megusta` |
+
+**El resto del tiempo** manda la primera que se cumpla:
 
 | Pose | Cuándo | Si falta, usa |
 |---|---|---|
 | `error` | Algo falla | `cargando` |
 | `cargando` | Una pista tarda más de 0,7 s en arrancar | `reposo` |
-| `clic` | Unos segundos tras pincharla | `nueva` |
 | `nueva` | Unos segundos al empezar una pista | `sonando` |
 | `sonando` | Mientras suena música | `reposo` |
 | `navegando` | Sin música, mientras recorres una sección o abres un álbum (4 s tras el último movimiento) | `pausa` |
 | `pausa` | Con una pista en pausa | `reposo` |
 | `reposo` | Nada de lo anterior (la única obligatoria) | — |
 
+Con solo `reposo` y `sonando`, la mascota está siempre en `reposo` salvo mientras suena música.
 Recorta las poses con un corte recto abajo: así parece apoyada en la barra. En macOS, Vista
 Previa quita el fondo blanco (Herramientas › Quitar fondo). Pulsa **Recargar** en Opciones tras
 añadir o editar una. Solo se carga la pose visible, a su tamaño en pantalla: unos cientos de KB.

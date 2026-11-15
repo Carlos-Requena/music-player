@@ -171,10 +171,13 @@ Item {
         return target.queueIndex !== undefined
     }
 
-    // Resultado de «Guardar en una playlist» (va por la red).
+    // Resultado de «Guardar en una playlist» y del «Me gusta» de la mascota (van por la red).
     Connections {
         target: Library
         function onGuardado(mensaje, error) {
+            root.notify(mensaje)
+        }
+        function onGustado(mensaje, error) {
             root.notify(mensaje)
         }
     }

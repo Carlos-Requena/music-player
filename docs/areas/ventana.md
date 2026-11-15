@@ -18,12 +18,15 @@ También el arranque del proceso y los argumentos de depuración (`--probe`, `--
 - **Panel de letra y cola** a la derecha (por defecto) o a la izquierda (opción `panel`), o
   cerrado; con el panel a la izquierda todo el escenario se desplaza con `stageX`. En ventanas
   estrechas se oculta para que quepa la navegación.
-- **«Sonando»** (`NowPlayingView`): sube desde la barra al pulsar la canción; carátula grande sobre
+- **«Sonando»** (`NowPlayingView`): sube desde la barra al pulsar en ella (fuera de los controles); carátula grande sobre
   el fondo ambiente de sus colores, letra y cola.
 - **Mini reproductor**: ventana pequeña siempre encima; la grande se oculta mientras tanto
   ([ADR-10](../decisions/ADR-10-mini-reproductor-oculta-la-ventana.md)).
 - **Menú de clic derecho** (`Main.openMenu` → `ContextMenu`) y aviso breve: cola, lista temporal,
-  guardar en playlist, categorías (subpáginas `page:<id>`) y portada.
+  guardar en playlist, categorías (subpáginas `page:<id>`) y portada. El aviso también da el
+  resultado del «Me gusta» de la mascota (`Library.gustado`).
+- **Mascota** (`mascotLoader`): sobre el borde izquierdo de la barra; con las opciones abiertas, en
+  la esquina inferior izquierda de su panel (`SettingsSheet.panel`) ([mascotas](mascotas.md)).
 
 ## Reglas y decisiones
 
@@ -89,7 +92,8 @@ También el arranque del proceso y los argumentos de depuración (`--probe`, `--
   categorías.
 - **[personalizacion](personalizacion.md)** (`AppSettings`, `SettingsSheet`, `Ambient`,
   `TintProbe`): opciones, modo ambiente y color de lo que suena (`playingProbe`).
-- **[mascotas](mascotas.md)** (`Mascot`): la mascota y su aviso al navegar (`browsed`).
+- **[mascotas](mascotas.md)** (`Mascot`): la mascota, su aviso al navegar (`browsed`) y su sitio
+  en la barra o en Opciones.
 - **[resolucion](resolucion.md)** (`resolver`, `stream`, `daemon` en `--probe`): las sondas sin
   ventana.
 - **[sesion](sesion.md)** (`Account`, `login_window`): la cuenta y la ventana de macOS.
