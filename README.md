@@ -240,8 +240,11 @@ Las opciones se guardan en `~/Library/Application Support/musicplayer/settings.j
 - [docs/GUIA.md](docs/GUIA.md): **guía para aprender el proyecto desde cero** (Rust y QML
   explicados con su propio código, recorrido de un clic, recetas y ejercicios).
 - [COMPILAR.md](COMPILAR.md): compilar e instalar en macOS y CachyOS.
-- [AGENTS.md](AGENTS.md): guía para colaboradores y agentes (cómo está montado, convenciones,
-  cómo probar, trampas conocidas).
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): flujo de datos, hilos, arranque instantáneo de
-  pistas y medidas de memoria.
+- [docs/AGENTES.md](docs/AGENTES.md): **normas para colaboradores y agentes** (comandos,
+  convenciones, cómo verificar, cómo documentar).
+- [docs/INDEX.md](docs/INDEX.md): qué leer para cada tarea; una ficha por área del programa en
+  [docs/areas/](docs/areas/), decisiones en [docs/decisions/](docs/decisions/README.md) y
+  procedimientos en [docs/runbooks/](docs/runbooks/).
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): cómo encajan las piezas, hilos y memoria.
+- [docs/TRAMPAS.md](docs/TRAMPAS.md): errores conocidos de Qt, cxx-qt, mpv y YouTube.
 - [docs/ROADMAP.md](docs/ROADMAP.md): qué falta y en qué orden.

@@ -1,2 +1,10 @@
 /target
 .DS_Store
+
+# Archivos que genera LaTeX al compilar la guía (el PDF sí se versiona)
+docs/guia/*.aux
+docs/guia/*.fdb_latexmk
+docs/guia/*.fls
+docs/guia/*.log
+docs/guia/*.toc
+docs/guia/*.xdv

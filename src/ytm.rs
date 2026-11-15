@@ -11,7 +11,7 @@ use serde_json::{json, Value};
 const ENDPOINT: &str = "https://music.youtube.com/youtubei/v1";
 pub const USER_AGENT: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 \
      (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36";
-const CLIENT_VERSION: &str = "1.20251101.01.00";
+pub const CLIENT_VERSION: &str = "1.20251101.01.00";
 
 /// Filtros de búsqueda (parámetro `params` de InnerTube).
 const SEARCH_ARTISTS: &str = "EgWKAQIgAWoMEA4QChADEAQQCRAF";

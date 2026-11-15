@@ -1,48 +1,47 @@
 # Hoja de ruta
 
 Ordenada por lo que más acerca la app a sustituir a Pear Desktop. Lo marcado **(decidir)**
-necesita una decisión del propietario antes de empezar.
-
-## Hecho
-
-- Ventana de vidrio y estilo Escenario, navegación superior, modo ambiente con el color de la
-  carátula.
-- Vistas Lomos, Cubeta y Muro, elegibles por sección y alternables al vuelo.
-- Catálogo real sin sesión: inicio, explorar, novedades, playlists por estado de ánimo,
-  búsqueda de canciones, álbumes y playlists.
-- Reproducción con mpv + yt-dlp, cola, siguiente/anterior, posición, volumen.
-- Arranque instantáneo de pistas con precarga (ver [ARCHITECTURE.md](ARCHITECTURE.md)).
-- Letra sincronizada (LRCLIB), resaltado palabra a palabra.
-- Inicio de sesión (ventana propia en macOS o sesión del navegador); Playlists de tu biblioteca y Me gusta.
-- Detalle de álbum, playlist y artista con Reproducir y Aleatorio; artistas en la búsqueda.
-- Modo inspeccionar: girar la caja, abrirla, sacar el disco.
-- Rendimiento: caché de secciones, mini reproductor que libera la ventana grande, yt-dlp
-  residente, mpv aligerado, carga perezosa de carátulas.
-- Plugins: controles del sistema (macOS y MPRIS), Discord Rich Presence y Last.fm.
+necesita una decisión del propietario antes de empezar; en diseño, con alternativas
+([AGENTES §6](AGENTES.md#6-normas-de-interfaz)). Lo ya hecho está en el
+[changelog técnico](history/CHANGELOG-TECNICO.md).
 
 ## Siguiente
 
-1. **Probar y empaquetar en CachyOS**: compilar, revisar Wayland, desenfoque y rendimiento con
-   el controlador de la máquina, y un `PKGBUILD`.
-2. **Editor de disposición** (ver Personalización).
-3. Guardar en la biblioteca y marcar «Me gusta» desde la app.
+1. **Probar y empaquetar en CachyOS**: compilar, revisar Wayland, desenfoque y rendimiento con el
+   controlador de la máquina, y un `PKGBUILD`.
+2. **Editor de disposición** (decidir): arrastrar, ocultar y redimensionar paneles (letra, cola,
+   barra, navegación) sobre la propia ventana, guardando en `opciones`
+   ([personalizacion](areas/personalizacion.md)).
+3. Guardar en la biblioteca y marcar «Me gusta» desde la app ([catalogo](areas/catalogo.md)).
 
 ## Personalización
 
-Hecho: skins en JSON (cuatro incluidas y carpeta del usuario), panel a izquierda o derecha,
-modo ambiente y desenfoque activables, tamaño de las carátulas del Muro.
-
-6. **Editor de disposición**: arrastrar, ocultar y redimensionar paneles (letra, cola, barra,
-   navegación) sobre la propia ventana, guardando en `opciones`.
-7. **Skins claras**: hacen falta tokens para los velos y fondos de superposición, que hoy
-   asumen fondo oscuro.
-8. **Skins con QML propio** (sustituir componentes enteros, no solo colores).
-9. **Más plugins**: letras de otras fuentes, ecualizador (filtros de mpv), notificaciones.
+4. **Skins claras**: hacen falta tokens para los velos y fondos de superposición, que asumen fondo
+   oscuro.
+5. **Skins con QML propio** (decidir): sustituir componentes enteros, no solo colores.
+6. **Más plugins**: letras de otras fuentes, ecualizador (filtros de mpv), notificaciones.
 
 ## Rendimiento
 
-Hecho (ver ARCHITECTURE). Queda:
+7. Liberar memoria al **minimizar** en macOS (Qt conserva los búferes): destruir y recrear la
+   ventana, o pasar al mini reproductor automáticamente al minimizar (decidir)
+   ([ventana](areas/ventana.md)).
+8. Probar si **libmpv embebido** ahorra algo frente al proceso mpv (~20 MB en reposo)
+   ([ADR-02](decisions/ADR-02-mpv-en-proceso-aparte.md)).
 
-10. Liberar memoria al **minimizar** en macOS (Qt conserva los búferes): habría que destruir y
-    recrear la ventana, o pasar al mini reproductor automáticamente al minimizar.
-11. Probar si libmpv embebido ahorra algo frente al proceso mpv (~20 MB en reposo hoy).
+## Deuda conocida
+
+Lo que falta para poder confiar en un cambio sin probarlo todo a mano. Si tu tarea toca uno de
+estos puntos, no lo empeores ([AGENTES §10](AGENTES.md#10-deuda-conocida-no-la-empeores)).
+
+- **Sin CI:** `cargo build --release`, `cargo test` y `python3 scripts/docs.py check` se pasan a
+  mano.
+- **Sin pruebas de lo que habla con la red** (`ytm.rs`, `library.rs`, `resolver.rs`, `player.rs`):
+  dependen de `--probe` y de capturas. Las respuestas de InnerTube guardadas como ejemplo
+  permitirían probar el análisis sin red.
+- **Linux sin verificar a fondo:** Wayland, MPRIS en GNOME y KDE, la ventana de inicio de sesión
+  con Qt WebEngine y el coste de la letra con el controlador de CachyOS.
+- **Verificaciones sin registrar:** casi todas las fichas dicen «sin registrar»: se rellenan la
+  próxima vez que se toque cada área.
+- **Archivos generados de la guía en git** (`docs/guia/guia.aux`, `.log`, `.toc`…): deberían
+  ignorarse.

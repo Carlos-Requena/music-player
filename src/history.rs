@@ -6,6 +6,10 @@
 //! cuenta como reproducción y para las recomendaciones). Sus direcciones llegan en la
 //! respuesta de `/player` con la sesión.
 //!
+//! Los avisos llevan `c=WEB_REMIX` (y su versión): es lo que dice que la escucha es de YouTube
+//! Music. Sin él, YouTube la apunta en el historial de YouTube y no en el de YouTube Music
+//! (ytmusicapi, `add_history_item`, hace lo mismo).
+//!
 //! Nada de esto toca el arranque de la pista: se pide cuando ya suena, en un hilo aparte, y
 //! un fallo solo se apunta en stderr.
 
@@ -35,24 +39,29 @@ pub struct Report {
 pub fn start(video_id: &str) -> Result<Report, String> {
     let (playback, watchtime) = crate::ytm::tracking_urls(video_id)?;
     let report = Report { playback, watchtime, cpn: nonce() };
-    ping(&report.playback, &[("ver", "2".into()), ("cpn", report.cpn.clone()), ("cmt", "0".into())])?;
+    let mut params = client();
+    params.extend([("cpn", report.cpn.clone()), ("cmt", "0".into())]);
+    ping(&report.playback, &params)?;
     Ok(report)
 }
 
 /// Avisa de que se escuchó el tramo `from`–`to` (segundos de la pista).
 pub fn watched(report: &Report, from: f64, to: f64) -> Result<(), String> {
     let (from, to) = (format!("{from:.3}"), format!("{to:.3}"));
-    ping(
-        &report.watchtime,
-        &[
-            ("ver", "2".into()),
-            ("cpn", report.cpn.clone()),
-            ("cmt", to.clone()),
-            ("st", from),
-            ("et", to),
-            ("state", "playing".into()),
-        ],
-    )
+    let mut params = client();
+    params.extend([
+        ("cpn", report.cpn.clone()),
+        ("cmt", to.clone()),
+        ("st", from),
+        ("et", to),
+        ("state", "playing".into()),
+    ]);
+    ping(&report.watchtime, &params)
+}
+
+/// Parámetros comunes: versión del protocolo y cliente de YouTube Music.
+fn client() -> Vec<(&'static str, String)> {
+    vec![("ver", "2".into()), ("c", "WEB_REMIX".into()), ("cver", crate::ytm::CLIENT_VERSION.into())]
 }
 
 /// 16 caracteres al azar del alfabeto que usa el reproductor web (como yt-dlp).
@@ -121,6 +130,13 @@ mod tests {
     fn los_parametros_se_sustituyen() {
         let url = with_params("https://s.youtube.com/api/stats/playback?ns=yt&cpn=viejo&docid=x", &[("cpn", "nuevo".into()), ("ver", "2".into())]);
         assert_eq!(url, "https://s.youtube.com/api/stats/playback?ns=yt&docid=x&cpn=nuevo&ver=2");
+    }
+
+    #[test]
+    fn los_avisos_dicen_que_son_de_youtube_music() {
+        let url = with_params("https://s.youtube.com/api/stats/playback?c=WEB&docid=x", &super::client());
+        assert!(url.contains("c=WEB_REMIX"));
+        assert!(!url.contains("c=WEB&"));
     }
 
     #[test]

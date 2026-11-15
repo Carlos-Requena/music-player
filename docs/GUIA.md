@@ -18,9 +18,11 @@ Léela en orden. Cada parte enlaza al código real: ábrelo al lado.
 | [8. Depurar](#8-depurar) | Qué hacer cuando algo no funciona | 15 min |
 | [9. Ejercicios](#9-ejercicios-para-coger-soltura) | Para practicar con el proyecto | — |
 
-Documentos hermanos: [AGENTS.md](../AGENTS.md) (mapa de archivos, comandos, trampas
-conocidas: tenlo siempre a mano) y [ARCHITECTURE.md](ARCHITECTURE.md) (decisiones técnicas
-y medidas).
+Documentos hermanos: [AGENTES.md](AGENTES.md) (las normas y los comandos: tenlo siempre a
+mano), [INDEX.md](INDEX.md) (qué leer para cada tarea y la ficha de cada área),
+[TRAMPAS.md](TRAMPAS.md) (los errores raros que ya nos han pasado) y
+[ARCHITECTURE.md](ARCHITECTURE.md) (cómo encajan las piezas). Esta guía enseña; cuando una
+receta de aquí y un [runbook](runbooks/) no coincidan, manda el runbook.
 
 ---
 
@@ -115,7 +117,7 @@ terminal. Es la forma más rápida de saber si un problema es de la red o de la 
 ./target/release/musicplayer --probe album OLAK5uy_m5cMcwGb9BHQr6rBbNqTcuEmrX0afsbC0
 ```
 
-La lista completa está en AGENTS.md («Probar sin abrir la ventana»).
+La lista completa está en [verificar-reproduccion](runbooks/verificar-reproduccion.md#sondas-sin-ventana---probe).
 
 ### Capturas automáticas
 
@@ -127,7 +129,7 @@ MUSICPLAYER_SILENT=1 ./target/release/musicplayer --shot /tmp/prueba.png --delay
 ```
 
 `MUSICPLAYER_SILENT=1` hace que mpv no suene. Incluso puedes simular clics y arrastres de
-ratón con `MUSICPLAYER_DEBUG_CLICK` (ver AGENTS.md). Así se prueba la interfaz sin tocarla.
+ratón con `MUSICPLAYER_DEBUG_CLICK` ([verificar-interfaz](runbooks/verificar-interfaz.md#clics-de-verdad)). Así se prueba la interfaz sin tocarla.
 Por ejemplo, esto reproduce la primera canción de Inicio y, a los 10 s, arrastra la segunda
 fila de la cola dos puestos hacia abajo sin soltarla (`draghold`), para ver el gesto a medias:
 
@@ -513,7 +515,7 @@ Lo que tienes que saber:
   métodos seguidos.
 - Para los datos estructurados (listas de canciones, secciones), Rust no expone objetos sino
   **un JSON en una propiedad `QString`**. Es simple y rápido para el volumen de este proyecto.
-- **Trampas** (también en AGENTS.md): un archivo Rust con puente nuevo hay que añadirlo a
+- **Trampas** (también en [TRAMPAS.md](TRAMPAS.md#compilación-y-cxx-qt)): un archivo Rust con puente nuevo hay que añadirlo a
   `build.rs` (`.files([...])`) y como `mod` en `main.rs`; un QML nuevo, a `QML_FILES` de
   `build.rs`. Si no, «el tipo no existe».
 
@@ -615,7 +617,7 @@ Ejemplo: saber cuántas canciones quedan en la cola.
 4. En QML: `Text { text: Player.restantes + " canciones más" }`.
 
 Para una **función**: declárala con `#[qinvokable]` en el bloque del puente (solo la firma,
-como las demás) y escribe el cuerpo en `impl qobject::Player`. Ojo con la trampa de AGENTS.md:
+como las demás) y escribe el cuerpo en `impl qobject::Player`. Ojo con la trampa de [TRAMPAS.md](TRAMPAS.md#compilación-y-cxx-qt):
 el cuerpo nunca va dentro del bloque `extern "RustQt"`.
 
 ### 7.5 Añadir datos nuevos de YouTube Music
@@ -684,7 +686,7 @@ fn quita_el_numero_de_reproducciones() {
 | La ventana sale vacía o falta algo | La terminal: QML escribe ahí sus errores (`qrc:/…qml:123: …`) |
 | Algo de la red no llega | Una sonda `--probe …` para aislar si es YouTube o la interfaz |
 | Una canción no suena | `--probe fast ID` (¿qué dice YouTube?), `--probe playable ID`, y las líneas de stderr del resolvedor |
-| Un clic «atraviesa» a lo de debajo | `gesturePolicy: TapHandler.ReleaseWithinBounds` (ver AGENTS.md) |
+| Un clic «atraviesa» a lo de debajo | `gesturePolicy: TapHandler.ReleaseWithinBounds` ([TRAMPAS](TRAMPAS.md#qt-quick-y-qml)) |
 | Arrastrar dentro de una lista la desplaza en vez de mover la fila | La lista se queda el gesto. Un `MouseArea` con `preventStealing: true` lo impide (así lo hace `QueueList`) |
 | Lo escuchado no aparece en el historial de YouTube Music | Las líneas `historial:` de la terminal dicen por qué; la opción está en Opciones › Reproducción |
 | «Guardar en una playlist» falla | La línea `guardar en …` de la terminal; solo funciona con playlists tuyas y con sesión |
@@ -695,7 +697,7 @@ fn quita_el_numero_de_reproducciones() {
   preferencias ni tu sesión.
 - **No castigues a YouTube**: muchas pruebas seguidas hacen que bloquee tu IP un rato. Si de
   repente todo falla con 403 o «confirm you're not a bot», espera unos minutos.
-- La sección «Trampas conocidas» de AGENTS.md recoge cada error raro que ya nos ha pasado y su
+- [TRAMPAS.md](TRAMPAS.md) recoge cada error raro que ya nos ha pasado y su
   arreglo. Léela entera una vez.
 
 ---
