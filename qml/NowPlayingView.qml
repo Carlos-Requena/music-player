@@ -32,6 +32,15 @@ FocusScope {
     // - «clasica»: carátula con su título debajo, con el borde derecho algo pasado el centro, y
     //   la letra o la cola anchas, del borde de arriba a la barra.
     readonly property bool big: { void AppSettings.revision; return AppSettings.opcion("sonando") !== "clasica" }
+    // Título y artista bajo la carátula (opción `sonandoTitulo`): «auto» (por defecto) los pone
+    // solo en la Clásica; «si» y «no», en las dos disposiciones.
+    readonly property bool showTitle: {
+        void AppSettings.revision
+        const mode = AppSettings.opcion("sonandoTitulo")
+        return mode === "si" ? true : mode === "no" ? false : !big
+    }
+    // Alto que ocupa el título bajo la carátula (en «grande», se le quita a la carátula).
+    readonly property real titleSpace: showTitle ? 28 + info.height : 0
     readonly property real edge: 48
     readonly property real gutter: 56
     readonly property real artTop: 76
@@ -41,7 +50,7 @@ FocusScope {
     readonly property real bottomEdge: height - bottomInset + Theme.gap - sideMargin
     readonly property real sideWidth: big ? Math.max(380, Math.min(460, width * 0.3)) : width * 0.55 - 200
     readonly property real art: big
-        ? Math.max(200, Math.min(bottomEdge - artTop, width - 2 * edge - gutter - sideWidth, 1000))
+        ? Math.max(200, Math.min(bottomEdge - artTop - titleSpace, width - 2 * edge - gutter - sideWidth, 1000))
         : Math.max(200, Math.min((height - bottomInset) * 0.68, width * 0.45 - 80, 680))
     readonly property real groupLeft: Math.max(edge, (width - root.art - gutter - sideWidth) / 2)
     // Sin letra ni cola, la carátula va al centro.
@@ -58,7 +67,23 @@ FocusScope {
     readonly property real sideTop: big ? artTop : sideMargin
     readonly property real sideBottom: big ? artTop + root.art : bottomEdge
     readonly property bool hasLyrics: Catalog.lyrics.length > 0
-    readonly property string bigThumb: Player.thumb.replace("w544-h544", "w1200-h1200")
+    // Carátula grande (opción `caratulaCalidad`): «Máxima» (por defecto) la pide al tamaño que
+    // ocupa en pantalla, en píxeles físicos, entre 1200 y 2400 y en escalones de 400 para no
+    // pedir otra a cada paso al redimensionar la ventana; «Alta», a 1200. El servidor no la
+    // agranda: si el original es menor, llega el original. Los vídeos (i.ytimg.com) no tienen
+    // carátula cuadrada: en vez de su miniatura pequeña (con bandas negras), su fotograma a
+    // 1280×720 (`hq720`); si no lo tiene, se queda la miniatura de debajo.
+    readonly property bool maxCover: { void AppSettings.revision; return AppSettings.opcion("caratulaCalidad") !== "alta" }
+    readonly property real dpr: Screen.devicePixelRatio > 0 ? Screen.devicePixelRatio : 1
+    readonly property int bigPixels: maxCover
+        ? Math.max(1200, Math.min(2400, Math.ceil(root.art * dpr / 400) * 400))
+        : 1200
+    readonly property string bigThumb: {
+        const video = Player.thumb.match(/^https:\/\/i\.ytimg\.com\/vi\/([^\/]+)\//)
+        if (video)
+            return "https://i.ytimg.com/vi/" + video[1] + "/hq720.jpg"
+        return Player.thumb.replace("w544-h544", "w" + bigPixels + "-h" + bigPixels)
+    }
 
     visible: shown > 0.001
     clip: true
@@ -128,11 +153,13 @@ FocusScope {
             // «clásica», con su título debajo, centrada en vertical.
             x: root.artLeft
             width: root.art
-            height: root.big ? root.art : root.art + 24 + info.height
+            height: root.art + root.titleSpace
             y: root.big ? root.artTop : Math.max(96, (root.height - root.bottomInset - height) / 2 + 42)
 
-            // Halo del color de la carátula detrás de ella.
+            // Halo del color de la carátula detrás de ella. En el ambiente «Plano» no: es un
+            // degradado más.
             RectangularShadow {
+                visible: !Theme.ambientFlat
                 x: art.x
                 y: art.y + root.art * 0.04
                 width: root.art
@@ -150,15 +177,28 @@ FocusScope {
                 height: root.art
                 scale: 0.94 + 0.06 * root.shown
 
+                // Mientras llega la grande (a máxima calidad tarda hasta un segundo la primera
+                // vez), la de la barra de reproducción ampliada: es la misma URL y el mismo
+                // tamaño, así que ya está en memoria. Se suelta en cuanto la grande está lista.
+                Cover {
+                    anchors.fill: parent
+                    thumb: Player.thumb
+                    pixels: 120
+                    load: root.visible && !cover.ready
+                    visible: !cover.ready
+                    radius: 18
+                }
+
                 // Redondeada con su propia forma, sin capa ni máscara: a este tamaño, dos capas
                 // costaban varios MB de memoria gráfica.
                 Cover {
                     id: cover
                     anchors.fill: parent
                     thumb: root.bigThumb
-                    pixels: 1200
+                    pixels: root.bigPixels
                     load: root.visible
                     radius: 18
+                    placeholder: false
                 }
 
                 // Brillo suave arriba a la izquierda, como un vinilo bajo una luz.
@@ -192,7 +232,7 @@ FocusScope {
 
             Column {
                 id: info
-                visible: !root.big
+                visible: root.showTitle
                 anchors.horizontalCenter: parent.horizontalCenter
                 y: root.art + 28
                 width: parent.width + 56

@@ -3,7 +3,7 @@ area: ventana
 titulo: Ventana y navegación
 resumen: Arranque, ventana principal con escenario, navegación superior, panel de letra y cola, pantalla «Sonando», mini reproductor, búsqueda y menú de clic derecho.
 archivos: [src/main.rs, src/window.cpp, qml/Main.qml, qml/TopNav.qml, qml/SearchField.qml, qml/NowPlayingPanel.qml, qml/NowPlayingView.qml, qml/MiniPlayer.qml, qml/ContextMenu.qml]
-opciones: [panel, sonando]
+opciones: [panel, sonando, sonandoTitulo, caratulaCalidad]
 adr: [ADR-10]
 ---
 
@@ -29,8 +29,22 @@ También el arranque del proceso y los argumentos de depuración (`--probe`, `--
   - **Clásica**: la carátula con su título y artista debajo, con el borde derecho algo pasado el
     centro, y letra y cola anchas, del borde de arriba a la barra.
 
+  **Título bajo la carátula** (opción `sonandoTitulo`, Opciones › Vistas), por petición del
+  propietario: Automático (por defecto: solo en la Clásica), Siempre o Nunca. En la Grande con
+  título, la carátula se encoge lo que ocupa el título (`titleSpace`) para que todo quepa sobre la
+  barra.
+
   Sin letra ni cola (botón del panel), la carátula va al centro. Se redondea con `Cover.radius`,
   sin capas.
+
+  **Calidad de la carátula** (opción `caratulaCalidad`, Opciones › Apariencia): **Máxima** (por
+  defecto, elegido por el propietario) la pide al tamaño que ocupa en pantalla en píxeles
+  físicos, entre 1200 y 2400 px y en escalones de 400 (`bigPixels`); **Alta**, a 1200 px. El
+  servidor de carátulas no agranda: si el original es menor (suelen ser de 1400 a 4000 px), llega
+  el original. Mientras llega la grande se ve la de la barra (120 px, ya en memoria) ampliada, y
+  se suelta en cuanto la grande está a la vista (`Cover.ready`). Las canciones que son vídeos
+  (`i.ytimg.com`) piden su fotograma `hq720` (1280×720) en vez de la miniatura pequeña con bandas
+  negras; si no lo tienen, queda la miniatura.
 - **Mini reproductor**: ventana pequeña siempre encima; la grande se oculta mientras tanto
   ([ADR-10](../decisions/ADR-10-mini-reproductor-oculta-la-ventana.md)).
 - **Menú de clic derecho** (`Main.openMenu` → `ContextMenu`) y aviso breve: cola, lista temporal,
@@ -53,6 +67,9 @@ También el arranque del proceso y los argumentos de depuración (`--probe`, `--
 - **Al volver de oculta**, `Theme.renderEpoch` sube para recrear los iconos
   ([TRAMPAS](../TRAMPAS.md#qt-quick-y-qml)).
 - **Proxy:** Qt ignora el proxy de macOS; `window.cpp` respeta `HTTPS_PROXY`/`HTTP_PROXY`.
+- **Carátula grande en «Sonando»**: medido el 2026-11-16, pedirla a 2000–2400 px tarda 0,6–1,5 s
+  la primera vez (el servidor la redimensiona) frente a ~0,2 s a 1200 px, y pesa de 2 a 4 veces
+  más; por eso la vista previa de 120 px y la opción Alta.
 - **Una lista larga en el menú** (playlists donde guardar) va en una subpágina, no en el menú
   principal.
 
@@ -71,6 +88,7 @@ También el arranque del proceso y los argumentos de depuración (`--probe`, `--
 | Ventana lista | ~0,75 s | 2026-11-13, M4 Pro, release |
 | Ocultar para el mini reproductor | 213 → 148 MB | 2026-11-13, M4 Pro, release |
 | «Sonando» abierta, Grande con cola (1440×900, Retina) | 252–264 MB, igual que la Clásica con dos capas (254–273 MB; ruido ±10 MB) | 2026-11-16, M4 Pro, release |
+| «Sonando» sin cola (1440×900, Retina), carátula Máxima (1600 px) frente a Alta (1200 px) | 248–249 MB frente a 243–247 MB (~+4 MB; canciones distintas en cada pasada) | 2026-11-16, M4 Pro, release |
 
 ## Archivos
 
@@ -95,6 +113,8 @@ También el arranque del proceso y los argumentos de depuración (`--probe`, `--
 | Proxy y red | [`musicplayer_configure_network`](../../src/window.cpp) |
 | Abrir el menú | [`openMenu`](../../qml/Main.qml) |
 | Argumentos de depuración | [`arg`](../../qml/Main.qml) |
+| Título bajo la carátula | [`showTitle`](../../qml/NowPlayingView.qml), [`titleSpace`](../../qml/NowPlayingView.qml) |
+| Calidad de la carátula de «Sonando» | [`bigPixels`](../../qml/NowPlayingView.qml), [`bigThumb`](../../qml/NowPlayingView.qml) |
 | Mini y vuelta | [`showMini`](../../qml/Main.qml), [`restoreFromMini`](../../qml/Main.qml) |
 | Entradas del menú | [`entries`](../../qml/ContextMenu.qml), [`run`](../../qml/ContextMenu.qml) |
 
@@ -119,10 +139,12 @@ También el arranque del proceso y los argumentos de depuración (`--probe`, `--
 
 ## Estado actual
 
-- **Última verificación:** 2026-11-16, «Sonando» en Grande y Clásica, con letra y con cola, y
-  la carátula del panel, capturas ([historial](../history/verificacion/ventana.md)).
+- **Última verificación:** 2026-11-16, «Sonando» con la carátula en Máxima y en Alta, el
+  ambiente «Plano», Grande con título y Clásica sin él, capturas y memoria ([historial](../history/verificacion/ventana.md)).
 - **Pruebas:** capturas con `--shot` ([verificar-interfaz](../runbooks/verificar-interfaz.md)).
-- **Sin verificar:** Wayland en CachyOS (panel, desenfoque, mini siempre encima).
+- **Sin verificar:** Wayland en CachyOS (panel, desenfoque, mini siempre encima); la carátula
+  `hq720` de una canción que es vídeo dentro de la app (solo con `curl`); la vista previa de 120 px
+  mientras carga (en las capturas la grande ya estaba).
 - **Historial:** [docs/history/verificacion/ventana.md](../history/verificacion/ventana.md).
 
 ## Pendiente

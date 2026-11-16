@@ -67,6 +67,9 @@ QtObject {
     // pantallas que muestran con escalones los degradados de varios colores.
     // «Tenue»: igual que «Suave» pero apenas un velo de color.
     readonly property bool ambientSingle: ambientMode === "suave" || ambientMode === "tenue"
+    // «Plano»: todo el fondo de un solo color sólido (el del elemento enfocado), sin ningún
+    // degradado. Para pantallas antiguas, donde hasta un solo foco sale con escalones.
+    readonly property bool ambientFlat: ambientMode === "plano"
     readonly property real ambient: ambientOn
         ? (skin.ambiente !== undefined ? skin.ambiente : 1) * (ambientMode === "tenue" ? 0.3 : ambientSingle ? 0.7 : 1)
         : 0

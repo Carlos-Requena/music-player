@@ -5,6 +5,13 @@ son de cuando se escribieron. El estado actual está en su [ficha](../../areas/i
 
 Lo nuevo va arriba: añade una sección `## AAAA-MM-DD · qué se verificó` encima de las anteriores.
 
+## 2026-11-16 · `Cover` con `placeholder` y `ready`
+
+- **Cambio:** `placeholder: false` quita el fondo neutro mientras carga, para que se vea la
+  carátula pequeña de debajo; `ready` dice si ya está cargada y a la vista. Los usa «Sonando».
+- **Verificado:** capturas de «Sonando» con la carátula redonda y nítida.
+- **No verificado:** el momento de la carga (las capturas llegan con la grande ya puesta).
+
 ## 2026-11-16 · `Cover` redondeada sin el borde repetido
 
 - **Cambio:** `fillTransform` escala la textura de `ShapePath.fillItem` para cubrir la carátula y

@@ -21,7 +21,11 @@ Vistas y Plugins. Cómo crear una skin o una mascota, para quien usa la app: [RE
   `<config>/musicplayer/settings.json`. Las de cada área están en el `opciones:` de su ficha; la
   tabla completa, en [INDEX](../INDEX.md#opciones).
 - **Modo ambiente** (`ambiente`): focos de color suaves, uno teñido por lo enfocado y otro por lo
-  que suena. **Desenfoque** (`desenfoque`): desactivarlo ahorra memoria y batería.
+  que suena. Vivo (por defecto), Suave y Tenue (un solo foco), **Plano** y No. **Plano**, por
+  petición del propietario para pantallas antiguas que muestran los degradados con escalones:
+  todo el fondo de un solo color sólido (el de fondo de la skin mezclado con el de lo enfocado,
+  `Theme.ambientFlat`), sin focos, sin el suelo oscuro y sin el halo de la carátula de «Sonando».
+  **Desenfoque** (`desenfoque`): desactivarlo ahorra memoria y batería.
 
 ## Reglas y decisiones
 
@@ -95,10 +99,10 @@ skin o pose `reposo` de la mascota, con la ruta de su carpeta).
 
 ## Estado actual
 
-- **Última verificación:** 2026-11-16, Apariencia con dos mascotas de prueba, captura
-  ([historial](../history/verificacion/personalizacion.md)).
+- **Última verificación:** 2026-11-16, ambiente «Plano» en Inicio y en «Sonando» y la fila de
+  Apariencia con sus cinco valores, capturas ([historial](../history/verificacion/personalizacion.md)).
 - **Pruebas:** `preview_image` y `skins_list` en `cargo test`; capturas con `--settings-cat`.
-- **Sin verificar:** skins claras (los velos asumen fondo oscuro); la miniatura de una skin de
+- **Sin verificar:** «Plano» en una pantalla antigua de verdad (solo en Retina); skins claras (los velos asumen fondo oscuro); la miniatura de una skin de
   carpeta con fondo; abrir la carpeta en Linux (`xdg-open`).
 - **Historial:** [docs/history/verificacion/personalizacion.md](../history/verificacion/personalizacion.md).
 

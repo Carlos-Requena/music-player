@@ -229,7 +229,11 @@ añadas más casos, y actualiza la lista.
   ([reproduccion](areas/reproduccion.md)).
 - **«Sonando» en dos disposiciones a elegir**: Grande (por defecto: carátula sola, sin título,
   y letra y cola estrechas, con el mismo margen a los dos lados) y Clásica (con el título y letra
-  ancha); la letra cabe siempre ([ventana](areas/ventana.md)).
+  ancha); la letra cabe siempre. El título bajo la carátula también se elige aparte (Automático,
+  Siempre, Nunca), y la carátula va a máxima calidad por defecto, con «Alta» en Opciones
+  ([ventana](areas/ventana.md)).
+- **Fondo «Plano»** en el modo ambiente para pantallas antiguas: un color sólido de la carátula,
+  sin degradados ([personalizacion](areas/personalizacion.md)).
 - **«Me gusta» en la cuenta**: el corazón de la barra lo da en YouTube Music y, pulsado otra vez,
   lo quita ([reproduccion](areas/reproduccion.md)).
 - **Diseño de las muestras del propietario**: barra con «Me gusta» y Aleatorio en tres estilos a

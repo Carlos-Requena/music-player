@@ -5,6 +5,17 @@ son de cuando se escribieron. El estado actual está en su [ficha](../../areas/p
 
 Lo nuevo va arriba: añade una sección `## AAAA-MM-DD · qué se verificó` encima de las anteriores.
 
+## 2026-11-16 · Modo ambiente «Plano»
+
+- **Cambio:** valor `plano` de la opción `ambiente` (rama `feature/personalizacion-fondo-plano`),
+  pedido por el propietario para pantallas antiguas donde los degradados salen con escalones: un
+  solo color sólido (`Qt.tint` del fondo con el color de lo enfocado), sin focos ni suelo, y sin el
+  halo de la carátula de «Sonando». Elegido entre tres propuestas (Plano, Dos bloques, Plano con
+  grano).
+- **Verificado:** capturas en Retina de Inicio y de «Sonando» con «Plano» (fondo liso, del color
+  de lo enfocado) y de Opciones › Apariencia con los cinco valores.
+- **No verificado:** en una pantalla antigua de verdad; Linux.
+
 ## 2026-11-16 · Apariencia rediseñada: miniaturas de skins y mascotas
 
 - **Cambio:** tarjetas de skin con miniatura en sus colores, recuadros de mascota con su pose

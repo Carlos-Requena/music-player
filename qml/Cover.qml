@@ -14,11 +14,17 @@ Item {
     // Permite no descargar las carátulas que aún no se ven.
     property bool load: true
     property real radius: 0
+    // Fondo neutro mientras carga. Sin él, se ve lo que haya debajo (otra carátula más pequeña
+    // que ya está en memoria, como en «Sonando»).
+    property bool placeholder: true
 
     readonly property string url: load ? thumb.replace("w544-h544", "w" + pixels + "-h" + pixels) : ""
+    // Cargada y ya a la vista del todo (terminado el fundido de entrada).
+    readonly property bool ready: image.status === Image.Ready && image.opacity >= 1
 
     Rectangle {
         anchors.fill: parent
+        visible: root.placeholder
         radius: root.radius
         color: "#1A1D24"
     }

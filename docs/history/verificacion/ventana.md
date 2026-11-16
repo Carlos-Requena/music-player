@@ -5,6 +5,21 @@ son de cuando se escribieron. El estado actual está en su [ficha](../../areas/v
 
 Lo nuevo va arriba: añade una sección `## AAAA-MM-DD · qué se verificó` encima de las anteriores.
 
+## 2026-11-16 · Carátula de «Sonando» a máxima calidad y título opcional
+
+- **Cambio:** opción `caratulaCalidad` (Máxima por defecto, Alta = 1200 px como antes), vista
+  previa de 120 px mientras llega la grande, `hq720` para las canciones que son vídeos, y opción
+  `sonandoTitulo` (Automático, Siempre, Nunca). Rama `feature/personalizacion-fondo-plano`.
+- **Medido con `curl`:** cinco carátulas reales: originales de 1400 a 4000 px; a 1200 px ~0,2 s y
+  190–370 KB; a 2400 px 0,6–1,5 s la primera vez y 300–860 KB; `hq720` de un vídeo, 1280×720 y
+  ~0,2 s frente a `hqdefault` de 480×360 con bandas.
+- **Verificado:** capturas de «Sonando» en Máxima y Alta (la grande se ve nítida), Grande con
+  título y Clásica sin él, y Opciones › Vistas. Memoria en release (1440×900, Retina): Máxima
+  248–249 MB, Alta 243–247 MB, con canciones distintas en cada pasada (YouTube cambiaba Álbumes).
+- **No verificado:** que suene (YouTube pedía iniciar sesión, «LOGIN_REQUIRED», en todas las
+  pruebas sin sesión; no se tocó la reproducción); `hq720` dentro de la app; la vista previa a
+  mitad de carga; Linux.
+
 ## 2026-11-16 · «Sonando» en dos disposiciones (Grande y Clásica)
 
 - **Cambio:** opción `sonando` (Opciones › Vistas). Grande, por defecto: carátula sola y más

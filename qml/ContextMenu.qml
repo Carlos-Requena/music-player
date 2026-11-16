@@ -182,13 +182,25 @@ Item {
         }
     }
 
-    // Un clic fuera cierra el menú. Se cierra al soltar: si se ocultara al pulsar, el resto
-    // del clic llegaría a lo que hay debajo.
-    MouseArea {
+    // Un clic fuera cierra el menú, y ni el clic ni la rueda llegan a lo de debajo. Se cierra al
+    // soltar: si se ocultara al pulsar, el resto del clic llegaría a lo que hay debajo. Un
+    // `MouseArea` solo no basta: los `TapHandler` de las tarjetas de debajo seguían recibiendo
+    // el clic; el agarre exclusivo (`ReleaseWithinBounds`) lo corta (TRAMPAS, «Clics que atraviesan»).
+    Item {
         anchors.fill: parent
         visible: root.opened
-        acceptedButtons: Qt.AllButtons
-        onClicked: root.close()
+
+        TapHandler {
+            acceptedButtons: Qt.AllButtons
+            gesturePolicy: TapHandler.ReleaseWithinBounds
+            onTapped: root.close()
+            onLongPressed: root.close()
+        }
+        MouseArea {
+            anchors.fill: parent
+            acceptedButtons: Qt.NoButton
+            onWheel: wheel => wheel.accepted = true
+        }
     }
 
     // Sombra suave bajo el menú.
@@ -221,10 +233,16 @@ Item {
                 root.close()
         }
 
-        // Los clics en el menú no atraviesan a la vista de debajo.
+        // Los clics en el menú (el título, los huecos, el botón derecho sobre una entrada) y la
+        // rueda no atraviesan a la vista de debajo; las entradas van antes con su propio gestor.
+        TapHandler {
+            acceptedButtons: Qt.AllButtons
+            gesturePolicy: TapHandler.ReleaseWithinBounds
+        }
         MouseArea {
             anchors.fill: parent
-            acceptedButtons: Qt.AllButtons
+            acceptedButtons: Qt.NoButton
+            onWheel: wheel => wheel.accepted = true
         }
 
         Flickable {

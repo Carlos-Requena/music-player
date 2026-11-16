@@ -3,7 +3,7 @@ import QtQuick.Shapes
 import app.musicplayer
 
 // Modo ambiente: dos focos de color suaves, uno teñido por el elemento enfocado en el
-// escenario y otro por la carátula que está sonando.
+// escenario y otro por la carátula que está sonando; en «Plano», un solo color sólido.
 Item {
     id: root
 
@@ -48,13 +48,19 @@ Item {
         }
     }
 
+    // En modo «Plano», el color de fondo mezclado con el de lo enfocado: un solo color sólido,
+    // oscuro para que el texto se lea, y sin focos ni suelo (los degradados son lo que sale con
+    // escalones en algunas pantallas).
     Rectangle {
         anchors.fill: parent
-        color: Theme.ground
+        color: Theme.ambientFlat
+            ? Qt.tint(Theme.ground, Qt.rgba(root.stageTint.r, root.stageTint.g, root.stageTint.b, 0.42 * Math.min(1, root.intensity)))
+            : Theme.ground
     }
 
     Item {
         anchors.fill: parent
+        visible: !Theme.ambientFlat
         opacity: root.intensity
 
         Glow {
@@ -88,6 +94,7 @@ Item {
     // Suelo oscuro: da contraste al texto inferior y recoge los reflejos de la estantería.
     Rectangle {
         anchors.fill: parent
+        visible: !Theme.ambientFlat
         gradient: Gradient {
             GradientStop { position: 0.5; color: "transparent" }
             GradientStop { position: 1; color: Qt.rgba(0.015, 0.02, 0.035, 0.88) }

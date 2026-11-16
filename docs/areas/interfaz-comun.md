@@ -17,7 +17,7 @@ esta ficha), no se copia con otro nombre.
 | Pieza | Para qué |
 |---|---|
 | `Glass` | Panel de vidrio; con `backdrop` desenfoca en tiempo real lo de detrás, sin él solo tiñe (más barato) |
-| `Cover` | Carátula desde su miniatura, con fondo neutro mientras carga; `load` permite no descargar lo que no se ve; `radius` la redondea (o la hace círculo) |
+| `Cover` | Carátula desde su miniatura, con fondo neutro mientras carga (`placeholder: false` lo quita para que se vea lo de debajo); `load` permite no descargar lo que no se ve; `radius` la redondea (o la hace círculo); `ready`, cargada y ya a la vista |
 | `Icon` | Icono vectorial de un trazo SVG en caja 24×24 |
 | `IconButton` | Botón de icono: 44 px, foco por teclado, nombre accesible, agarre exclusivo |
 | `PillButton` | Botón de texto en píldora; `primary` lo rellena |
