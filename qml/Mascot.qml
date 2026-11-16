@@ -96,7 +96,7 @@ Item {
         if (likes && Player.playing && id !== "") {
             if (likedId !== id) {
                 likedId = id
-                Library.like(id, Player.title)
+                Library.like(id, Player.title, true)
             }
             react("clic", "megusta")
         } else {
@@ -172,9 +172,13 @@ Item {
             if (!error)
                 root.react("playlist")
         }
-        function onGustado(mensaje, error) {
-            if (!error)
+        function onGustado(mensaje, error, videoId, gusta) {
+            // Si se quitó el «Me gusta» (desde la barra), pincharla otra vez lo vuelve a dar.
+            if (!error) {
+                if (!gusta && videoId === root.likedId)
+                    root.likedId = ""
                 return
+            }
             root.likedId = ""
             root.react("fallo")
         }

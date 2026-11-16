@@ -36,6 +36,11 @@ retraso, bajo la propia letra.
   pasaría por una textura y se vería borroso). **Sin medios píxeles** en la elevación de las
   palabras: también emborronan.
 - **Texto sin `Text.CurveRendering`** en «Calidad»: costaba ~95 MB más.
+- **Ninguna palabra se sale de su línea:** una más ancha que la línea (en un recuadro estrecho,
+  como «supercalifragilisticexpialidocious») se encoge hasta caber; las demás conservan su tamaño.
+  Su ancho a tamaño completo lo mide una sola `FontMetrics` común (`metrics`): deducirlo del ancho
+  pintado creaba un bucle de enlaces. En «Sonando», el tamaño base baja con el ancho del recuadro
+  (`width / 12`, de 24 a 34).
 - El retraso lo guardan `Catalog.lyricsDelay` y `Catalog.setLyricsDelay`; `Catalog.lyricsTime` da
   la posición corregida.
 

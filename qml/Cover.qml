@@ -49,12 +49,26 @@ Item {
         }
 
         sourceComponent: Shape {
+            id: shape
             preferredRendererType: Shape.CurveRenderer
             opacity: image.opacity
+
+            // La forma coloca la textura en su esquina con su tamaño en píxeles físicos, no con el
+            // de `image`: sin escalarla, en una carátula mayor que eso se repetía el último píxel
+            // por la derecha y por abajo. Se escala para cubrir la carátula (como
+            // PreserveAspectCrop) y se centra.
+            readonly property real dpr: Screen.devicePixelRatio > 0 ? Screen.devicePixelRatio : 1
+            readonly property real texW: Math.max(1, image.implicitWidth / dpr)
+            readonly property real texH: Math.max(1, image.implicitHeight / dpr)
+            readonly property real scale: Math.max(root.width / texW, root.height / texH)
 
             ShapePath {
                 strokeColor: "transparent"
                 fillItem: image
+                fillTransform: Qt.matrix4x4(shape.scale, 0, 0, (root.width - shape.texW * shape.scale) / 2,
+                                            0, shape.scale, 0, (root.height - shape.texH * shape.scale) / 2,
+                                            0, 0, 1, 0,
+                                            0, 0, 0, 1)
                 PathRectangle {
                     width: root.width
                     height: root.height

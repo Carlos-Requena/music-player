@@ -5,6 +5,15 @@ son de cuando se escribieron. El estado actual está en su [ficha](../../areas/l
 
 Lo nuevo va arriba: añade una sección `## AAAA-MM-DD · qué se verificó` encima de las anteriores.
 
+## 2026-11-16 · Las palabras largas caben en recuadros estrechos
+
+- **Cambio:** una palabra más ancha que la línea se encoge hasta caber (`FontMetrics` común); en
+  «Sonando» el tamaño base baja con el ancho del recuadro.
+- **Verificado:** captura de «Supercalifragilisticexpialidocious» en «Sonando» Grande (recuadro de
+  ~430 px): antes se cortaba, ahora cabe; sin avisos de bucle de enlaces en la terminal.
+- **No verificado:** CPU de la letra sonando (YouTube pidió sesión y no sonó), el panel lateral con
+  esa canción.
+
 ## 2026-11-14 · Letra al estilo Better Lyrics, tres calidades
 
 - **Cómo:** CPU acumulada de la app en 25 s (`ps -o time=`), reproduciendo la misma canción, panel

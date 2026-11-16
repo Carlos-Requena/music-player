@@ -44,7 +44,7 @@ Qué leer para cada tarea. Las tablas a partir de [Áreas](#áreas) las escribe
 | [Reproducción y cola](areas/reproduccion.md) | Cola, lista temporal, siguiente y anterior, repetición, volumen y estado de lo que suena, con mpv como motor en un proceso aparte. | `barra` | [ADR-02](decisions/ADR-02-mpv-en-proceso-aparte.md) |
 | [Resolución del audio y arranque instantáneo](areas/resolucion.md) | Obtiene la URL de audio de cada pista (vía rápida, yt-dlp residente o yt-dlp) con caché y precarga, para que suene en décimas de segundo. | `calidad`, `ytdlp` | [ADR-03](decisions/ADR-03-via-rapida-y-yt-dlp-de-respaldo.md), [ADR-05](decisions/ADR-05-precarga-de-urls.md), [ADR-08](decisions/ADR-08-yt-dlp-residente.md) |
 | [Sesión de YouTube Music](areas/sesion.md) | Iniciar sesión (ventana propia o cookies del navegador), guardar solo las cookies de youtube.com y firmar las peticiones con SAPISIDHASH. | — | [ADR-07](decisions/ADR-07-inicio-de-sesion-en-proceso-aparte.md) |
-| [Ventana y navegación](areas/ventana.md) | Arranque, ventana principal con escenario, navegación superior, panel de letra y cola, pantalla «Sonando», mini reproductor, búsqueda y menú de clic derecho. | `panel` | [ADR-10](decisions/ADR-10-mini-reproductor-oculta-la-ventana.md) |
+| [Ventana y navegación](areas/ventana.md) | Arranque, ventana principal con escenario, navegación superior, panel de letra y cola, pantalla «Sonando», mini reproductor, búsqueda y menú de clic derecho. | `panel`, `sonando` | [ADR-10](decisions/ADR-10-mini-reproductor-oculta-la-ventana.md) |
 | [Vistas de las secciones](areas/vistas.md) | Muro, Lomos y Cubeta, elegibles por sección, y el selector que las alterna al vuelo. | `caratulas` | [ADR-14](decisions/ADR-14-lomos-con-matrices-propias.md) |
 <!-- /generado -->
 
@@ -139,6 +139,7 @@ Claves de `AppSettings.opcion`. Vacío es el valor por defecto (el `fallback` de
 | `letraTamano` | Tamaño de la letra (apariencia) | [Letra sincronizada](areas/letra.md) |
 | `panel` | Panel de letra y cola (vistas) | [Ventana y navegación](areas/ventana.md) |
 | `retraso:*` | — (interna) | [Letra sincronizada](areas/letra.md) |
+| `sonando` | Pantalla Sonando (vistas) | [Ventana y navegación](areas/ventana.md) |
 | `ytdlp` | yt-dlp residente (reproduccion) | [Resolución del audio y arranque instantáneo](areas/resolucion.md) |
 <!-- /generado -->
 

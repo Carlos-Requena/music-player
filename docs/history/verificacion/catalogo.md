@@ -5,6 +5,13 @@ son de cuando se escribieron. El estado actual está en su [ficha](../../areas/c
 
 Lo nuevo va arriba: añade una sección `## AAAA-MM-DD · qué se verificó` encima de las anteriores.
 
+## 2026-11-16 · `ytm::remove_like`
+
+- **Cambio:** `Library.like` lleva `gusta` y llama a `ytm::like` o `ytm::remove_like`
+  (`like/removelike`); `gustado` añade `videoId` y `gusta`.
+- **Verificado:** el camino sin sesión (mensaje de error); compila sin avisos.
+- **No verificado:** `like/removelike` con una sesión real.
+
 ## 2026-11-15 · `Library.like`
 
 `ytm::like` (`like/like` de InnerTube) y `Library.like` → `gustado`, que después vuelve a pedir

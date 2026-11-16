@@ -227,6 +227,11 @@ añadas más casos, y actualiza la lista.
   izquierda ([mascotas](areas/mascotas.md)).
 - **Pulsar la barra de reproducción** en cualquier sitio que no sea un control abre «Sonando»
   ([reproduccion](areas/reproduccion.md)).
+- **«Sonando» en dos disposiciones a elegir**: Grande (por defecto: carátula sola, sin título,
+  y letra y cola estrechas, con el mismo margen a los dos lados) y Clásica (con el título y letra
+  ancha); la letra cabe siempre ([ventana](areas/ventana.md)).
+- **«Me gusta» en la cuenta**: el corazón de la barra lo da en YouTube Music y, pulsado otra vez,
+  lo quita ([reproduccion](areas/reproduccion.md)).
 - **Diseño de las muestras del propietario**: barra con «Me gusta» y Aleatorio en tres estilos a
   elegir (Islas por defecto, Clásica y Compacta),
   Lomos con barra para recorrer la estantería y Opciones con miniaturas de skin y mascota

@@ -72,14 +72,15 @@ pub mod qobject {
         #[qsignal]
         fn guardado(self: Pin<&mut Library>, mensaje: QString, error: bool);
 
-        /// Marca con «Me gusta» la canción `video_id` (de título `titulo`) y vuelve a pedir la
-        /// sección «Me gusta». Termina con `gustado`.
+        /// Da (`gusta` verdadero) o quita «Me gusta» a la canción `video_id` (de título `titulo`)
+        /// en la cuenta y vuelve a pedir la sección «Me gusta». Termina con `gustado`.
         #[qinvokable]
-        fn like(self: Pin<&mut Library>, video_id: &QString, titulo: &QString);
+        fn like(self: Pin<&mut Library>, video_id: &QString, titulo: &QString, gusta: bool);
 
-        /// Resultado de `like`: el aviso para el usuario y si fue un error.
+        /// Resultado de `like`: el aviso para el usuario, si fue un error, la canción y si ahora
+        /// tiene (o tendría, si falló) «Me gusta».
         #[qsignal]
-        fn gustado(self: Pin<&mut Library>, mensaje: QString, error: bool);
+        fn gustado(self: Pin<&mut Library>, mensaje: QString, error: bool, video_id: QString, gusta: bool);
     }
 
     impl cxx_qt::Threading for Library {}
@@ -340,21 +341,25 @@ impl qobject::Library {
         });
     }
 
-    fn like(self: Pin<&mut Self>, video_id: &QString, titulo: &QString) {
+    fn like(self: Pin<&mut Self>, video_id: &QString, titulo: &QString, gusta: bool) {
         let video_id = video_id.to_string();
         let titulo = titulo.to_string();
         let generation = self.load_generation;
         let qt = self.qt_thread();
         thread::spawn(move || {
-            let result = ytm::like(&video_id);
+            let result = if gusta { ytm::like(&video_id) } else { ytm::remove_like(&video_id) };
             if let Err(error) = &result {
-                eprintln!("me gusta {video_id}: {error}");
+                eprintln!("me gusta {video_id} ({gusta}): {error}");
             }
             let (mensaje, error) = match &result {
-                Ok(()) => (format!("«{titulo}» está en tus «Me gusta»"), false),
+                Ok(()) if gusta => (format!("«{titulo}» está en tus «Me gusta»"), false),
+                Ok(()) => (format!("«{titulo}» ya no está en tus «Me gusta»"), false),
                 Err(error) => (error.clone(), true),
             };
-            let _ = qt.queue(move |library| library.gustado(QString::from(&mensaje), error));
+            let id = video_id.clone();
+            let _ = qt.queue(move |library| {
+                library.gustado(QString::from(&mensaje), error, QString::from(&id), gusta)
+            });
             if result.is_err() {
                 return;
             }

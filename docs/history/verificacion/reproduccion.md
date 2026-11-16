@@ -5,6 +5,15 @@ son de cuando se escribieron. El estado actual está en su [ficha](../../areas/r
 
 Lo nuevo va arriba: añade una sección `## AAAA-MM-DD · qué se verificó` encima de las anteriores.
 
+## 2026-11-16 · Quitar «Me gusta» desde la barra
+
+- **Cambio:** el corazón alterna: lo da en la cuenta y, pulsado otra vez, lo quita
+  (`like/removelike`); no acepta otro clic mientras va la petición.
+- **Verificado:** sin sesión, un clic de verdad en el corazón: stderr `me gusta … (true): Hace
+  falta iniciar sesión…` y el corazón vuelve a vacío. `cargo test` en verde.
+- **No verificado:** con sesión (no se usan las cookies del propietario en pruebas): dar, quitar y
+  que la sección «Me gusta» se actualice.
+
 ## 2026-11-16 · `kill` a la app ya no deja mpv huérfano
 
 Con SIGTERM la app moría sin destruir el `Player` y su mpv seguía vivo con padre 1 (~20 MB cada

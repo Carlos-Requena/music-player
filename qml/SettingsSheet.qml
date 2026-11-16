@@ -56,6 +56,8 @@ Item {
           options: [{ id: "negrita", label: "Negrita" }, { id: "normal", label: "Normal" }] },
         { cat: "vistas", key: "panel", label: "Panel de letra y cola", fallback: "derecha",
           options: [{ id: "izquierda", label: "Izquierda" }, { id: "derecha", label: "Derecha" }] },
+        { cat: "vistas", key: "sonando", label: "Pantalla Sonando", hint: "Grande: carátula sola y letra estrecha. Clásica: con el título y letra ancha.", fallback: "grande",
+          options: [{ id: "grande", label: "Grande" }, { id: "clasica", label: "Clásica" }] },
         { cat: "vistas", key: "caratulas", label: "Carátulas del Muro", fallback: "medianas",
           options: [{ id: "pequenas", label: "Pequeñas" }, { id: "medianas", label: "Medianas" }, { id: "grandes", label: "Grandes" }] }
     ]

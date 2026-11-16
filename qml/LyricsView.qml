@@ -33,6 +33,14 @@ Item {
     // Tamaño base; Opciones › Apariencia lo escala.
     property real baseSize: 24
     readonly property real fontSize: Math.round(baseSize * Theme.lyricsScale)
+    // Mide las palabras a tamaño completo, para encoger las que no caben en una línea.
+    FontMetrics {
+        id: metrics
+        font.pixelSize: root.fontSize
+        font.family: Theme.lyricsFamily
+        font.weight: Theme.lyricsWeight
+        font.letterSpacing: 0
+    }
     // Momento de la letra: la posición corregida con el retraso de esta canción.
     property real position: Catalog.lyricsTime
     // Muestra abajo el ajuste de retraso (adelantar/atrasar la letra de esta canción).
@@ -341,11 +349,19 @@ Item {
                             // Mientras se barre, encima va la parte cantada recortada. (Recortar
                             // todas las palabras impedía a Qt dibujar el texto por lotes y la
                             // letra gastaba diez veces más CPU.)
+                            // Una palabra más ancha que la línea (en un recuadro estrecho) se encoge
+                            // hasta caber en vez de salirse. Su ancho a tamaño completo lo da la
+                            // `FontMetrics` común (los nombres de la fuente, para medir otra vez si
+                            // cambia).
+                            readonly property real natural: (root.fontSize, Theme.lyricsFamily, Theme.lyricsWeight,
+                                metrics.advanceWidth(modelData.text) - 0.3 * modelData.text.length)
+                            readonly property real fit: natural > body.width && body.width > 0 ? body.width / natural : 1
+
                             Text {
                                 id: dim
                                 text: word.modelData.text
                                 color: word.fill >= 1 ? Theme.text : Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.35)
-                                font.pixelSize: root.fontSize
+                                font.pixelSize: Math.max(8, Math.floor(root.fontSize * word.fit))
                                 font.family: Theme.lyricsFamily
                                 font.weight: Theme.lyricsWeight
                                 font.letterSpacing: -0.3

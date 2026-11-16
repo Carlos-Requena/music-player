@@ -33,7 +33,10 @@ esta ficha), no se copia con otro nombre.
 - **`Glass` con `backdrop` cuesta un desenfoque por fotograma**: úsalo solo donde se vea. Sin
   `backdrop` no reserva ni la máscara del desenfoque.
 - **`Cover` con `radius`** rellena una forma con la imagen (`ShapePath.fillItem`), sin capa ni
-  máscara aparte; la forma se recrea con `Theme.renderEpoch`, como `Icon`.
+  máscara aparte; la forma se recrea con `Theme.renderEpoch`, como `Icon`. La forma pone la
+  textura en su esquina con su tamaño en píxeles físicos, así que `fillTransform` la escala para
+  cubrir la carátula y la centra (como `PreserveAspectCrop`) ([TRAMPAS](../TRAMPAS.md#qt-quick-y-qml)).
+  Es lo que usan la barra, el panel y «Sonando».
 - Los iconos (trazos) están en `Theme.qml` (`iconPlay`, `iconQueue`…).
 
 ## Archivos
@@ -55,8 +58,9 @@ esta ficha), no se copia con otro nombre.
 
 ## Estado actual
 
-- **Última verificación:** 2026-11-16, carátula redonda en la barra y el panel, capturas
-  ([historial](../history/verificacion/interfaz-comun.md)).
+- **Última verificación:** 2026-11-16, carátula redonda del panel y de «Sonando» sin el borde
+  repetido, capturas en Retina ([historial](../history/verificacion/interfaz-comun.md)).
 - **Pruebas:** ninguna automática.
-- **Sin verificar:** `Cover` con `radius` tras ocultar y volver a mostrar la ventana.
+- **Sin verificar:** `Cover` con `radius` tras ocultar y volver a mostrar la ventana; en una
+  pantalla sin Retina (densidad 1, CachyOS): la captura sin ventana no pinta el relleno de la forma.
 - **Historial:** [docs/history/verificacion/interfaz-comun.md](../history/verificacion/interfaz-comun.md).

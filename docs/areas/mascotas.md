@@ -41,7 +41,8 @@ Opciones › Mascota. Van aparte de las skins, en `<config>/musicplayer/mascotas
 - **Pincharla da «Me gusta» solo si la mascota lo pide** (`pincharDaMeGusta`) y solo con música
   sonando; sin música, pincharla solo cambia la pose. Pedido por el propietario para Ralsei.
 - **Una petición por canción**: pincharla otra vez con la misma canción no repite el «Me gusta»
-  (`likedId`); tras un fallo se puede reintentar.
+  (`likedId`); tras un fallo, o si se quitó desde la barra (`gustado` con `gusta` falso), se puede
+  volver a dar. La mascota nunca lo quita.
 - **Se queda el clic** (`gesturePolicy: TapHandler.ReleaseWithinBounds`): como pincharla puede dar
   «Me gusta», el clic no debe llegar también a la tarjeta que haya debajo.
 - Las rutas las resuelve `Theme.mascotImage` a partir de `AppSettings.mascotaData` (que añade

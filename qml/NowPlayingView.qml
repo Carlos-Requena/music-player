@@ -25,25 +25,40 @@ FocusScope {
     property real shown: open ? 1 : 0
     Behavior on shown { NumberAnimation { duration: 460; easing.type: Easing.OutCubic } }
 
-    // Carátula grande con su borde derecho algo pasado el centro de la pantalla; a la derecha,
-    // más estrecha, la letra o la cola (pestañas).
-    readonly property real art: Math.max(200, Math.min((height - bottomInset) * 0.68, width * 0.45 - 80, 680))
+    // Dos disposiciones (opción `sonando`):
+    // - «grande» (por defecto): carátula sola, todo lo grande que deje el alto (entre «Sonando» y
+    //   la barra) y, a su derecha, la letra o la cola, estrechas y a la misma altura que ella. El
+    //   conjunto va centrado: el margen exterior es el mismo a los dos lados.
+    // - «clasica»: carátula con su título debajo, con el borde derecho algo pasado el centro, y
+    //   la letra o la cola anchas, del borde de arriba a la barra.
+    readonly property bool big: { void AppSettings.revision; return AppSettings.opcion("sonando") !== "clasica" }
+    readonly property real edge: 48
+    readonly property real gutter: 56
+    readonly property real artTop: 76
+    // Mismo hueco hasta la barra (que empieza un `Theme.gap` por encima de `bottomInset`) que
+    // hasta el borde de arriba.
+    readonly property real sideMargin: 32
+    readonly property real bottomEdge: height - bottomInset + Theme.gap - sideMargin
+    readonly property real sideWidth: big ? Math.max(380, Math.min(460, width * 0.3)) : width * 0.55 - 200
+    readonly property real art: big
+        ? Math.max(200, Math.min(bottomEdge - artTop, width - 2 * edge - gutter - sideWidth, 1000))
+        : Math.max(200, Math.min((height - bottomInset) * 0.68, width * 0.45 - 80, 680))
+    readonly property real groupLeft: Math.max(edge, (width - root.art - gutter - sideWidth) / 2)
     // Sin letra ni cola, la carátula va al centro.
     // (`root.art`: dentro de este archivo, `art` a secas es la carátula, que tiene ese id.)
-    readonly property real artRight: width * 0.45 + (width / 2 + root.art / 2 - width * 0.45) * (1 - sideShown)
-    readonly property real sideX: width * 0.45 + 100 + 60 * (1 - sideShown)
-    readonly property real sideWidth: width * 0.55 - 200
+    readonly property real artLeft: (big ? groupLeft : width * 0.45 - root.art) * sideShown
+                                    + (width - root.art) / 2 * (1 - sideShown)
+    readonly property real artRight: artLeft + root.art
+    readonly property real sideX: (big ? groupLeft + root.art + gutter : width * 0.45 + 100) + 60 * (1 - sideShown)
     readonly property real tabsHeight: Theme.hit + 8
     // Pestaña de la derecha. Sin letra solo existe «Cola».
     property string tab: "letra"
     readonly property string shownTab: hasLyrics ? tab : "cola"
-    // Letra/Cola con el mismo hueco arriba (hasta el borde de la ventana) que abajo (hasta la
-    // barra de reproducción, que empieza un `Theme.gap` por encima de `bottomInset`).
-    readonly property real sideMargin: 32
-    readonly property real sideTop: sideMargin
-    readonly property real sideBottom: height - bottomInset + Theme.gap - sideMargin
+    // Letra/Cola: en «grande», a la altura de la carátula; en «clásica», del borde a la barra.
+    readonly property real sideTop: big ? artTop : sideMargin
+    readonly property real sideBottom: big ? artTop + root.art : bottomEdge
     readonly property bool hasLyrics: Catalog.lyrics.length > 0
-    readonly property string bigThumb: Player.thumb.replace("w544-h544", "w1080-h1080")
+    readonly property string bigThumb: Player.thumb.replace("w544-h544", "w1200-h1200")
 
     visible: shown > 0.001
     clip: true
@@ -109,11 +124,12 @@ FocusScope {
 
         Item {
             id: column
-            // Centrada en la carátula, que acaba en `artRight`.
-            x: root.artRight - root.art - 60
-            width: root.art + 120
-            height: root.art + 24 + info.height
-            y: Math.max(96, (root.height - root.bottomInset - height) / 2 + 42)
+            // En «grande», la carátula sola (el título ya está en la barra de reproducción); en
+            // «clásica», con su título debajo, centrada en vertical.
+            x: root.artLeft
+            width: root.art
+            height: root.big ? root.art : root.art + 24 + info.height
+            y: root.big ? root.artTop : Math.max(96, (root.height - root.bottomInset - height) / 2 + 42)
 
             // Halo del color de la carátula detrás de ella.
             RectangularShadow {
@@ -134,19 +150,15 @@ FocusScope {
                 height: root.art
                 scale: 0.94 + 0.06 * root.shown
 
+                // Redondeada con su propia forma, sin capa ni máscara: a este tamaño, dos capas
+                // costaban varios MB de memoria gráfica.
                 Cover {
                     id: cover
                     anchors.fill: parent
                     thumb: root.bigThumb
-                    pixels: 1080
+                    pixels: 1200
                     load: root.visible
-                    layer.enabled: true
-                    layer.effect: MultiEffect {
-                        maskEnabled: true
-                        maskSource: roundMask
-                        maskThresholdMin: 0.5
-                        maskSpreadAtMin: 1
-                    }
+                    radius: 18
                 }
 
                 // Brillo suave arriba a la izquierda, como un vinilo bajo una luz.
@@ -178,25 +190,12 @@ FocusScope {
                 Accessible.name: "Cerrar la pantalla Sonando"
             }
 
-            Item {
-                id: roundMask
-                width: root.art
-                height: root.art
-                visible: false
-                layer.enabled: true
-
-                Rectangle {
-                    anchors.fill: parent
-                    radius: 18
-                    color: "black"
-                }
-            }
-
             Column {
                 id: info
+                visible: !root.big
                 anchors.horizontalCenter: parent.horizontalCenter
                 y: root.art + 28
-                width: parent.width - 64
+                width: parent.width + 56
                 spacing: 6
 
                 Text {
@@ -313,7 +312,8 @@ FocusScope {
                 y: 62
                 width: parent.width - 48
                 height: parent.height - 62 - 12
-                baseSize: 34
+                // Más pequeña si el recuadro es estrecho, para que quepan las palabras largas.
+                baseSize: Math.max(24, Math.min(34, width / 12))
                 showTiming: false
             }
         }

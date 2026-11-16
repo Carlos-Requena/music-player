@@ -5,6 +5,19 @@ son de cuando se escribieron. El estado actual está en su [ficha](../../areas/v
 
 Lo nuevo va arriba: añade una sección `## AAAA-MM-DD · qué se verificó` encima de las anteriores.
 
+## 2026-11-16 · «Sonando» en dos disposiciones (Grande y Clásica)
+
+- **Cambio:** opción `sonando` (Opciones › Vistas). Grande, por defecto: carátula sola y más
+  grande, letra y cola estrechas (380–460 px) a su altura, conjunto centrado con el mismo margen a
+  los dos lados. Clásica: la de antes, con título y letra ancha. La carátula se redondea con
+  `Cover.radius` en vez de una capa con máscara.
+- **Verificado:** capturas en Retina (1440×900) de Grande con cola, con letra
+  («Supercalifragilisticexpialidocious») y sin panel; de Clásica con letra; y de Opciones › Vistas.
+  Memoria con «Sonando» abierta: 252–264 MB en la rama frente a 254–273 MB en `master` (ruido
+  ±10 MB), con la app del propietario abierta a la vez.
+- **No verificado:** Linux, ventanas estrechas (la letra tiene 380 px como mínimo), la transición
+  al cambiar la opción con «Sonando» abierta.
+
 ## 2026-11-16 · El panel de letra y cola arranca oculto
 
 - **Cambio:** `lyricsOn` empieza en `false` (lo pidió el propietario); el argumento de depuración

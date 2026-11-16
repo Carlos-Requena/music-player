@@ -12,8 +12,8 @@ necesita una decisión del propietario antes de empezar; en diseño, con alterna
 2. **Editor de disposición** (decidir): arrastrar, ocultar y redimensionar paneles (letra, cola,
    barra, navegación) sobre la propia ventana, guardando en `opciones`
    ([personalizacion](areas/personalizacion.md)).
-3. Guardar álbumes en la biblioteca y «Me gusta» desde el menú contextual, con quitarlo; hoy solo
-   se da pinchando la mascota ([catalogo](areas/catalogo.md)).
+3. Guardar álbumes en la biblioteca y dar o quitar «Me gusta» desde el menú contextual; hoy se
+   hace con el corazón de la barra o pinchando la mascota ([catalogo](areas/catalogo.md)).
 
 ## Personalización
 

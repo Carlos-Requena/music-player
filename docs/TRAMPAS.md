@@ -46,6 +46,11 @@ que toque **antes** de cambiar algo ahí. Una trampa nueva se añade en su secci
 - **`Shape` con CurveRenderer no se redibuja** tras liberar los gráficos de la ventana (al ocultarla
   o minimizarla): `Icon.qml` se recrea con un `Loader` cada vez que sube `Theme.renderEpoch`. Una
   `Shape` nueva con ese renderizador necesita lo mismo.
+- **`ShapePath.fillItem` no usa el tamaño del elemento:** coloca la textura en la esquina de la
+  forma con su tamaño en píxeles físicos (una imagen de 544 px en Retina ocupa 272 px). En una forma
+  mayor, el último píxel se repite por la derecha y por abajo (la carátula del panel salía
+  «corrida»). Escálala con `fillTransform`, como `Cover.qml`. La captura sin ventana
+  (`offscreen`) no pinta el relleno: compruébalo con ventana.
 
 ## YouTube, yt-dlp y mpv
 

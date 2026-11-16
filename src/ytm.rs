@@ -145,13 +145,23 @@ pub fn add_to_playlist(playlist_id: &str, video_id: &str, source_playlist: &str)
 
 /// Marca la canción `video_id` con «Me gusta» en la cuenta. Repetirlo no cambia nada.
 pub fn like(video_id: &str) -> Result<()> {
+    rate(video_id, "like/like", "Hace falta iniciar sesión para dar «Me gusta».")
+}
+
+/// Quita el «Me gusta» de la canción `video_id` en la cuenta (la deja sin valorar, no en «No me
+/// gusta»). Repetirlo no cambia nada.
+pub fn remove_like(video_id: &str) -> Result<()> {
+    rate(video_id, "like/removelike", "Hace falta iniciar sesión para quitar «Me gusta».")
+}
+
+fn rate(video_id: &str, endpoint: &str, sin_sesion: &str) -> Result<()> {
     if crate::account::with_session(|_| ()).is_none() {
-        return Err("Hace falta iniciar sesión para dar «Me gusta».".to_owned());
+        return Err(sin_sesion.to_owned());
     }
     if video_id.is_empty() {
         return Err("No hay ninguna canción sonando.".to_owned());
     }
-    post("like/like", json!({ "target": { "videoId": video_id } }))?;
+    post(endpoint, json!({ "target": { "videoId": video_id } }))?;
     Ok(())
 }
 

@@ -5,6 +5,13 @@ son de cuando se escribieron. El estado actual está en su [ficha](../../areas/m
 
 Lo nuevo va arriba: añade una sección `## AAAA-MM-DD · qué se verificó` encima de las anteriores.
 
+## 2026-11-16 · La mascota y el «Me gusta» quitado desde la barra
+
+- **Cambio:** si se quita el «Me gusta» desde la barra, pincharla otra vez con la misma canción lo
+  vuelve a dar (`likedId` se borra con `gustado` falso).
+- **Verificado:** solo que carga sin errores de QML.
+- **No verificado:** con sesión y música sonando.
+
 ## 2026-11-16 · Imagen de la mascota en Opciones
 
 - **Cambio:** cada mascota sale en Opciones con su pose `reposo` (área

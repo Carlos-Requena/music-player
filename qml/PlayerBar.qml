@@ -18,14 +18,15 @@ Item {
     // Pulsar en cualquier sitio de la barra que no sea un control abre la pantalla «Sonando».
     signal expandRequested()
 
-    // «Me gusta» de lo que suena: está en la sección «Me gusta» o se acaba de dar aquí.
-    property string likedId: ""
+    // «Me gusta» de lo que suena: lo que se acaba de dar o quitar (aquí o con la mascota) manda
+    // sobre la sección «Me gusta», que tarda en volver a pedirse.
+    property var likeOverride: ({ id: "", gusta: false })
     readonly property bool liked: {
         const id = Catalog.currentVideoId
         if (id === "")
             return false
-        if (id === likedId)
-            return true
+        if (id === likeOverride.id)
+            return likeOverride.gusta
         for (const zona of Catalog.megusta)
             for (const item of zona.items)
                 if (item.videoId === id)
@@ -33,20 +34,31 @@ Item {
         return false
     }
 
+    // Pulsar el corazón da «Me gusta» en la cuenta; pulsarlo otra vez lo quita. Mientras va la
+    // petición no se aceptan más clics: dos peticiones a la vez podrían llegar en desorden y dejar
+    // la cuenta al revés que el corazón.
+    property string likePending: ""
     function like() {
         const id = Catalog.currentVideoId
-        if (id === "" || liked)
+        if (id === "" || likePending === id)
             return
-        likedId = id
-        Library.like(id, Player.title)
+        const gusta = !liked
+        likePending = id
+        likeOverride = { id: id, gusta: gusta }
+        Library.like(id, Player.title, gusta)
     }
 
-    // El aviso del resultado lo muestra el menú contextual; aquí solo se deshace si falla.
+    // El aviso del resultado lo muestra el menú contextual; aquí se apunta el nuevo estado o, si
+    // falla, se vuelve al de antes.
     Connections {
         target: Library
-        function onGustado(mensaje, error) {
-            if (error)
-                root.likedId = ""
+        function onGustado(mensaje, error, videoId, gusta) {
+            if (root.likePending === videoId)
+                root.likePending = ""
+            if (!error)
+                root.likeOverride = { id: videoId, gusta: gusta }
+            else if (root.likeOverride.id === videoId && root.likeOverride.gusta === gusta)
+                root.likeOverride = { id: "", gusta: false }
         }
     }
 
@@ -128,7 +140,7 @@ Item {
             iconSize: 20
             filled: root.liked
             foreground: root.liked ? Theme.accent : Theme.textMuted
-            label: root.liked ? "Está en tus «Me gusta»" : "Me gusta"
+            label: root.liked ? "Quitar «Me gusta»" : "Me gusta"
             onClicked: root.like()
         }
     }

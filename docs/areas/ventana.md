@@ -3,7 +3,7 @@ area: ventana
 titulo: Ventana y navegación
 resumen: Arranque, ventana principal con escenario, navegación superior, panel de letra y cola, pantalla «Sonando», mini reproductor, búsqueda y menú de clic derecho.
 archivos: [src/main.rs, src/window.cpp, qml/Main.qml, qml/TopNav.qml, qml/SearchField.qml, qml/NowPlayingPanel.qml, qml/NowPlayingView.qml, qml/MiniPlayer.qml, qml/ContextMenu.qml]
-opciones: [panel]
+opciones: [panel, sonando]
 adr: [ADR-10]
 ---
 
@@ -20,8 +20,17 @@ También el arranque del proceso y los argumentos de depuración (`--probe`, `--
   oculto**, por petición del propietario (`lyricsOn`), y se abre con su botón de la barra
   (`--panel` lo abre al arrancar, para capturas). En ventanas estrechas se oculta para que quepa
   la navegación.
-- **«Sonando»** (`NowPlayingView`): sube desde la barra al pulsar en ella (fuera de los controles); carátula grande sobre
-  el fondo ambiente de sus colores, letra y cola.
+- **«Sonando»** (`NowPlayingView`): sube desde la barra al pulsar en ella (fuera de los
+  controles); carátula grande sobre el fondo ambiente de sus colores, letra y cola. Dos
+  disposiciones a elegir en Opciones › Vistas (opción `sonando`), por petición del propietario:
+  - **Grande** (por defecto): la carátula sola, sin título (ya está en la barra), todo lo grande
+    que deje el alto; a su derecha, letra y cola estrechas (380–460 px) y a la misma altura. El
+    conjunto va centrado, con el mismo margen a los dos lados.
+  - **Clásica**: la carátula con su título y artista debajo, con el borde derecho algo pasado el
+    centro, y letra y cola anchas, del borde de arriba a la barra.
+
+  Sin letra ni cola (botón del panel), la carátula va al centro. Se redondea con `Cover.radius`,
+  sin capas.
 - **Mini reproductor**: ventana pequeña siempre encima; la grande se oculta mientras tanto
   ([ADR-10](../decisions/ADR-10-mini-reproductor-oculta-la-ventana.md)).
 - **Menú de clic derecho** (`Main.openMenu` → `ContextMenu`) y aviso breve: cola, lista temporal,
@@ -61,6 +70,7 @@ También el arranque del proceso y los argumentos de depuración (`--probe`, `--
 |---|---|---|
 | Ventana lista | ~0,75 s | 2026-11-13, M4 Pro, release |
 | Ocultar para el mini reproductor | 213 → 148 MB | 2026-11-13, M4 Pro, release |
+| «Sonando» abierta, Grande con cola (1440×900, Retina) | 252–264 MB, igual que la Clásica con dos capas (254–273 MB; ruido ±10 MB) | 2026-11-16, M4 Pro, release |
 
 ## Archivos
 
@@ -109,8 +119,8 @@ También el arranque del proceso y los argumentos de depuración (`--probe`, `--
 
 ## Estado actual
 
-- **Última verificación:** 2026-11-16, panel con letra cargada y barra nueva, captura
-  ([historial](../history/verificacion/ventana.md)).
+- **Última verificación:** 2026-11-16, «Sonando» en Grande y Clásica, con letra y con cola, y
+  la carátula del panel, capturas ([historial](../history/verificacion/ventana.md)).
 - **Pruebas:** capturas con `--shot` ([verificar-interfaz](../runbooks/verificar-interfaz.md)).
 - **Sin verificar:** Wayland en CachyOS (panel, desenfoque, mini siempre encima).
 - **Historial:** [docs/history/verificacion/ventana.md](../history/verificacion/ventana.md).

@@ -75,9 +75,12 @@ Stderr escribe `arranque de pista: N ms` en cada una.
   usan `ReleaseWithinBounds`. El botón de reproducir late mientras la pista se resuelve.
   - **Un solo desenfoque** para las tres islas: se captura la franja de la barra y se recorta con la
     forma de las islas (`shapes`); un desenfoque por isla costaba más memoria.
-  - **«Me gusta»**: lleno si la canción está en la sección «Me gusta» o se acaba de dar
-    (`Library.like`); el aviso del resultado lo da el menú contextual. No se puede quitar (no hay
-    petición para ello).
+  - **«Me gusta»**: pulsarlo lo da en la cuenta de YouTube Music y pulsarlo otra vez lo quita
+    (`Library.like(id, titulo, gusta)`). Está lleno si la canción está en la sección «Me gusta»,
+    salvo que se acabe de dar o quitar aquí o con la mascota (`likeOverride`, que manda hasta que
+    llega la sección nueva). Mientras va la petición no acepta otro clic (`likePending`): dos
+    peticiones a la vez podían llegar en desorden. Si falla, vuelve a como estaba; el aviso del
+    resultado lo da el menú contextual.
   - **Aleatorio** baraja lo que queda de la cola detrás de la que suena (`Player.shuffleQueue`);
     es una acción, no un modo que se active y desactive.
 - `QueueList.qml`: la cola del panel y de «Sonando». Clic salta, clic derecho abre su menú (lleva
@@ -133,12 +136,12 @@ Stderr escribe `arranque de pista: N ms` en cada una.
 
 ## Estado actual
 
-- **Última verificación:** 2026-11-16 (estilos de la barra con una canción cargada, y cierre de
-  mpv ante `kill`; sin audio: YouTube pidió sesión. Ver historial).
+- **Última verificación:** 2026-11-16 (dar y quitar «Me gusta» sin sesión: aviso y vuelta atrás;
+  sin audio: YouTube pidió sesión. Ver historial).
 - **Pruebas:** ninguna en `player.rs` ni `audio.rs`; se prueban con `--autoplay` y
   `--probe play` ([verificar-reproduccion](../runbooks/verificar-reproduccion.md)).
-- **Sin verificar:** MPRIS en GNOME y KDE con Wayland; el «Me gusta» y «Aleatorio» de la barra
-  con sesión y música sonando.
+- **Sin verificar:** MPRIS en GNOME y KDE con Wayland; dar y quitar «Me gusta» y «Aleatorio» de
+  la barra con sesión y música sonando.
 - **Historial:** [docs/history/verificacion/reproduccion.md](../history/verificacion/reproduccion.md).
 
 ## Pendiente
