@@ -2,7 +2,7 @@
 area: reproduccion
 titulo: Reproducción y cola
 resumen: Cola, lista temporal, siguiente y anterior, repetición, volumen y estado de lo que suena, con mpv como motor en un proceso aparte.
-archivos: [src/player.rs, src/audio.rs, qml/PlayerBar.qml, qml/QueueList.qml]
+archivos: [src/player.rs, src/audio.rs, src/signals.cpp, qml/PlayerBar.qml, qml/QueueList.qml]
 opciones: [barra]
 adr: [ADR-02]
 ---
@@ -39,6 +39,10 @@ Del clic a que suene, y lo que pasa mientras suena. Obtener la URL es de
 - **Apps gráficas en macOS no heredan el `PATH`**: `search_path` añade `/opt/homebrew/bin` y
   `/usr/local/bin`.
 - **Al empezar una pista nada espera** al historial ni a los plugins: se avisan después.
+- **mpv muere con la app**, también ante SIGTERM, SIGINT o SIGHUP (`kill <pid>`, Ctrl+C):
+  `signals.cpp` convierte la señal en `QCoreApplication::quit()`, la salida normal destruye el
+  `Player` y el `Drop` de `Mpv` cierra el proceso. Una segunda señal mata la app sin esperar. El
+  yt-dlp residente se cierra solo al ver su stdin cerrado. Con SIGKILL no hay remedio.
 
 ## Cómo funciona
 
@@ -92,7 +96,8 @@ Stderr escribe `arranque de pista: N ms` en cada una.
 |---|---|
 | `src/player.rs` | Singleton `Player`: cola, lista temporal, estado, controles del sistema, avisos |
 | `src/audio.rs` | Proceso mpv y su IPC; búsqueda de ejecutables en el `PATH` ampliado |
-| `qml/PlayerBar.qml` | Barra de reproducción en tres islas |
+| `src/signals.cpp` | SIGTERM, SIGINT y SIGHUP cierran la app de forma ordenada (y con ella, mpv) |
+| `qml/PlayerBar.qml` | Barra de reproducción en tres estilos (Islas, Clásica, Compacta) |
 | `qml/QueueList.qml` | Lista de la cola, con arrastrar para reordenar |
 
 ### Dónde está cada cosa
@@ -109,6 +114,8 @@ Stderr escribe `arranque de pista: N ms` en cada una.
 | Lanzar mpv | [`spawn`](../../src/audio.rs) |
 | Eventos de mpv | [`read_events`](../../src/audio.rs) |
 | `PATH` ampliado | [`search_path`](../../src/audio.rs) |
+| Cerrar mpv al salir | [`Drop for Mpv`](../../src/audio.rs) |
+| Señales de terminar → salir de Qt | [`musicplayer_handle_signals`](../../src/signals.cpp) |
 | Arrastrar en la cola | [`startDrag`](../../qml/QueueList.qml) |
 
 ## Dependencias
@@ -126,8 +133,8 @@ Stderr escribe `arranque de pista: N ms` en cada una.
 
 ## Estado actual
 
-- **Última verificación:** 2026-11-16 (barra en tres islas, captura con una canción cargada; sin audio:
-  YouTube pidió sesión. Ver historial).
+- **Última verificación:** 2026-11-16 (estilos de la barra con una canción cargada, y cierre de
+  mpv ante `kill`; sin audio: YouTube pidió sesión. Ver historial).
 - **Pruebas:** ninguna en `player.rs` ni `audio.rs`; se prueban con `--autoplay` y
   `--probe play` ([verificar-reproduccion](../runbooks/verificar-reproduccion.md)).
 - **Sin verificar:** MPRIS en GNOME y KDE con Wayland; el «Me gusta» y «Aleatorio» de la barra

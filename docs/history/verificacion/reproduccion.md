@@ -5,6 +5,18 @@ son de cuando se escribieron. El estado actual está en su [ficha](../../areas/r
 
 Lo nuevo va arriba: añade una sección `## AAAA-MM-DD · qué se verificó` encima de las anteriores.
 
+## 2026-11-16 · `kill` a la app ya no deja mpv huérfano
+
+Con SIGTERM la app moría sin destruir el `Player` y su mpv seguía vivo con padre 1 (~20 MB cada
+uno; 15 tras 15 mediciones del runbook de rendimiento). `src/signals.cpp` (self-pipe y
+`QSocketNotifier`) convierte SIGTERM, SIGINT y SIGHUP en `QCoreApplication::quit()`.
+Verificado en macOS (M4 Pro), release, `HOME` temporal y `MUSICPLAYER_SILENT=1`: arrancar, esperar
+10 s, `kill -TERM`/`-INT`/`-HUP` y a los 2 s `pgrep -f "musicplayer-mpv-$APP.sock"` vacío, la app
+fuera y código de salida 0, en las tres. También con `--autoplay` en marcha (pista cargada):
+mpv cerrado tras el `kill`. **No verificado:** con audio sonando de verdad ni con el yt-dlp
+residente vivo (YouTube respondía «Sign in to confirm you're not a bot», también a `yt-dlp`
+directo, así que `--autoplay` acabó en `sonando false`); Linux.
+
 ## 2026-11-16 · Estilos Clásica y Compacta de la barra
 
 - **Cambio:** opción `barra` (Islas, Clásica, Compacta) en Opciones › Apariencia; `PlayerBar.qml`

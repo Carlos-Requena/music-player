@@ -53,6 +53,7 @@ fn main() {
         .qt_module("Quick")
         .qt_module("Network")
         .cpp_file("src/window.cpp")
+        .cpp_file("src/signals.cpp")
         .files(["src/account.rs", "src/library.rs", "src/player.rs", "src/plugins.rs", "src/settings.rs"])
         .build();
 
