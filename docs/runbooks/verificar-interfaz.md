@@ -66,7 +66,7 @@ Un argumento nuevo se añade a `Main.qml` (`arg`) y a esta tabla en la misma tar
 `"120,250,right,5000;245,348,left,5500"` abre el menú de la primera tarjeta de Inicio y pulsa
 «Reproducir a continuación». `"x,y,drag,ms,x2,y2"` arrastra con el botón izquierdo hasta
 `(x2, y2)` y `draghold` lo hace sin soltar (para capturar a mitad del gesto, p. ej. reordenando
-la cola).
+la cola). `"x,y,wheel,ms,pasos"` gira la rueda `pasos` muescas (positivo, hacia abajo).
 
 ## Qué mirar
 

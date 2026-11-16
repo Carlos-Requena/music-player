@@ -70,6 +70,12 @@ QtObject {
     // «Plano»: todo el fondo de un solo color sólido (el del elemento enfocado), sin ningún
     // degradado. Para pantallas antiguas, donde hasta un solo foco sale con escalones.
     readonly property bool ambientFlat: ambientMode === "plano"
+    // «Fluido»: la carátula muy desenfocada y deformada como fondo, al estilo Better Lyrics
+    // Shaders (`Ambient.qml`, `shaders/fluido.frag`).
+    readonly property bool ambientFluid: ambientMode === "fluido"
+    // Movimiento del ambiente (opción `ambienteMovimiento`): «no» (por defecto), «sonando» (solo
+    // en la pantalla «Sonando») o «siempre». Ver `Ambient.drifting`.
+    readonly property string ambientMotion: { void revision; return AppSettings.opcion("ambienteMovimiento") || "no" }
     readonly property real ambient: ambientOn
         ? (skin.ambiente !== undefined ? skin.ambiente : 1) * (ambientMode === "tenue" ? 0.3 : ambientSingle ? 0.7 : 1)
         : 0

@@ -34,6 +34,9 @@ También el arranque del proceso y los argumentos de depuración (`--probe`, `--
   título, la carátula se encoge lo que ocupa el título (`titleSpace`) para que todo quepa sobre la
   barra.
 
+  Con el fondo «Fluido» ([personalizacion](personalizacion.md)), la letra y la cola van sin
+  recuadro, directamente sobre él.
+
   Sin letra ni cola (botón del panel), la carátula va al centro. Se redondea con `Cover.radius`,
   sin capas.
 
@@ -51,8 +54,8 @@ También el arranque del proceso y los argumentos de depuración (`--probe`, `--
   guardar en playlist, categorías (subpáginas `page:<id>`) y portada. El aviso también da el
   resultado del «Me gusta» de la mascota (`Library.gustado`).
 - **Panel lateral** (`NowPlayingPanel`): carátula con esquinas redondeadas, pestañas Letra, Cola y
-  Temporal y, bajo la letra, un pie fijo con su separador para el retraso de la canción («Letra en
-  hora», `− 0,0 s +`; pulsar la cifra la pone a cero).
+  Temporal; bajo la letra, el mismo pie discreto de retraso que en «Sonando» (`LyricsTiming`, que
+  pone la propia `LyricsView`; ver [letra](letra.md)).
 - **Barra de reproducción**: su alto (`barHeight`) sale de `Theme.barHeight`: 84 px en el estilo
   Clásica y 64 en los demás ([reproduccion](reproduccion.md)).
 - **Mascota** (`mascotLoader`): sobre el borde izquierdo de la barra; con las opciones abiertas, en

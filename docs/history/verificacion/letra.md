@@ -5,6 +5,28 @@ son de cuando se escribieron. El estado actual está en su [ficha](../../areas/l
 
 Lo nuevo va arriba: añade una sección `## AAAA-MM-DD · qué se verificó` encima de las anteriores.
 
+## 2026-11-16 · Letra centrada también en vertical y retraso como pie discreto
+
+- **Cambio:** con la letra centrada, la línea que suena va al 50 % de la altura y la letra no deja
+  hueco arriba al empezar. `LyricsTiming` pasa a ser un pie de texto tenue (diseño B), el mismo en
+  «Sonando» (antes, cápsula arriba a la derecha) y en el panel (antes, pie con separador que pintaba
+  el panel); la letra se recorta encima de él.
+- **Verificado:** capturas de «Sonando» y del panel al empezar la canción (la letra llena la zona y
+  el pie se lee) y a mitad de canción adelantando la letra 30 s con sesenta clics simulados en «−»
+  (la línea activa, a media palabra, en el centro; el pie iluminado con «Letra −30,0 s»).
+- **No verificado:** con música sonando de verdad (YouTube pedía sesión); el foco por teclado del
+  pie; volver a cero pulsando el texto.
+
+## 2026-11-16 · Letra centrada
+
+- **Cambio:** opción `letraAlineacion` (Centrada por defecto, A la izquierda). El `Flow` de cada
+  línea pasa a renglones calculados (`rows`, con el ancho de `FontMetrics`), cada uno un `Row`
+  centrado; las líneas inactivas encogen desde el centro y los puntos de las pausas van centrados.
+- **Verificado:** capturas de «Sonando» (con fondo «Fluido») y del panel lateral con letra de
+  LRCLIB: cada renglón centrado y los partidos en dos («Love of my life, you've / hurt me») también.
+- **No verificado:** el barrido y la cascada con música sonando (YouTube pedía sesión); CPU de la
+  letra con el cambio (no debería variar: el mismo número de `Text`); «A la izquierda» en captura.
+
 ## 2026-11-16 · Las palabras largas caben en recuadros estrechos
 
 - **Cambio:** una palabra más ancha que la línea se encoge hasta caber (`FontMetrics` común); en

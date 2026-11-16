@@ -33,4 +33,5 @@ reescribe: si algo cambia, se añade otra y se actualiza el estado de la antigua
 | [ADR-14](ADR-14-lomos-con-matrices-propias.md) | La estantería Lomos con matrices 3D propias y funciones continuas | aceptada | [vistas](../areas/vistas.md) | 2026-11-13 |
 | [ADR-15](ADR-15-plugins-en-un-hilo-propio.md) | Los plugins reciben los eventos del reproductor en un hilo propio | aceptada | [plugins](../areas/plugins.md) | 2026-11-13 |
 | [ADR-16](ADR-16-documentacion-por-areas.md) | Documentación por áreas, una fuente por tema y comprobada con scripts/docs.py | aceptada | — | 2026-11-15 |
+| [ADR-17](ADR-17-fondo-fluido-con-sombreador-propio.md) | El fondo «Fluido» es un sombreador propio, precompilado con qsb y guardado en el repositorio | aceptada | [personalizacion](../areas/personalizacion.md) | 2026-11-16 |
 <!-- /generado -->

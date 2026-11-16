@@ -125,6 +125,9 @@ FocusScope {
             playingTint: Qt.lighter(tint.tint, 1.25)
             stageCenter: parent.width / 2
             playingCenter: parent.width * 0.85
+            moving: Theme.ambientMotion !== "no"
+            thumb: Player.thumb
+            fluidDarken: 0.35
         }
 
         IconButton {
@@ -337,24 +340,20 @@ FocusScope {
             width: root.sideWidth
             height: root.sideBottom - y
             radius: 22
-            color: Qt.rgba(0, 0, 0, 0.22)
-            border.width: 1
+            // Con el fondo «Fluido», la letra y la cola van sobre él, sin recuadro (como en
+            // Better Lyrics).
+            color: Theme.ambientFluid ? "transparent" : Qt.rgba(0, 0, 0, 0.22)
+            border.width: Theme.ambientFluid ? 0 : 1
             border.color: Theme.glassBorder
 
-            LyricsTiming {
-                anchors.right: parent.right
-                anchors.rightMargin: 14
-                y: 8
-            }
-
+            // El ajuste de retraso es el pie discreto de la propia letra (`LyricsTiming`).
             LyricsView {
                 x: 24
-                y: 62
+                y: 12
                 width: parent.width - 48
-                height: parent.height - 62 - 12
+                height: parent.height - 12 - 6
                 // Más pequeña si el recuadro es estrecho, para que quepan las palabras largas.
                 baseSize: Math.max(24, Math.min(34, width / 12))
-                showTiming: false
             }
         }
 
@@ -367,8 +366,10 @@ FocusScope {
             width: root.sideWidth
             height: root.sideBottom - y
             radius: 22
-            color: Qt.rgba(0, 0, 0, 0.22)
-            border.width: 1
+            // Con el fondo «Fluido», la letra y la cola van sobre él, sin recuadro (como en
+            // Better Lyrics).
+            color: Theme.ambientFluid ? "transparent" : Qt.rgba(0, 0, 0, 0.22)
+            border.width: Theme.ambientFluid ? 0 : 1
             border.color: Theme.glassBorder
 
             QueueList {

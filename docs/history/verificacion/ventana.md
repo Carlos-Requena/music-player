@@ -5,6 +5,18 @@ son de cuando se escribieron. El estado actual está en su [ficha](../../areas/v
 
 Lo nuevo va arriba: añade una sección `## AAAA-MM-DD · qué se verificó` encima de las anteriores.
 
+## 2026-11-16 · El menú contextual no deja pasar clics ni rueda; rueda simulada
+
+- **Cambio:** fuera del menú, un `TapHandler` con agarre exclusivo que lo cierra y un `MouseArea`
+  que se queda la rueda; en el menú, lo mismo sin cerrar. `MUSICPLAYER_DEBUG_CLICK` acepta
+  `x,y,wheel,ms,pasos` (`window.cpp`). Rama `fix/clics-y-barra` (el menú ya iba en «Cambios
+  extras»).
+- **Verificado:** con la versión de `8dd106b`, la rueda sobre el menú y fuera de él desplazaba la
+  sección de debajo; ahora no. Clic izquierdo y derecho fuera del menú: lo cierran sin enfocar ni
+  abrir otro menú en la tarjeta de debajo (esto ya pasaba antes en estas pruebas).
+- **No verificado:** el clic que atraviesa «a veces» que vio el propietario no se reprodujo con
+  clics simulados; trackpad; Linux.
+
 ## 2026-11-16 · Carátula de «Sonando» a máxima calidad y título opcional
 
 - **Cambio:** opción `caratulaCalidad` (Máxima por defecto, Alta = 1200 px como antes), vista

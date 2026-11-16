@@ -3,7 +3,7 @@ area: letra
 titulo: Letra sincronizada
 resumen: Letra de LRCLIB línea a línea y, si la trae, palabra a palabra, al estilo Better Lyrics, con tres calidades y retraso ajustable por canción.
 archivos: [src/lyrics.rs, qml/LyricsView.qml, qml/LyricsTiming.qml]
-opciones: [letraCalidad, letraTamano, letraFuente, letraPeso, letraAnimada, retraso:*]
+opciones: [letraCalidad, letraTamano, letraFuente, letraPeso, letraAlineacion, letraAnimada, retraso:*]
 adr: [ADR-13]
 ---
 
@@ -20,10 +20,18 @@ retraso, bajo la propia letra.
   defecto) y «Bajo» (10 Hz, sin cascada ni brillo).
 - **Tamaño, fuente y grosor** (`letraTamano`, `letraFuente`, `letraPeso`) y animación
   (`letraAnimada`).
+- **Alineación** (`letraAlineacion`): centrada (por defecto, la pidió el propietario), con cada
+  renglón centrado en su zona, o a la izquierda. Las palabras se reparten en renglones según su
+  ancho medido (`rows`) y cada renglón es un `Row`: un `Flow` no sabe centrar renglón a renglón.
+  Centrada, la línea que suena va también en el centro vertical (`anchorRatio` 0,5; a la
+  izquierda, al 37 % como Better Lyrics), y la letra nunca deja hueco arriba: al empezar llena la
+  zona desde arriba y la línea que suena baja hasta el centro.
 - **Retraso por canción** (`retraso:<videoId>`): «−» la adelanta y «+» la atrasa medio segundo;
-  clic en el texto vuelve a cero. Positivo: la letra va más tarde. En «Sonando» es la píldora de
-  `LyricsTiming`; en el panel lateral, un pie fijo bajo la letra que pinta el propio panel
-  ([ventana](ventana.md)), con `showTiming: false` en su `LyricsView`.
+  pulsar el texto la vuelve a poner en hora. Positivo: la letra va más tarde. Es un **pie
+  discreto** centrado bajo la letra (`LyricsTiming`, diseño B elegido por el propietario entre
+  cuatro): solo texto tenue «−  letra en hora  +», sin cápsula ni bordes; con retraso se ilumina y
+  dice cuánto («Letra −0,5 s»). Lo pone la propia `LyricsView` (`showTiming`) en «Sonando» y en el
+  panel lateral, y la letra se recorta encima de él.
 
 ## Reglas y decisiones
 

@@ -234,6 +234,11 @@ Window {
             playingTint: playingProbe.tint
             stageCenter: win.stageX + win.stageWidth / 2
             playingCenter: win.showPanel ? win.panelX + win.panelWidth / 2 : win.width * 0.9
+            // Con «Sonando» abierta se mueve el suyo; este, tapado, se queda quieto.
+            moving: Theme.ambientMotion === "siempre" && !win.nowOpen
+            thumb: stageProbe.thumb
+            // Detrás de las carátulas de la sección: más oscuro que en «Sonando».
+            fluidDarken: 0.5
         }
 
         // Fondo de imagen de la skin (si lo trae), sobre el modo ambiente. Se decodifica al

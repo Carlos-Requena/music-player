@@ -39,9 +39,12 @@ Item {
         { cat: "reproduccion", key: "ytdlp", label: "yt-dlp residente", hint: "Suena ~1 s antes; ocupa ~120 MB mientras navegas.", fallback: "si",
           options: [{ id: "si", label: "Activado" }, { id: "no", label: "Desactivado" }] },
         { cat: "apariencia", key: "ambiente", label: "Modo ambiente",
-          hint: "Suave y Tenue: un solo color; Tenue, apenas un velo. Plano: un color sólido, sin degradados (para pantallas antiguas).",
+          hint: "Suave y Tenue: un solo color; Tenue, apenas un velo. Plano: un color sólido, sin degradados (para pantallas antiguas). Fluido: la carátula desenfocada como fondo.",
           fallback: "si",
-          options: [{ id: "si", label: "Vivo" }, { id: "suave", label: "Suave" }, { id: "tenue", label: "Tenue" }, { id: "plano", label: "Plano" }, { id: "no", label: "No" }] },
+          options: [{ id: "si", label: "Vivo" }, { id: "suave", label: "Suave" }, { id: "tenue", label: "Tenue" }, { id: "plano", label: "Plano" }, { id: "fluido", label: "Fluido" }, { id: "no", label: "No" }] },
+        { cat: "apariencia", key: "ambienteMovimiento", label: "Movimiento del ambiente",
+          hint: "Los focos pasean despacio mientras suena. Gasta ~5 % de CPU y unos 100 MB más de memoria; en Plano no se mueve.",
+          fallback: "no", options: [{ id: "no", label: "No" }, { id: "sonando", label: "En Sonando" }, { id: "siempre", label: "Siempre" }] },
         { cat: "apariencia", key: "caratulaCalidad", label: "Carátula de «Sonando»",
           hint: "Máxima: al tamaño que ocupa en pantalla (hasta 2400 px); tarda hasta un segundo más la primera vez y usa más memoria. Alta: 1200 px.",
           fallback: "maxima", options: [{ id: "maxima", label: "Máxima" }, { id: "alta", label: "Alta" }] },
@@ -59,6 +62,8 @@ Item {
           options: [{ id: "sistema", label: "Sistema" }, { id: "serif", label: "Serif" }, { id: "mono", label: "Mono" }] },
         { cat: "apariencia", key: "letraPeso", label: "Grosor de la letra", fallback: "negrita",
           options: [{ id: "negrita", label: "Negrita" }, { id: "normal", label: "Normal" }] },
+        { cat: "apariencia", key: "letraAlineacion", label: "Alineación de la letra", fallback: "centro",
+          options: [{ id: "centro", label: "Centrada" }, { id: "izquierda", label: "A la izquierda" }] },
         { cat: "vistas", key: "panel", label: "Panel de letra y cola", fallback: "derecha",
           options: [{ id: "izquierda", label: "Izquierda" }, { id: "derecha", label: "Derecha" }] },
         { cat: "vistas", key: "sonando", label: "Pantalla Sonando", hint: "Grande: carátula sola y letra estrecha. Clásica: con el título y letra ancha.", fallback: "grande",
@@ -283,9 +288,25 @@ Item {
         color: Qt.rgba(0.02, 0.03, 0.05, 0.55)
     }
 
-    // Un toque fuera de la hoja la cierra.
+    // La rueda no llega al escenario: la lista de opciones la usa si puede desplazarse y, si no
+    // (al llegar al final, o fuera de ella), se queda aquí. Sin esto se desplazaba la sección de
+    // debajo.
+    MouseArea {
+        anchors.fill: parent
+        acceptedButtons: Qt.NoButton
+        onWheel: wheel => wheel.accepted = true
+    }
+
+    // Un toque fuera de la hoja la cierra. Con agarre exclusivo (`ReleaseWithinBounds`) y todos
+    // los botones: con el agarre pasivo de un `TapHandler` normal, el clic seguía hasta las
+    // tarjetas de debajo (TRAMPAS, «Clics que atraviesan»). Lo de la hoja va antes con sus
+    // propios gestores.
     TapHandler {
-        onTapped: eventPoint => {
+        acceptedButtons: Qt.AllButtons
+        gesturePolicy: TapHandler.ReleaseWithinBounds
+        onTapped: (eventPoint, button) => {
+            if (button !== Qt.LeftButton)
+                return
             const local = sheet.mapFromItem(root, eventPoint.position.x, eventPoint.position.y)
             if (!sheet.contains(local))
                 root.closed()

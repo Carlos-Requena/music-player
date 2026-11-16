@@ -433,11 +433,13 @@ Item {
                 coverRadius: 8
             }
 
+            // Botones y posición centrados en la barra, siempre en el mismo sitio: el margen de
+            // los dos lados es el mismo y se calcula con el ancho máximo de lo que suena (300),
+            // no con el de su título, para que la zona central no se mueva al cambiar de canción.
             Column {
-                anchors.left: now.right
-                anchors.right: extras.left
-                anchors.leftMargin: 20
-                anchors.rightMargin: 20
+                readonly property real side: Math.max(now.x + 300, bar.width - extras.x) + 20
+                x: side
+                width: Math.max(0, bar.width - 2 * side)
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 2
 

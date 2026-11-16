@@ -5,6 +5,15 @@ son de cuando se escribieron. El estado actual está en su [ficha](../../areas/r
 
 Lo nuevo va arriba: añade una sección `## AAAA-MM-DD · qué se verificó` encima de las anteriores.
 
+## 2026-11-16 · La zona central de la barra Clásica ya no se mueve con el título
+
+- **Cambio:** la columna de botones y posición se centra con un margen fijo a los dos lados
+  (`side`, a partir de los 300 px máximos de lo que suena), no anclada al ancho del título. Rama
+  `fix/clics-y-barra`.
+- **Verificado:** capturas de la barra Clásica con «Nada sonando» y con «Cosas del amor»: el botón
+  de reproducir y la posición en el mismo sitio.
+- **No verificado:** con un título larguísimo y la ventana al ancho mínimo (1120 px); Linux.
+
 ## 2026-11-16 · Quitar «Me gusta» desde la barra
 
 - **Cambio:** el corazón alterna: lo da en la cuenta y, pulsado otra vez, lo quita

@@ -64,7 +64,9 @@ Stderr escribe `arranque de pista: N ms` en cada una.
   - **Islas** (por defecto): tres islas de vidrio sueltas: lo que suena (carátula redonda, título,
     artista y «Me gusta»), los controles con la posición, y mini reproductor, panel y volumen.
   - **Clásica**: una barra de 84 px; en el centro, aleatorio, anterior, reproducir, siguiente y
-    repetir, con la posición debajo.
+    repetir, con la posición debajo. La zona central está siempre centrada y con el mismo ancho:
+    su margen sale del ancho máximo de lo que suena (300 px), no del título, para que no se mueva
+    al cambiar de canción (lo pidió el propietario).
   - **Compacta**: una barra de 64 px; la posición es una línea fina de color de acento en el borde
     de arriba (se pulsa o arrastra; con el foco, las flechas mueven 5 s) y el tiempo va en texto
     junto a los extras.
@@ -136,8 +138,8 @@ Stderr escribe `arranque de pista: N ms` en cada una.
 
 ## Estado actual
 
-- **Última verificación:** 2026-11-16 (dar y quitar «Me gusta» sin sesión: aviso y vuelta atrás;
-  sin audio: YouTube pidió sesión. Ver historial).
+- **Última verificación:** 2026-11-16 (barra Clásica con «Nada sonando» y con una canción: la
+  zona central en el mismo sitio; sin audio: YouTube pidió sesión. Ver historial).
 - **Pruebas:** ninguna en `player.rs` ni `audio.rs`; se prueban con `--autoplay` y
   `--probe play` ([verificar-reproduccion](../runbooks/verificar-reproduccion.md)).
 - **Sin verificar:** MPRIS en GNOME y KDE con Wayland; dar y quitar «Me gusta» y «Aleatorio» de

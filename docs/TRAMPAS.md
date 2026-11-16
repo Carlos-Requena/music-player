@@ -27,6 +27,9 @@ que toque **antes** de cambiar algo ahí. Una trampa nueva se añade en su secci
 - **Clics que atraviesan:** un `TapHandler` normal solo toma un agarre pasivo y el clic sigue hacia
   lo de debajo (cerrar «Sonando» abría las opciones). En botones y opciones,
   `gesturePolicy: TapHandler.ReleaseWithinBounds`. Un `MouseArea` debajo no basta.
+- **La rueda atraviesa las capas de encima** (Opciones, menú contextual) y desplaza la sección de
+  debajo: un `Flickable` que llega al tope, o que no se desplaza, la deja pasar. Debajo de la capa,
+  un `MouseArea` con `acceptedButtons: Qt.NoButton` y `onWheel: wheel => wheel.accepted = true`.
 - **`Window.window` dentro de un `TapHandler` es `null`** (los gestores no son `Item`): usa el del
   elemento, `delegado.Window.window.openMenu(…)`.
 - **Arrastrar dentro de una lista la desplaza** en vez de mover la fila: un `MouseArea` con

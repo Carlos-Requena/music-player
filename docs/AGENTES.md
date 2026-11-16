@@ -43,6 +43,7 @@ cargo run --release
 cargo test                      # pruebas de Rust (cookies, firmas, Discord, Last.fm, letra…)
 python3 scripts/docs.py check   # comprueba la documentación (norma: antes de terminar)
 python3 scripts/docs.py index   # regenera las tablas de docs/INDEX.md y docs/decisions/README.md
+scripts/shaders.sh              # recompila shaders/*.frag a .qsb (necesita qsb) tras cambiarlos
 ```
 
 - **Probar sin ventana** (`--probe`), **capturas** (`--shot`) y **clics simulados**: los
@@ -60,6 +61,7 @@ src/            Núcleo Rust. Un archivo por pieza; los singletons QML son puent
   plugins/      Discord y Last.fm (los reparte plugins.rs).
 qml/            Interfaz. Main.qml es la ventana; Theme.qml y Catalog.qml, singletons.
 skins/          Skins incluidas (JSON dentro del binario).
+shaders/        Sombreadores (.frag) y su versión compilada (.qsb), dentro del binario.
 login/          Crate aparte: ventana de inicio de sesión de Linux (Qt WebEngine, opcional).
 build.rs        Registra los QML y los puentes en el módulo app.musicplayer.
 scripts/        Empaquetado (crear-app-macos.sh, instalar-linux.sh) y docs.py.
@@ -234,6 +236,10 @@ añadas más casos, y actualiza la lista.
   ([ventana](areas/ventana.md)).
 - **Fondo «Plano»** en el modo ambiente para pantallas antiguas: un color sólido de la carátula,
   sin degradados ([personalizacion](areas/personalizacion.md)).
+- **Movimiento del ambiente** en «deriva lenta» (los focos pasean despacio mientras suena),
+  activable en Opciones (No, En Sonando, Siempre), y fondo «Fluido» (la carátula desenfocada y
+  deformada, al estilo Better Lyrics Shaders) como valor del modo ambiente, con la letra de
+  «Sonando» sobre él sin recuadro ([personalizacion](areas/personalizacion.md)).
 - **«Me gusta» en la cuenta**: el corazón de la barra lo da en YouTube Music y, pulsado otra vez,
   lo quita ([reproduccion](areas/reproduccion.md)).
 - **Diseño de las muestras del propietario**: barra con «Me gusta» y Aleatorio en tres estilos a
@@ -243,6 +249,8 @@ añadas más casos, y actualiza la lista.
   [personalizacion](areas/personalizacion.md)).
 - **Registrar las escuchas en YouTube Music**, activado por defecto y desactivable
   ([historial](areas/historial.md)).
+- **Letra centrada** en horizontal y en vertical, y el ajuste de retraso como un pie discreto de
+  texto tenue bajo ella ([letra](areas/letra.md)).
 - **Iniciar sesión con una ventana propia** (WebKit del sistema en macOS, Qt WebEngine opcional en
   Linux) y, como alternativa, importar del navegador; sin disfrazar el agente de usuario
   ([sesion](areas/sesion.md)).

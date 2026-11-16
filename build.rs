@@ -37,7 +37,21 @@ const QML_FILES: &[&str] = &[
 /// Singletons QML (tema y datos de ejemplo).
 const QML_SINGLETONS: &[&str] = &["qml/Theme.qml", "qml/Catalog.qml"];
 
+/// Sombreadores ya compilados con `scripts/shaders.sh` (qsb). Van en el repositorio para que
+/// compilar no necesite qsb; en QML: `qrc:/qt/qml/app/musicplayer/shaders/<nombre>.qsb`.
+const SHADERS: &[&str] = &["shaders/fluido.frag"];
+
 fn main() {
+    // Aviso si un sombreador cambió y su .qsb no se volvió a compilar.
+    for source in SHADERS {
+        println!("cargo::rerun-if-changed={source}");
+        let modified = |path: &str| std::fs::metadata(path).and_then(|m| m.modified()).ok();
+        if let (Some(src), Some(qsb)) = (modified(source), modified(&format!("{source}.qsb"))) {
+            if src > qsb {
+                println!("cargo::warning={source} es más nuevo que su .qsb: ejecuta scripts/shaders.sh");
+            }
+        }
+    }
     // Application ID de Discord que se incluye en la app (ver COMPILAR.md).
     println!("cargo::rerun-if-env-changed=MUSICPLAYER_DISCORD_ID");
     let module = QmlModule::new("app.musicplayer")
@@ -52,6 +66,7 @@ fn main() {
         .qt_module("Gui")
         .qt_module("Quick")
         .qt_module("Network")
+        .qrc_resources(SHADERS.iter().map(|source| format!("{source}.qsb")).collect::<Vec<_>>())
         .cpp_file("src/window.cpp")
         .cpp_file("src/signals.cpp")
         .files(["src/account.rs", "src/library.rs", "src/player.rs", "src/plugins.rs", "src/settings.rs"])

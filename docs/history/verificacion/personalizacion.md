@@ -5,6 +5,39 @@ son de cuando se escribieron. El estado actual está en su [ficha](../../areas/p
 
 Lo nuevo va arriba: añade una sección `## AAAA-MM-DD · qué se verificó` encima de las anteriores.
 
+## 2026-11-16 · Modo ambiente «Fluido» (carátula fluida) y letra sin recuadro
+
+- **Cambio:** valor `fluido` de `ambiente`: sombreador `shaders/fluido.frag` (desenfoque en anillo
+  sobre la carátula a 32 px, deformación de dominio con ruido, límite de brillo y grano), fundido
+  de un segundo entre carátulas y animación a 15 Hz con la opción `ambienteMovimiento`. En
+  «Sonando», la letra y la cola sin recuadro sobre el fondo. ADR-17.
+- **Verificado:** capturas de Inicio y de «Sonando» con letra (Queen, de LRCLIB) sobre el fondo; con
+  una carátula clara el fondo no pasa de un gris medio y la letra se lee. CPU y memoria en release
+  (ficha, «Medidas»), con la condición de que suene quitada a mano y repuesta después.
+- **No verificado:** el movimiento a la vista (dos fotogramas de la misma carátula), el fundido,
+  Linux y Windows, con música sonando de verdad (YouTube pedía sesión).
+
+## 2026-11-16 · Movimiento del ambiente: deriva lenta
+
+- **Cambio:** opción `ambienteMovimiento` (No, En Sonando, Siempre) y deriva de los focos en
+  `Ambient.qml` a 10 Hz. Elegida por el propietario (B) entre respiración, deriva, oleada en los
+  cambios y carátula fluida, tras una demostración animada y un prototipo medido.
+- **Verificado:** CPU acumulada y memoria en release en cada modo (ficha, «Medidas»); a 60 fps el
+  prototipo gastaba 6,2–7,6 s de CPU en 25 s, y 4,4 s sin desenfoque. Con la ventana minimizada o
+  en el mini, la CPU vuelve a ~0. Capturas de «Sonando» a los 6 y 14 s con los focos en otro sitio;
+  la fila nueva en Opciones › Apariencia.
+- **No verificado:** con música sonando (YouTube pedía sesión: se midió quitando esa condición a
+  mano); pausa y reanudación; Linux.
+
+## 2026-11-16 · Opciones ya no deja pasar clics ni rueda a la sección de debajo
+
+- **Cambio:** el `TapHandler` de fuera de la hoja con agarre exclusivo y todos los botones, y un
+  `MouseArea` que se queda la rueda. Rama `fix/clics-y-barra`.
+- **Verificado:** con la rueda simulada (`MUSICPLAYER_DEBUG_CLICK="300,600,wheel,5000,8"`) sobre
+  Opciones › Apariencia: antes la sección de debajo bajaba; ahora no se mueve. Un clic en un hueco
+  de la hoja no cambia el foco de debajo.
+- **No verificado:** trackpad (desplazamiento por píxeles e inercia); Linux.
+
 ## 2026-11-16 · Modo ambiente «Plano»
 
 - **Cambio:** valor `plano` de la opción `ambiente` (rama `feature/personalizacion-fondo-plano`),

@@ -83,7 +83,8 @@ static void scheduleDebugDrag(QQuickWindow *window, QPointF from, QPointF to, in
 // Depuración: MUSICPLAYER_DEBUG_CLICK="x,y,boton,ms[;x,y,boton,ms…]" envía clics de ratón de
 // verdad a la ventana principal (boton: left o right; ms desde el arranque). Sirve para
 // probar menús y gestos en capturas automáticas sin tocar el ratón. «x,y,drag,ms,x2,y2»
-// arrastra hasta (x2, y2) y «x,y,draghold,ms,x2,y2» lo mismo sin soltar.
+// arrastra hasta (x2, y2) y «x,y,draghold,ms,x2,y2» lo mismo sin soltar. «x,y,wheel,ms,pasos»
+// gira la rueda `pasos` muescas (positivo, hacia abajo).
 static void scheduleDebugClicks(QQuickWindow *window)
 {
     const QByteArray spec = qgetenv("MUSICPLAYER_DEBUG_CLICK");
@@ -91,6 +92,21 @@ static void scheduleDebugClicks(QQuickWindow *window)
         return;
     for (const QByteArray &click : spec.split(';')) {
         const QList<QByteArray> parts = click.split(',');
+        if (parts.size() == 5 && parts[2] == "wheel") {
+            const QPointF at(parts[0].toDouble(), parts[1].toDouble());
+            const int steps = parts[4].toInt();
+            QTimer::singleShot(parts[3].toInt(), window, [window, at, steps]() {
+                const QPointF global = window->mapToGlobal(at);
+                QMouseEvent move(QEvent::MouseMove, at, global, Qt::NoButton, Qt::NoButton, Qt::NoModifier);
+                QGuiApplication::sendEvent(window, &move);
+                for (int i = 0; i < std::abs(steps); ++i) {
+                    QWheelEvent wheel(at, global, QPoint(), QPoint(0, steps > 0 ? -120 : 120), Qt::NoButton,
+                                      Qt::NoModifier, Qt::NoScrollPhase, false);
+                    QGuiApplication::sendEvent(window, &wheel);
+                }
+            });
+            continue;
+        }
         if (parts.size() == 6 && (parts[2] == "drag" || parts[2] == "draghold")) {
             scheduleDebugDrag(window, QPointF(parts[0].toDouble(), parts[1].toDouble()),
                               QPointF(parts[4].toDouble(), parts[5].toDouble()), parts[3].toInt(),
