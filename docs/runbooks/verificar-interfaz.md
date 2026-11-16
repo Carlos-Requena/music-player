@@ -49,7 +49,7 @@ HOME="$PRUEBA" MUSICPLAYER_SILENT=1 ./target/release/musicplayer \
 | `--now` | Arranca con la pantalla «Sonando» abierta |
 | `--tab id` | Abre esa pestaña del panel (`letra`, `cola`, `temporal`) |
 | `--temporal` | (con `--autoplay`) añade el elemento enfocado a la lista temporal y abre el menú sobre él |
-| `--no-panel` | Arranca con el panel derecho cerrado |
+| `--panel` | Arranca con el panel de letra y cola abierto (sin él, arranca oculto) |
 | `--autoplay` | Reproduce el elemento enfocado |
 | `--autoplay-delay ms` | Espera antes de reproducir (deja tiempo a la precarga) |
 | `--then-next ms` | Pasa a la pista siguiente tras ese tiempo |

@@ -216,8 +216,8 @@ añadas más casos, y actualiza la lista.
   ([ARCHITECTURE, memoria](ARCHITECTURE.md#memoria-y-arranque)).
 - **Clic y que suene**: el arranque de una pista no espera a nada que no sea el audio (historial,
   plugins y precarga van aparte) ([resolucion](areas/resolucion.md)).
-- **Ventana de vidrio con la navegación superior**; el panel de letra y cola, a la derecha por
-  defecto y movible ([ventana](areas/ventana.md)).
+- **Ventana de vidrio con la navegación superior**; el panel de letra y cola, oculto al arrancar,
+  a la derecha por defecto y movible ([ventana](areas/ventana.md)).
 - **Vistas por sección**: Inicio, Explorar, Me gusta y Búsqueda en Muro; Playlists y Álbumes en
   Lomos; cualquier sección puede usar cualquier vista ([vistas](areas/vistas.md)).
 - **Diseño con alternativas**: mockups y decisiones visuales con 2–4 opciones a elegir, no una sola

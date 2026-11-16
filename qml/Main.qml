@@ -11,7 +11,9 @@ Window {
     property bool settingsOpen: false
     property bool inspecting: false
     readonly property bool detailOpen: Catalog.detalle !== null
-    property bool lyricsOn: Qt.application.arguments.indexOf("--no-panel") < 0
+    // Panel de letra y cola: arranca oculto (lo pidió el propietario) y se abre con su botón de la
+    // barra. Depuración: `--panel` arranca con él abierto.
+    property bool lyricsOn: Qt.application.arguments.indexOf("--panel") >= 0
     // Pantalla «Sonando» (sube desde la barra de reproducción).
     property bool nowOpen: args.indexOf("--now") >= 0
 

@@ -5,6 +5,13 @@ son de cuando se escribieron. El estado actual está en su [ficha](../../areas/v
 
 Lo nuevo va arriba: añade una sección `## AAAA-MM-DD · qué se verificó` encima de las anteriores.
 
+## 2026-11-16 · El panel de letra y cola arranca oculto
+
+- **Cambio:** `lyricsOn` empieza en `false` (lo pidió el propietario); el argumento de depuración
+  `--no-panel` pasa a ser `--panel`, que lo abre al arrancar.
+- **Verificado:** nada todavía (falta compilar y capturar con y sin `--panel`).
+- **No verificado:** Linux.
+
 ## 2026-11-16 · Panel lateral y barra más baja
 
 - **Cambio:** `barHeight` de 84 a 64; en el panel, carátula redondeada y pie fijo del retraso de la

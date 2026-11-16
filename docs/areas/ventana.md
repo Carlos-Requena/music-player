@@ -16,8 +16,10 @@ También el arranque del proceso y los argumentos de depuración (`--probe`, `--
 
 - **Navegación superior** en píldoras (`TopNav`) y **búsqueda** (`SearchField`).
 - **Panel de letra y cola** a la derecha (por defecto) o a la izquierda (opción `panel`), o
-  cerrado; con el panel a la izquierda todo el escenario se desplaza con `stageX`. En ventanas
-  estrechas se oculta para que quepa la navegación.
+  cerrado; con el panel a la izquierda todo el escenario se desplaza con `stageX`. **Arranca
+  oculto**, por petición del propietario (`lyricsOn`), y se abre con su botón de la barra
+  (`--panel` lo abre al arrancar, para capturas). En ventanas estrechas se oculta para que quepa
+  la navegación.
 - **«Sonando»** (`NowPlayingView`): sube desde la barra al pulsar en ella (fuera de los controles); carátula grande sobre
   el fondo ambiente de sus colores, letra y cola.
 - **Mini reproductor**: ventana pequeña siempre encima; la grande se oculta mientras tanto
