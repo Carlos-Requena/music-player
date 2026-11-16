@@ -5,6 +5,14 @@ son de cuando se escribieron. El estado actual está en su [ficha](../../areas/v
 
 Lo nuevo va arriba: añade una sección `## AAAA-MM-DD · qué se verificó` encima de las anteriores.
 
+## 2026-11-16 · Panel lateral y barra más baja
+
+- **Cambio:** `barHeight` de 84 a 64; en el panel, carátula redondeada y pie fijo del retraso de la
+  letra con separador.
+- **Verificado:** captura con «Creep» cargada y su letra: pie «Letra en hora · − 0,0 s +» bajo la
+  letra, carátula con esquinas redondas.
+- **No verificado:** el panel a la izquierda; ventanas estrechas (la isla central ocupa el hueco).
+
 ## 2026-11-15 · Mascota en Opciones y aviso del «Me gusta»
 
 `mascotLoader` sigue a `SettingsSheet.panel` con las opciones abiertas; `ContextMenu` avisa del

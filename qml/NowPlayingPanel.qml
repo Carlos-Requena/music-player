@@ -16,6 +16,7 @@ Glass {
         height: width
         thumb: Player.thumb
         pixels: 544
+        radius: 12
     }
 
     Column {
@@ -124,10 +125,73 @@ Glass {
         visible: root.tab === "letra"
         anchors.top: tabs.bottom
         anchors.topMargin: 14
-        anchors.bottom: parent.bottom
-        anchors.bottomMargin: root.pad
+        anchors.bottom: timing.visible ? timing.top : parent.bottom
+        anchors.bottomMargin: timing.visible ? 4 : root.pad
         x: root.pad
         width: root.width - 2 * root.pad
+        showTiming: false
+    }
+
+    // Pie de la letra: retraso de esta canción (se guarda por canción). «−» la adelanta y «+»
+    // la atrasa medio segundo; pulsar la cifra la vuelve a poner en hora.
+    Item {
+        id: timing
+        visible: root.tab === "letra" && Catalog.lyrics.length > 0
+        anchors.bottom: parent.bottom
+        width: root.width
+        height: Theme.hit + 12
+
+        readonly property real delay: Catalog.lyricsDelay
+
+        Rectangle {
+            width: parent.width
+            height: 1
+            color: Theme.glassBorder
+        }
+
+        Text {
+            x: root.pad + 4
+            anchors.verticalCenter: parent.verticalCenter
+            text: timing.delay === 0 ? "Letra en hora" : timing.delay > 0 ? "Letra atrasada" : "Letra adelantada"
+            color: Theme.textMuted
+            font.pixelSize: 13
+        }
+
+        Row {
+            anchors.right: parent.right
+            anchors.rightMargin: root.pad - 8
+            anchors.verticalCenter: parent.verticalCenter
+
+            IconButton {
+                icon: "M6 12h12"
+                iconSize: 16
+                label: "Adelantar la letra medio segundo"
+                onClicked: Catalog.setLyricsDelay(timing.delay - 0.5)
+            }
+
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+                width: 56
+                horizontalAlignment: Text.AlignHCenter
+                text: (timing.delay > 0 ? "+" : timing.delay < 0 ? "−" : "")
+                      + Math.abs(timing.delay).toFixed(1).replace(".", ",") + " s"
+                color: Theme.text
+                font.pixelSize: 13
+                font.features: { "tnum": 1 }
+
+                TapHandler {
+                    gesturePolicy: TapHandler.ReleaseWithinBounds
+                    onTapped: Catalog.setLyricsDelay(0)
+                }
+            }
+
+            IconButton {
+                icon: Theme.iconPlus
+                iconSize: 16
+                label: "Atrasar la letra medio segundo"
+                onClicked: Catalog.setLyricsDelay(timing.delay + 0.5)
+            }
+        }
     }
 
     QueueList {

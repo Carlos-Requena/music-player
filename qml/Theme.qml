@@ -51,6 +51,16 @@ QtObject {
     }
     readonly property int lyricsWeight: { void revision; return AppSettings.opcion("letraPeso") === "normal" ? Font.Medium : Font.Bold }
 
+    // Estilo de la barra de reproducción (Opciones › Apariencia): «islas» (tres piezas
+    // sueltas), «clasica» (una barra, la posición bajo los botones) o «compacta» (más baja, la
+    // posición como una línea arriba). La usan `PlayerBar` y el alto que reserva `Main`.
+    readonly property string barStyle: {
+        void revision
+        const style = AppSettings.opcion("barra")
+        return style === "clasica" || style === "compacta" ? style : "islas"
+    }
+    readonly property int barHeight: barStyle === "clasica" ? 84 : 64
+
     readonly property string ambientMode: { void revision; return AppSettings.opcion("ambiente") || "si" }
     readonly property bool ambientOn: ambientMode !== "no"
     // «Suave»: un solo color (el del elemento enfocado) y menos intensidad. Se ve mejor en
@@ -131,6 +141,8 @@ QtObject {
     readonly property string iconAddQueue: "M4 6h16 M4 11h16 M4 16h9 M18 12v9 M15 18l3 3 3-3"
     readonly property string iconSaveList: "M5 4h14v16l-7-4-7 4z M12 8v6 M9 11h6"
     readonly property string iconForward: "M9 5l7 7-7 7"
+    // Recargar: una vuelta casi entera con la punta arriba a la derecha.
+    readonly property string iconReload: "M19.5 12a7.5 7.5 0 1 1-2.2-5.3 M18 3v4h-4"
     readonly property string iconFolder: "M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"
     readonly property string iconPlug: "M9 3v5 M15 3v5 M6 8h12v3a6 6 0 0 1-12 0z M12 17v4"
     readonly property string iconLomos: "M4 5v14 M8 5v14 M11 5h9v14h-9z"

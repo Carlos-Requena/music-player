@@ -466,6 +466,7 @@ FocusScope {
     }
 
     Column {
+        id: captions
         anchors.horizontalCenter: parent.horizontalCenter
         y: root.centerY + root.side * root.centerScale / 2 + 22
         width: parent.width - 80
@@ -490,6 +491,40 @@ FocusScope {
             font.pixelSize: 13
             font.letterSpacing: 0.5
             elide: Text.ElideRight
+        }
+    }
+
+    // Barra para recorrer la estantería: arrastrarla salta a cualquier álbum o playlist; las
+    // flechas, de uno en uno.
+    Row {
+        visible: root.items.length > 1
+        anchors.horizontalCenter: parent.horizontalCenter
+        y: Math.min(captions.y + captions.height + 30, root.height - height - 12)
+        height: Theme.hit
+        spacing: 16
+
+        Text {
+            anchors.verticalCenter: parent.verticalCenter
+            text: "1"
+            color: Theme.textMuted
+            font.pixelSize: 13
+        }
+
+        Slider {
+            anchors.verticalCenter: parent.verticalCenter
+            width: Math.min(560, root.width * 0.5)
+            label: "Elegir entre " + root.items.length + " (" + (root.index + 1) + ")"
+            fill: Theme.textFaint
+            stepSize: 1 / Math.max(1, root.items.length - 1)
+            value: root.index / Math.max(1, root.items.length - 1)
+            onMoved: value => root.index = Math.round(value * (root.items.length - 1))
+        }
+
+        Text {
+            anchors.verticalCenter: parent.verticalCenter
+            text: root.items.length
+            color: Theme.textMuted
+            font.pixelSize: 13
         }
     }
 }

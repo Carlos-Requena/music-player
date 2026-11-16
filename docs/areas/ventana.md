@@ -25,6 +25,11 @@ También el arranque del proceso y los argumentos de depuración (`--probe`, `--
 - **Menú de clic derecho** (`Main.openMenu` → `ContextMenu`) y aviso breve: cola, lista temporal,
   guardar en playlist, categorías (subpáginas `page:<id>`) y portada. El aviso también da el
   resultado del «Me gusta» de la mascota (`Library.gustado`).
+- **Panel lateral** (`NowPlayingPanel`): carátula con esquinas redondeadas, pestañas Letra, Cola y
+  Temporal y, bajo la letra, un pie fijo con su separador para el retraso de la canción («Letra en
+  hora», `− 0,0 s +`; pulsar la cifra la pone a cero).
+- **Barra de reproducción**: su alto (`barHeight`) sale de `Theme.barHeight`: 84 px en el estilo
+  Clásica y 64 en los demás ([reproduccion](reproduccion.md)).
 - **Mascota** (`mascotLoader`): sobre el borde izquierdo de la barra; con las opciones abiertas, en
   la esquina inferior izquierda de su panel (`SettingsSheet.panel`) ([mascotas](mascotas.md)).
 
@@ -102,7 +107,8 @@ También el arranque del proceso y los argumentos de depuración (`--probe`, `--
 
 ## Estado actual
 
-- **Última verificación:** sin registrar.
+- **Última verificación:** 2026-11-16, panel con letra cargada y barra nueva, captura
+  ([historial](../history/verificacion/ventana.md)).
 - **Pruebas:** capturas con `--shot` ([verificar-interfaz](../runbooks/verificar-interfaz.md)).
 - **Sin verificar:** Wayland en CachyOS (panel, desenfoque, mini siempre encima).
 - **Historial:** [docs/history/verificacion/ventana.md](../history/verificacion/ventana.md).

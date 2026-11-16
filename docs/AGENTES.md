@@ -227,6 +227,11 @@ añadas más casos, y actualiza la lista.
   izquierda ([mascotas](areas/mascotas.md)).
 - **Pulsar la barra de reproducción** en cualquier sitio que no sea un control abre «Sonando»
   ([reproduccion](areas/reproduccion.md)).
+- **Diseño de las muestras del propietario**: barra con «Me gusta» y Aleatorio en tres estilos a
+  elegir (Islas por defecto, Clásica y Compacta),
+  Lomos con barra para recorrer la estantería y Opciones con miniaturas de skin y mascota
+  ([reproduccion](areas/reproduccion.md), [vistas](areas/vistas.md),
+  [personalizacion](areas/personalizacion.md)).
 - **Registrar las escuchas en YouTube Music**, activado por defecto y desactivable
   ([historial](areas/historial.md)).
 - **Iniciar sesión con una ventana propia** (WebKit del sistema en macOS, Qt WebEngine opcional en

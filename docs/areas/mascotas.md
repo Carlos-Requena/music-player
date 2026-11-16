@@ -29,6 +29,8 @@ Opciones › Mascota. Van aparte de las skins, en `<config>/musicplayer/mascotas
   la barra al cerrarlas (`Main.qml`, `mascotLoader`). Es la misma instancia: no pierde lo que
   estaba haciendo.
 - Si una pose no existe en la carpeta se usa la que la sustituye (tabla `fallback`).
+- **En Opciones › Apariencia** cada mascota sale en su recuadro con la pose `reposo`
+  ([personalizacion](personalizacion.md)).
 
 ## Reglas y decisiones
 

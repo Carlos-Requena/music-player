@@ -23,7 +23,7 @@ Window {
     readonly property real panelX: panelLeft ? Theme.gap : width - panelWidth - Theme.gap
     readonly property real stageX: showPanel && panelLeft ? panelWidth + 2 * Theme.gap : 0
     readonly property real stageWidth: showPanel ? width - panelWidth - 2 * Theme.gap : width
-    readonly property real barHeight: 84
+    readonly property real barHeight: Theme.barHeight
     readonly property string view: {
         void AppSettings.revision
         return AppSettings.vista(section)

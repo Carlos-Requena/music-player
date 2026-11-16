@@ -29,11 +29,12 @@ Item {
         }
     }
 
+    // Máscara del desenfoque: sin `backdrop` no hace falta y no se reserva su textura.
     Item {
         id: mask
         anchors.fill: parent
         visible: false
-        layer.enabled: true
+        layer.enabled: root.backdrop !== null && Theme.blur
 
         Rectangle {
             anchors.fill: parent

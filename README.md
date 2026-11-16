@@ -36,13 +36,15 @@ En **Opciones**:
 - **Disposición**: panel de letra y cola a la izquierda o a la derecha, modo ambiente,
   desenfoque (desactivarlo ahorra memoria y batería) y tamaño de las carátulas del Muro.
 - **Vista de cada sección**: Lomos, Cubeta o Muro.
+- **Barra de reproducción** (Apariencia): Islas, Clásica o Compacta.
 
 ### Crear una skin
 
 Copia uno de los archivos de [`skins/`](skins) a la carpeta de skins
 (`~/Library/Application Support/musicplayer/skins/` en macOS,
-`~/.config/musicplayer/skins/` en Linux), cámbiale el nombre y edítalo. Después pulsa
-**Recargar skins** en Opciones.
+`~/.config/musicplayer/skins/` en Linux), cámbiale el nombre y edítalo. Después pulsa el botón
+de recargar (la flecha circular) junto a «Skin» en Opciones › Apariencia; el de la carpeta la
+abre.
 
 ```json
 {
@@ -132,8 +134,9 @@ canción le dé «Me gusta» (hace falta sesión).
 
 Con solo `reposo` y `sonando`, la mascota está siempre en `reposo` salvo mientras suena música.
 Recorta las poses con un corte recto abajo: así parece apoyada en la barra. En macOS, Vista
-Previa quita el fondo blanco (Herramientas › Quitar fondo). Pulsa **Recargar** en Opciones tras
-añadir o editar una. Solo se carga la pose visible, a su tamaño en pantalla: unos cientos de KB.
+Previa quita el fondo blanco (Herramientas › Quitar fondo). «Añadir…», en Opciones › Apariencia,
+abre la carpeta de mascotas; pulsa el botón de recargar junto a «Mascota» tras añadir o editar
+una (en su recuadro sale la pose `reposo`). Solo se carga la pose visible, a su tamaño en pantalla: unos cientos de KB.
 
 ## Plugins
 

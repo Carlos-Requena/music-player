@@ -21,7 +21,9 @@ retraso, bajo la propia letra.
 - **Tamaño, fuente y grosor** (`letraTamano`, `letraFuente`, `letraPeso`) y animación
   (`letraAnimada`).
 - **Retraso por canción** (`retraso:<videoId>`): «−» la adelanta y «+» la atrasa medio segundo;
-  clic en el texto vuelve a cero. Positivo: la letra va más tarde.
+  clic en el texto vuelve a cero. Positivo: la letra va más tarde. En «Sonando» es la píldora de
+  `LyricsTiming`; en el panel lateral, un pie fijo bajo la letra que pinta el propio panel
+  ([ventana](ventana.md)), con `showTiming: false` en su `LyricsView`.
 
 ## Reglas y decisiones
 

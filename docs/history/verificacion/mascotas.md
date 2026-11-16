@@ -5,6 +5,12 @@ son de cuando se escribieron. El estado actual está en su [ficha](../../areas/m
 
 Lo nuevo va arriba: añade una sección `## AAAA-MM-DD · qué se verificó` encima de las anteriores.
 
+## 2026-11-16 · Imagen de la mascota en Opciones
+
+- **Cambio:** cada mascota sale en Opciones con su pose `reposo` (área
+  [personalizacion](../../areas/personalizacion.md)).
+- **Verificado:** captura de Apariencia con Ralsei y Ralsei chibi.
+
 ## 2026-11-15 · Expresiones de Ralsei, reacciones y «Me gusta» al pincharla
 
 Rama `feature/mascotas`. Ralsei gana ocho poses (recortadas de una hoja de expresiones con el

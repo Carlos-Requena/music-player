@@ -150,6 +150,10 @@ pub mod qobject {
         /// Quita de la cola la pista `index` (no la que suena).
         #[qinvokable]
         fn remove_from_queue(self: Pin<&mut Player>, index: i32);
+
+        /// Baraja las pistas que quedan detrás de la que suena; la que suena sigue sonando.
+        #[qinvokable]
+        fn shuffle_queue(self: Pin<&mut Player>);
     }
 
     impl cxx_qt::Threading for Player {}
@@ -769,6 +773,17 @@ impl qobject::Player {
         if index < current {
             self.as_mut().set_index(current - 1);
         }
+        self.prefetch_next();
+    }
+
+    fn shuffle_queue(mut self: Pin<&mut Self>) {
+        let start = (*self.index() + 1).max(0) as usize;
+        if start + 1 >= self.tracks.len() {
+            return;
+        }
+        let mut tracks = self.tracks.clone();
+        shuffle_tracks(&mut tracks[start..]);
+        self.as_mut().set_tracks(tracks);
         self.prefetch_next();
     }
 

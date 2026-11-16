@@ -21,6 +21,9 @@ Cómo se recorre cada sección. Opciones › Vistas, el selector de arriba a la 
 
 Tamaño de las carátulas del Muro: opción `caratulas`.
 
+En Lomos, bajo el título de la elegida, una barra (`1 —●— N`) recorre la estantería: arrastrarla
+salta a cualquier elemento y, con el foco en ella, las flechas avanzan de uno en uno.
+
 ## Reglas y decisiones
 
 - **Vistas por sección**, preferencia del propietario ([AGENTES §11](../AGENTES.md#11-cómo-trabajar-con-el-propietario));
@@ -75,6 +78,7 @@ Tamaño de las carátulas del Muro: opción `caratulas`.
 |---|---|
 | Matriz de cada cara | [`faceMatrix`](../../qml/LomosView.qml) |
 | Ángulo continuo | [`signedAngle`](../../qml/LomosView.qml) |
+| Barra para recorrer la estantería | [`captions`](../../qml/LomosView.qml) (la barra va justo debajo) |
 | Sitio de cada caja | [`slotAt`](../../qml/LomosView.qml) |
 | Filas del Muro | [`moveRow`](../../qml/MuroView.qml) |
 | Paso en la Cubeta | [`step`](../../qml/CubetaView.qml) |
@@ -91,8 +95,10 @@ Tamaño de las carátulas del Muro: opción `caratulas`.
 
 ## Estado actual
 
-- **Última verificación:** sin registrar.
+- **Última verificación:** 2026-11-16, barra de Lomos en Inicio con `--index 3`, captura
+  ([historial](../history/verificacion/vistas.md)).
 - **Pruebas:** ninguna automática; capturas con `--section` e `--index`
   ([verificar-interfaz](../runbooks/verificar-interfaz.md)).
-- **Sin verificar:** Lomos en Linux con Vulkan.
+- **Sin verificar:** Lomos en Linux con Vulkan; la barra de Lomos en Álbumes y Playlists con
+  sesión (mismo componente, probada en Inicio).
 - **Historial:** [docs/history/verificacion/vistas.md](../history/verificacion/vistas.md).

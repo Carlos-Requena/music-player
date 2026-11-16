@@ -3,7 +3,7 @@ area: reproduccion
 titulo: Reproducción y cola
 resumen: Cola, lista temporal, siguiente y anterior, repetición, volumen y estado de lo que suena, con mpv como motor en un proceso aparte.
 archivos: [src/player.rs, src/audio.rs, qml/PlayerBar.qml, qml/QueueList.qml]
-opciones: []
+opciones: [barra]
 adr: [ADR-02]
 ---
 
@@ -55,9 +55,27 @@ Stderr escribe `arranque de pista: N ms` en cada una.
 
 ## Interfaz
 
-- `PlayerBar.qml`: barra flotante; pulsar en cualquier sitio de ella que no sea un botón o un
-  deslizador abre «Sonando» ([ventana](ventana.md)), preferencia del propietario. Los controles se quedan su clic porque
+- `PlayerBar.qml`: barra flotante en uno de **tres estilos** (opción `barra`, leída en
+  `Theme.barStyle`; diseños del propietario):
+  - **Islas** (por defecto): tres islas de vidrio sueltas: lo que suena (carátula redonda, título,
+    artista y «Me gusta»), los controles con la posición, y mini reproductor, panel y volumen.
+  - **Clásica**: una barra de 84 px; en el centro, aleatorio, anterior, reproducir, siguiente y
+    repetir, con la posición debajo.
+  - **Compacta**: una barra de 64 px; la posición es una línea fina de color de acento en el borde
+    de arriba (se pulsa o arrastra; con el foco, las flechas mueven 5 s) y el tiempo va en texto
+    junto a los extras.
+
+  Las piezas (`NowPlaying`, `Transport`, `Seek`, `Extras`…) son componentes del mismo archivo que
+  comparten los tres; el alto que reserva la ventana es `Theme.barHeight`. Pulsar en una isla fuera de los controles abre «Sonando»
+  ([ventana](ventana.md)), preferencia del propietario; los controles se quedan su clic porque
   usan `ReleaseWithinBounds`. El botón de reproducir late mientras la pista se resuelve.
+  - **Un solo desenfoque** para las tres islas: se captura la franja de la barra y se recorta con la
+    forma de las islas (`shapes`); un desenfoque por isla costaba más memoria.
+  - **«Me gusta»**: lleno si la canción está en la sección «Me gusta» o se acaba de dar
+    (`Library.like`); el aviso del resultado lo da el menú contextual. No se puede quitar (no hay
+    petición para ello).
+  - **Aleatorio** baraja lo que queda de la cola detrás de la que suena (`Player.shuffleQueue`);
+    es una acción, no un modo que se active y desactive.
 - `QueueList.qml`: la cola del panel y de «Sonando». Clic salta, clic derecho abre su menú (lleva
   `queueIndex`) y arrastrar reordena; un `MouseArea` con `preventStealing: true` impide que la
   lista se quede el gesto.
@@ -74,13 +92,14 @@ Stderr escribe `arranque de pista: N ms` en cada una.
 |---|---|
 | `src/player.rs` | Singleton `Player`: cola, lista temporal, estado, controles del sistema, avisos |
 | `src/audio.rs` | Proceso mpv y su IPC; búsqueda de ejecutables en el `PATH` ampliado |
-| `qml/PlayerBar.qml` | Barra de reproducción |
+| `qml/PlayerBar.qml` | Barra de reproducción en tres islas |
 | `qml/QueueList.qml` | Lista de la cola, con arrastrar para reordenar |
 
 ### Dónde está cada cosa
 
 | Concepto | Símbolo |
 |---|---|
+| Estilo de la barra y su alto | [`barStyle`](../../qml/Theme.qml), [`barHeight`](../../qml/Theme.qml) |
 | Elegir algo para reproducir | [`play_item`](../../src/player.rs) |
 | Barajar | [`shuffle_tracks`](../../src/player.rs) |
 | Colas en caché | [`QUEUES`](../../src/player.rs) |
@@ -107,10 +126,12 @@ Stderr escribe `arranque de pista: N ms` en cada una.
 
 ## Estado actual
 
-- **Última verificación:** 2026-11-15 (barra y `saltada`, sin audio: ver historial).
+- **Última verificación:** 2026-11-16 (barra en tres islas, captura con una canción cargada; sin audio:
+  YouTube pidió sesión. Ver historial).
 - **Pruebas:** ninguna en `player.rs` ni `audio.rs`; se prueban con `--autoplay` y
   `--probe play` ([verificar-reproduccion](../runbooks/verificar-reproduccion.md)).
-- **Sin verificar:** MPRIS en GNOME y KDE con Wayland.
+- **Sin verificar:** MPRIS en GNOME y KDE con Wayland; el «Me gusta» y «Aleatorio» de la barra
+  con sesión y música sonando.
 - **Historial:** [docs/history/verificacion/reproduccion.md](../history/verificacion/reproduccion.md).
 
 ## Pendiente

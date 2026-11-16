@@ -92,3 +92,6 @@ que toque **antes** de cambiar algo ahí. Una trampa nueva se añade en su secci
 - **Memoria con `footprint`**, la que muestra el Monitor de Actividad; cualquier ventana de Qt Quick
   que se redibuje reserva ~100 MB en el controlador gráfico de macOS
   ([ARCHITECTURE](ARCHITECTURE.md#memoria-y-arranque)).
+- **`kill` a la app deja mpv vivo:** con SIGTERM no se cierra su proceso de mpv (se queda huérfano,
+  con `--ao=null` si era una prueba). Tras cada `kill $APP`, `pkill -f "musicplayer-mpv-$APP.sock"`
+  (el socket lleva el pid de la app); `--shot` sale bien y no deja ninguno.

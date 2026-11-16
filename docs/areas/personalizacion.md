@@ -43,6 +43,20 @@ Vistas y Plugins. Cómo crear una skin o una mascota, para quien usa la app: [RE
 (`cat`, `key`, `label`, `hint`, `fallback`, `options`); las de Cuenta y Plugins son bloques
 propios. `--settings-cat id` abre una categoría para capturarla.
 
+En Apariencia, diseño elegido por el propietario con sus muestras:
+
+- **Skin**: cuatro tarjetas por fila con una miniatura pintada con los colores de cada skin
+  (`SkinPreview`: barra de arriba, cuatro carátulas, barra de reproducción con su acento; las de
+  carpeta con fondo lo muestran detrás), el nombre debajo y un aro en la elegida (`ChosenRing`).
+  Debajo, la descripción de la elegida.
+- **Mascota**: recuadros con su pose de reposo, «Ninguna» vacío y «Añadir…» (borde discontinuo),
+  que abre la carpeta de mascotas.
+- **Encabezados con dos botones** (`FolderHeading`): abrir la carpeta del usuario (se crea si
+  falta) y recargar.
+
+Los datos de las miniaturas salen de `skins_list` (Rust): `colores`, `radio` e `imagen` (fondo de la
+skin o pose `reposo` de la mascota, con la ruta de su carpeta).
+
 ## Archivos
 
 | Archivo | Contenido |
@@ -65,6 +79,8 @@ propios. `--settings-cat id` abre una categoría para capturarla.
 | Color con valor por defecto | [`pick`](../../qml/Theme.qml) |
 | Imagen de una skin de carpeta | [`skinImage`](../../qml/Theme.qml) |
 | Filas de Opciones | [`optionRows`](../../qml/SettingsSheet.qml) |
+| Datos de las miniaturas | [`skins_list`](../../src/settings.rs), [`preview_image`](../../src/settings.rs) |
+| Miniatura de una skin | [`SkinPreview`](../../qml/SettingsSheet.qml) |
 
 ## Dependencias
 
@@ -79,9 +95,11 @@ propios. `--settings-cat id` abre una categoría para capturarla.
 
 ## Estado actual
 
-- **Última verificación:** sin registrar.
-- **Pruebas:** ninguna automática; capturas con `--settings-cat`.
-- **Sin verificar:** skins claras (los velos asumen fondo oscuro).
+- **Última verificación:** 2026-11-16, Apariencia con dos mascotas de prueba, captura
+  ([historial](../history/verificacion/personalizacion.md)).
+- **Pruebas:** `preview_image` y `skins_list` en `cargo test`; capturas con `--settings-cat`.
+- **Sin verificar:** skins claras (los velos asumen fondo oscuro); la miniatura de una skin de
+  carpeta con fondo; abrir la carpeta en Linux (`xdg-open`).
 - **Historial:** [docs/history/verificacion/personalizacion.md](../history/verificacion/personalizacion.md).
 
 ## Pendiente

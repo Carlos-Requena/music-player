@@ -57,11 +57,11 @@ pub mod qobject {
         #[qinvokable]
         fn elegir_mascota(self: Pin<&mut AppSettings>, id: &QString);
 
-        /// Carpeta donde el usuario deja sus mascotas.
+        /// Carpeta donde el usuario deja sus mascotas (se crea si falta).
         #[qinvokable]
         fn carpeta_mascotas(self: &AppSettings) -> QString;
 
-        /// Carpeta donde el usuario puede dejar sus skins.
+        /// Carpeta donde el usuario puede dejar sus skins (se crea si falta).
         #[qinvokable]
         fn carpeta_skins(self: &AppSettings) -> QString;
 
@@ -220,20 +220,50 @@ fn all_mascots() -> Vec<(String, String)> {
         .collect()
 }
 
+/// Ruta de una carpeta del usuario, creándola si falta (Opciones la abre en el gestor de
+/// archivos).
+fn existing(dir: Option<PathBuf>) -> String {
+    let Some(dir) = dir else { return String::new() };
+    let _ = fs::create_dir_all(&dir);
+    dir.display().to_string()
+}
+
 fn mascot_json(mascots: &[(String, String)], id: &str) -> String {
     mascots.iter().find(|(mascot, _)| mascot == id).map(|(_, json)| json.clone()).unwrap_or_default()
 }
 
-/// Lista para QML: `[{ id, nombre, descripcion }]`.
+/// Lista para QML: `[{ id, nombre, descripcion, colores, radio, imagen }]`. `colores` y `radio`
+/// pintan la miniatura de cada skin en Opciones; `imagen` es la URL de su fondo (skins de
+/// carpeta) o de la pose «reposo» (mascotas), o vacía si no hay.
 fn skins_list(skins: &[(String, String)]) -> String {
     let list: Vec<serde_json::Value> = skins
         .iter()
         .filter_map(|(id, json)| {
             let value: serde_json::Value = serde_json::from_str(json).ok()?;
-            Some(serde_json::json!({ "id": id, "nombre": value["nombre"], "descripcion": value["descripcion"] }))
+            Some(serde_json::json!({
+                "id": id,
+                "nombre": value["nombre"],
+                "descripcion": value["descripcion"],
+                "colores": value["colores"],
+                "radio": value["radio"],
+                "imagen": preview_image(&value),
+            }))
         })
         .collect();
     serde_json::to_string(&list).unwrap_or_default()
+}
+
+/// Imagen que representa una skin (su fondo) o una mascota (su pose «reposo», que puede ser
+/// el nombre del archivo o `{ "imagen": … }`), con la ruta de su carpeta delante.
+fn preview_image(value: &serde_json::Value) -> String {
+    let Some(carpeta) = value["carpeta"].as_str() else { return String::new() };
+    let reposo = &value["poses"]["reposo"];
+    value["fondo"]
+        .as_str()
+        .or_else(|| reposo.as_str())
+        .or_else(|| reposo["imagen"].as_str())
+        .map(|file| format!("{carpeta}{file}"))
+        .unwrap_or_default()
 }
 
 fn skin_json(skins: &[(String, String)], id: &str) -> String {
@@ -344,11 +374,11 @@ impl qobject::AppSettings {
     }
 
     fn carpeta_mascotas(&self) -> QString {
-        QString::from(&mascots_dir().map(|dir| dir.display().to_string()).unwrap_or_default())
+        QString::from(&existing(mascots_dir()))
     }
 
     fn carpeta_skins(&self) -> QString {
-        QString::from(&skins_dir().map(|dir| dir.display().to_string()).unwrap_or_default())
+        QString::from(&existing(skins_dir()))
     }
 
     /// Escribe las preferencias; un fallo de disco no debe tumbar la interfaz.
@@ -369,5 +399,33 @@ impl qobject::AppSettings {
                 eprintln!("No se pudieron guardar las preferencias en {}: {error}", path.display());
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn miniatura_de_skins_y_mascotas() {
+        let carpeta = "file:///x/";
+        let skin = serde_json::json!({ "carpeta": carpeta, "fondo": "fondo.jpg", "colores": {} });
+        assert_eq!(preview_image(&skin), "file:///x/fondo.jpg");
+        let corta = serde_json::json!({ "carpeta": carpeta, "poses": { "reposo": "quieta.png" } });
+        assert_eq!(preview_image(&corta), "file:///x/quieta.png");
+        let larga = serde_json::json!({ "carpeta": carpeta, "poses": { "reposo": { "imagen": "reojo.png", "alto": 180 } } });
+        assert_eq!(preview_image(&larga), "file:///x/reojo.png");
+        // Las incluidas no tienen carpeta: sin imagen.
+        assert_eq!(preview_image(&serde_json::json!({ "fondo": "fondo.jpg" })), "");
+    }
+
+    #[test]
+    fn la_lista_lleva_colores_y_radio() {
+        let skins = vec![("vidrio".to_owned(), BUILTIN_SKINS[0].1.to_owned())];
+        let list: serde_json::Value = serde_json::from_str(&skins_list(&skins)).unwrap();
+        assert_eq!(list[0]["id"], "vidrio");
+        assert!(list[0]["colores"]["fondo"].is_string());
+        assert!(list[0]["radio"].is_number());
+        assert_eq!(list[0]["imagen"], "");
     }
 }

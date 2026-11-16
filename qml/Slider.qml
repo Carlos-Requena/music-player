@@ -8,6 +8,8 @@ Item {
     property real value: 0
     property string label
     property color fill: Theme.accent
+    // Lo que mueve cada flecha del teclado (0–1).
+    property real stepSize: 0.05
 
     signal moved(real value)
 
@@ -17,8 +19,8 @@ Item {
     Accessible.role: Accessible.Slider
     Accessible.name: label
 
-    Keys.onLeftPressed: root.moved(Math.max(0, root.value - 0.05))
-    Keys.onRightPressed: root.moved(Math.min(1, root.value + 0.05))
+    Keys.onLeftPressed: root.moved(Math.max(0, root.value - root.stepSize))
+    Keys.onRightPressed: root.moved(Math.min(1, root.value + root.stepSize))
 
     Rectangle {
         anchors.verticalCenter: parent.verticalCenter

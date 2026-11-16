@@ -19,7 +19,7 @@ HOME="$PRUEBA" MUSICPLAYER_SILENT=1 ./target/release/musicplayer --section album
 APP=$!
 sleep 30
 footprint $APP | grep -i "phys_footprint"      # macOS: la del Monitor de Actividad
-kill $APP
+kill $APP; pkill -f "musicplayer-mpv-$APP.sock"  # SIGTERM no cierra mpv (TRAMPAS, Medir)
 ```
 
 En Linux, `grep VmRSS /proc/$APP/status` (no es la misma cifra: compara solo con Linux). mpv va

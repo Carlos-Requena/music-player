@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Shapes
 import app.musicplayer
 
 // Opciones, agrupadas por categorías (barra lateral): cuenta, reproducción, apariencia, vistas
@@ -41,6 +42,9 @@ Item {
           options: [{ id: "si", label: "Vivo" }, { id: "suave", label: "Suave" }, { id: "tenue", label: "Tenue" }, { id: "no", label: "No" }] },
         { cat: "apariencia", key: "desenfoque", label: "Desenfoque", hint: "Desactivarlo ahorra memoria y batería.", fallback: "si",
           options: [{ id: "si", label: "Activado" }, { id: "no", label: "Desactivado" }] },
+        { cat: "apariencia", key: "barra", label: "Barra de reproducción",
+          hint: "Clásica: la posición bajo los botones. Compacta: más baja, la posición arriba.",
+          fallback: "islas", options: [{ id: "islas", label: "Islas" }, { id: "clasica", label: "Clásica" }, { id: "compacta", label: "Compacta" }] },
         { cat: "apariencia", key: "letraCalidad", label: "Calidad de la letra",
           hint: "CPU con la letra a la vista: Calidad ~32 %, Equilibrado ~20 %, Bajo ~14 % (como con la cola).",
           fallback: "equilibrado", options: [{ id: "calidad", label: "Calidad" }, { id: "equilibrado", label: "Equilibrado" }, { id: "bajo", label: "Bajo" }] },
@@ -135,6 +139,134 @@ Item {
         font.weight: Font.DemiBold
         font.letterSpacing: 1.8
         font.capitalization: Font.AllUppercase
+    }
+
+    // Encabezado con dos botones a la derecha: abrir la carpeta del usuario y recargar.
+    component FolderHeading: Item {
+        id: folderHeading
+        property string text
+        property string what
+        signal openFolder()
+
+        width: parent ? parent.width : 0
+        height: Theme.hit
+
+        Heading {
+            anchors.verticalCenter: parent.verticalCenter
+            text: folderHeading.text
+            font.pixelSize: 12
+        }
+
+        Row {
+            anchors.right: parent.right
+            spacing: 8
+
+            IconButton {
+                icon: Theme.iconFolder
+                label: "Abrir la carpeta de " + folderHeading.what
+                solid: true
+                onClicked: folderHeading.openFolder()
+            }
+
+            IconButton {
+                icon: Theme.iconReload
+                label: "Recargar " + folderHeading.what
+                solid: true
+                onClicked: AppSettings.recargarSkins()
+            }
+        }
+    }
+
+    // Aro de la tarjeta elegida (o con el foco), separado de ella por un hueco.
+    component ChosenRing: Rectangle {
+        property Item target
+        x: target.x - 5
+        y: target.y - 5
+        width: target.width + 10
+        height: target.height + 10
+        radius: (target.radius || 12) + 5
+        color: "transparent"
+        border.width: 2
+        border.color: Theme.text
+    }
+
+    // Miniatura de una skin con sus propios colores: barra de arriba, cuatro carátulas (la
+    // primera, enfocada) y la barra de reproducción con su acento. Las de carpeta con fondo
+    // lo muestran detrás.
+    component SkinPreview: Rectangle {
+        id: preview
+        property var skin: ({})
+        property bool hovered: false
+
+        readonly property var colors: skin.colores || {}
+        readonly property color ink: colors.textoSecundario || "#BDFFFFFF"
+        readonly property real unit: width / 225
+        readonly property real round: (skin.radio !== undefined ? skin.radio : 20) * unit
+        function tone(alpha) {
+            return Qt.tint(color, Qt.rgba(ink.r, ink.g, ink.b, alpha))
+        }
+
+        radius: 12
+        color: colors.fondo || "#0A0C11"
+        border.width: 1
+        border.color: hovered ? Theme.textFaint : (colors.bordeVidrio || Theme.glassBorder)
+        clip: true
+
+        Image {
+            anchors.fill: parent
+            anchors.margins: 1
+            visible: source !== ""
+            source: preview.skin.imagen || ""
+            sourceSize.width: 2 * width
+            fillMode: Image.PreserveAspectCrop
+            asynchronous: true
+            opacity: 0.6
+        }
+
+        Rectangle {
+            x: parent.width * 0.07
+            y: parent.height * 0.1
+            width: parent.width * 0.37
+            height: parent.height * 0.09
+            radius: Math.min(height / 2, preview.round * 0.45)
+            color: preview.tone(0.25)
+        }
+
+        Row {
+            x: parent.width * 0.07
+            y: parent.height * 0.34
+            spacing: parent.width * 0.035
+
+            Repeater {
+                model: 4
+
+                Rectangle {
+                    required property int index
+                    width: preview.height * 0.27
+                    height: width
+                    radius: preview.round * 0.3
+                    color: preview.tone(index === 0 ? 0.36 : 0.2)
+                }
+            }
+        }
+
+        Rectangle {
+            x: parent.width * 0.07
+            y: parent.height * 0.76
+            width: parent.width * 0.86
+            height: parent.height * 0.14
+            radius: Math.min(height / 2, preview.round * 0.45)
+            color: preview.tone(0.14)
+
+            Rectangle {
+                x: parent.width * 0.03
+                anchors.verticalCenter: parent.verticalCenter
+                width: parent.width * 0.33
+                height: Math.max(2, parent.height * 0.17)
+                radius: height / 2
+                color: preview.colors.acento || Theme.accent
+            }
+        }
     }
 
     Rectangle {
@@ -265,18 +397,22 @@ Item {
 
         Flickable {
             id: settingsFlick
-            x: sidebar.x + sidebar.width + 40
+            // Margen de 6 px a cada lado: el aro de la tarjeta elegida asoma de ella sin cortarse.
+            x: sidebar.x + sidebar.width + 34
             anchors.top: sidebar.top
             anchors.bottom: parent.bottom
             anchors.bottomMargin: 24
-            width: parent.width - x - 32
-            contentHeight: content.implicitHeight
+            width: parent.width - x - 26
+            contentWidth: width
+            contentHeight: content.implicitHeight + 12
             clip: true
             boundsBehavior: Flickable.StopAtBounds
 
         Column {
             id: content
-            width: parent.width
+            x: 6
+            y: 6
+            width: settingsFlick.width - 12
             spacing: 26
 
             Column {
@@ -497,63 +633,66 @@ Item {
                 visible: root.category === "apariencia"
                 id: skinSection
                 width: parent.width
-                spacing: 12
+                spacing: 16
 
                 readonly property var skins: Catalog.parse(AppSettings.skins)
+                readonly property var chosenSkin: skins.find(skin => skin.id === AppSettings.skin) || skins[0] || null
 
-                Heading { text: "Skin" }
+                FolderHeading {
+                    text: "Skin"
+                    what: "skins"
+                    onOpenFolder: Qt.openUrlExternally("file://" + encodeURI(AppSettings.carpetaSkins()))
+                }
 
                 Grid {
                     width: parent.width
-                    columns: 2
+                    columns: 4
                     columnSpacing: 16
-                    rowSpacing: 12
+                    rowSpacing: 20
 
                     Repeater {
                         model: skinSection.skins
 
-                        Rectangle {
+                        Item {
                             id: skinCard
                             required property var modelData
                             readonly property bool chosen: AppSettings.skin === modelData.id
-                            readonly property var preview: {
-                                void AppSettings.skins
-                                return modelData
-                            }
 
-                            width: (skinSection.width - 16) / 2
-                            height: 76
-                            radius: 16
-                            color: skinHover.hovered ? Theme.controlActive : Theme.control
-                            border.width: chosen || activeFocus ? 2 : 1
-                            border.color: chosen || activeFocus ? Theme.text : Theme.glassBorder
+                            width: (skinSection.width - 3 * 16) / 4
+                            height: preview.height + 10 + skinName.implicitHeight
                             activeFocusOnTab: true
 
                             Accessible.role: Accessible.RadioButton
-                            Accessible.name: modelData.nombre
+                            Accessible.name: "Skin " + modelData.nombre
                             Accessible.checked: chosen
                             Accessible.onPressAction: AppSettings.elegirSkin(modelData.id)
                             Keys.onReturnPressed: AppSettings.elegirSkin(modelData.id)
+                            Keys.onSpacePressed: AppSettings.elegirSkin(modelData.id)
 
-                            Column {
-                                anchors.fill: parent
-                                anchors.margins: 16
-                                spacing: 4
+                            SkinPreview {
+                                id: preview
+                                width: parent.width
+                                height: Math.round(width * 0.57)
+                                skin: skinCard.modelData
+                                hovered: skinHover.hovered
+                            }
 
-                                Text {
-                                    text: skinCard.modelData.nombre
-                                    color: Theme.text
-                                    font.pixelSize: 16
-                                    font.weight: Font.DemiBold
-                                }
+                            ChosenRing {
+                                target: preview
+                                visible: skinCard.chosen || skinCard.activeFocus
+                            }
 
-                                Text {
-                                    width: parent.width
-                                    text: skinCard.modelData.descripcion || ""
-                                    color: Theme.textMuted
-                                    font.pixelSize: 13
-                                    elide: Text.ElideRight
-                                }
+                            Text {
+                                id: skinName
+                                anchors.top: preview.bottom
+                                anchors.topMargin: 10
+                                x: 4
+                                width: parent.width - 4
+                                text: skinCard.modelData.nombre
+                                color: Theme.text
+                                font.pixelSize: 15
+                                font.weight: Font.DemiBold
+                                elide: Text.ElideRight
                             }
 
                             HoverHandler {
@@ -562,94 +701,115 @@ Item {
                             }
 
                             TapHandler {
+                                gesturePolicy: TapHandler.ReleaseWithinBounds
                                 onTapped: AppSettings.elegirSkin(skinCard.modelData.id)
                             }
                         }
                     }
                 }
 
-                Item {
+                // Descripción de la elegida: «Vidrio: paneles translúcidos…».
+                Text {
                     width: parent.width
-                    height: Math.max(Theme.hit, skinsHint.implicitHeight)
-
-                    Text {
-                        id: skinsHint
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: parent.width - reload.width - 16
-                        text: "Tus skins: copia un archivo de la carpeta skins/ del proyecto en " + AppSettings.carpetaSkins() + " y cámbialo."
-                        color: Theme.textMuted
-                        font.pixelSize: 13
-                        wrapMode: Text.WordWrap
+                    visible: text !== ""
+                    text: {
+                        const skin = skinSection.chosenSkin
+                        if (!skin || !skin.descripcion)
+                            return ""
+                        return skin.nombre + ": " + skin.descripcion.charAt(0).toLowerCase() + skin.descripcion.slice(1)
                     }
-
-                    PillButton {
-                        id: reload
-                        anchors.right: parent.right
-                        text: "Recargar skins"
-                        onClicked: AppSettings.recargarSkins()
-                    }
+                    color: Theme.textMuted
+                    font.pixelSize: 14
+                    wrapMode: Text.WordWrap
                 }
             }
 
-            // Mascotas: aparte de las skins, para combinarlas como se quiera.
+            // Mascotas: aparte de las skins, para combinarlas como se quiera. Cada una se ve con
+            // su pose de reposo; «Añadir…» abre su carpeta.
             Column {
                 visible: root.category === "apariencia"
                 id: mascotSection
                 width: parent.width
-                spacing: 12
+                spacing: 16
 
-                readonly property var mascots: [{ id: "", nombre: "Ninguna", descripcion: "Sin mascota sobre la barra." }]
+                readonly property var mascots: [{ id: "", nombre: "Ninguna", imagen: "" }]
                     .concat(Catalog.parse(AppSettings.mascotas))
+                readonly property real tileWidth: 104
+                readonly property real tileHeight: 78
 
-                Heading { text: "Mascota" }
+                function openFolder() {
+                    Qt.openUrlExternally("file://" + encodeURI(AppSettings.carpetaMascotas()))
+                }
 
-                Grid {
+                FolderHeading {
+                    text: "Mascota"
+                    what: "mascotas"
+                    onOpenFolder: mascotSection.openFolder()
+                }
+
+                Flow {
                     width: parent.width
-                    columns: 2
-                    columnSpacing: 16
-                    rowSpacing: 12
+                    spacing: 16
 
                     Repeater {
                         model: mascotSection.mascots
 
-                        Rectangle {
+                        Item {
                             id: mascotCard
                             required property var modelData
                             readonly property bool chosen: AppSettings.mascota === modelData.id
 
-                            width: (mascotSection.width - 16) / 2
-                            height: 76
-                            radius: 16
-                            color: mascotHover.hovered ? Theme.controlActive : Theme.control
-                            border.width: chosen || activeFocus ? 2 : 1
-                            border.color: chosen || activeFocus ? Theme.text : Theme.glassBorder
+                            width: mascotSection.tileWidth
+                            height: tile.height + 10 + mascotName.implicitHeight
                             activeFocusOnTab: true
 
                             Accessible.role: Accessible.RadioButton
                             Accessible.name: "Mascota " + modelData.nombre
+                            Accessible.description: modelData.descripcion || ""
                             Accessible.checked: chosen
                             Accessible.onPressAction: AppSettings.elegirMascota(modelData.id)
                             Keys.onReturnPressed: AppSettings.elegirMascota(modelData.id)
+                            Keys.onSpacePressed: AppSettings.elegirMascota(modelData.id)
 
-                            Column {
-                                anchors.fill: parent
-                                anchors.margins: 16
-                                spacing: 4
+                            Rectangle {
+                                id: tile
+                                width: parent.width
+                                height: mascotSection.tileHeight
+                                radius: 14
+                                color: mascotHover.hovered ? Theme.controlActive : Theme.control
+                                border.width: 1
+                                border.color: Theme.glassBorder
 
-                                Text {
-                                    text: mascotCard.modelData.nombre
-                                    color: Theme.text
-                                    font.pixelSize: 16
-                                    font.weight: Font.DemiBold
+                                // Pose de reposo, reducida al recuadro (se decodifica a ese tamaño).
+                                Image {
+                                    anchors.fill: parent
+                                    anchors.margins: 6
+                                    visible: source !== ""
+                                    source: mascotCard.modelData.imagen || ""
+                                    sourceSize.height: 2 * height
+                                    fillMode: Image.PreserveAspectFit
+                                    asynchronous: true
+                                    smooth: true
+                                    mipmap: true
                                 }
+                            }
 
-                                Text {
-                                    width: parent.width
-                                    text: mascotCard.modelData.descripcion || ""
-                                    color: Theme.textMuted
-                                    font.pixelSize: 13
-                                    elide: Text.ElideRight
-                                }
+                            ChosenRing {
+                                target: tile
+                                visible: mascotCard.chosen || mascotCard.activeFocus
+                            }
+
+                            Text {
+                                id: mascotName
+                                anchors.top: tile.bottom
+                                anchors.topMargin: 10
+                                x: 4
+                                width: parent.width - 4
+                                text: mascotCard.modelData.nombre
+                                color: Theme.text
+                                font.pixelSize: 15
+                                font.weight: Font.DemiBold
+                                elide: Text.ElideRight
                             }
 
                             HoverHandler {
@@ -663,27 +823,80 @@ Item {
                             }
                         }
                     }
-                }
 
-                Item {
-                    width: parent.width
-                    height: Math.max(Theme.hit, mascotsHint.implicitHeight)
+                    // Añadir una: abre la carpeta de mascotas (una carpeta con mascota.json y
+                    // sus PNG; el formato está en el README).
+                    Item {
+                        id: addMascot
+                        width: mascotSection.tileWidth
+                        height: addTile.height + 10 + addName.implicitHeight
+                        activeFocusOnTab: true
 
-                    Text {
-                        id: mascotsHint
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: parent.width - reloadMascots.width - 16
-                        text: "Tus mascotas: una carpeta con mascota.json y sus PNG en " + AppSettings.carpetaMascotas() + "."
-                        color: Theme.textMuted
-                        font.pixelSize: 13
-                        wrapMode: Text.WordWrap
-                    }
+                        Accessible.role: Accessible.Button
+                        Accessible.name: "Añadir una mascota: abre la carpeta de mascotas"
+                        Accessible.onPressAction: mascotSection.openFolder()
+                        Keys.onReturnPressed: mascotSection.openFolder()
+                        Keys.onSpacePressed: mascotSection.openFolder()
 
-                    PillButton {
-                        id: reloadMascots
-                        anchors.right: parent.right
-                        text: "Recargar"
-                        onClicked: AppSettings.recargarSkins()
+                        Item {
+                            id: addTile
+                            width: parent.width
+                            height: mascotSection.tileHeight
+
+                            Rectangle {
+                                anchors.fill: parent
+                                radius: 14
+                                color: addHover.hovered ? Theme.control : "transparent"
+                                border.width: addMascot.activeFocus ? 2 : 0
+                                border.color: Theme.text
+                            }
+
+                            Shape {
+                                anchors.fill: parent
+
+                                ShapePath {
+                                    strokeColor: Theme.textFaint
+                                    strokeWidth: 1.5
+                                    strokeStyle: ShapePath.DashLine
+                                    dashPattern: [3, 3]
+                                    fillColor: "transparent"
+                                    PathRectangle {
+                                        x: 1
+                                        y: 1
+                                        width: addTile.width - 2
+                                        height: addTile.height - 2
+                                        radius: 13
+                                    }
+                                }
+                            }
+
+                            Icon {
+                                anchors.centerIn: parent
+                                path: Theme.iconPlus
+                                size: 22
+                                color: Theme.textMuted
+                            }
+                        }
+
+                        Text {
+                            id: addName
+                            anchors.top: addTile.bottom
+                            anchors.topMargin: 10
+                            x: 4
+                            text: "Añadir…"
+                            color: Theme.textMuted
+                            font.pixelSize: 15
+                        }
+
+                        HoverHandler {
+                            id: addHover
+                            cursorShape: Qt.PointingHandCursor
+                        }
+
+                        TapHandler {
+                            gesturePolicy: TapHandler.ReleaseWithinBounds
+                            onTapped: mascotSection.openFolder()
+                        }
                     }
                 }
             }
@@ -691,7 +904,7 @@ Item {
             // Filas de opciones sueltas de la categoría elegida (ver `optionRows`).
             Column {
                 readonly property var rows: root.optionRows.filter(row => row.cat === root.category)
-                readonly property var headings: ({ reproduccion: "Audio", apariencia: "Ambiente y letra", vistas: "Disposición" })
+                readonly property var headings: ({ reproduccion: "Audio", apariencia: "Aspecto", vistas: "Disposición" })
 
                 id: optionSection
                 visible: rows.length > 0

@@ -17,11 +17,11 @@ esta ficha), no se copia con otro nombre.
 | Pieza | Para qué |
 |---|---|
 | `Glass` | Panel de vidrio; con `backdrop` desenfoca en tiempo real lo de detrás, sin él solo tiñe (más barato) |
-| `Cover` | Carátula desde su miniatura, con fondo neutro mientras carga; `load` permite no descargar lo que no se ve |
+| `Cover` | Carátula desde su miniatura, con fondo neutro mientras carga; `load` permite no descargar lo que no se ve; `radius` la redondea (o la hace círculo) |
 | `Icon` | Icono vectorial de un trazo SVG en caja 24×24 |
 | `IconButton` | Botón de icono: 44 px, foco por teclado, nombre accesible, agarre exclusivo |
 | `PillButton` | Botón de texto en píldora; `primary` lo rellena |
-| `Slider` | Deslizador de 0 a 1 |
+| `Slider` | Deslizador de 0 a 1; `stepSize` es lo que mueve cada flecha |
 | `TextField` | Campo de una línea con etiqueta accesible; `committed` al pulsar Intro o salir |
 
 ## Reglas y decisiones
@@ -30,7 +30,10 @@ esta ficha), no se copia con otro nombre.
   atraviesa a lo de debajo ([TRAMPAS](../TRAMPAS.md#qt-quick-y-qml)).
 - **`Icon` se recrea** con un `Loader` cada vez que sube `Theme.renderEpoch`: una `Shape` con
   CurveRenderer no se redibuja tras liberar los gráficos de la ventana.
-- **`Glass` con `backdrop` cuesta un desenfoque por fotograma**: úsalo solo donde se vea.
+- **`Glass` con `backdrop` cuesta un desenfoque por fotograma**: úsalo solo donde se vea. Sin
+  `backdrop` no reserva ni la máscara del desenfoque.
+- **`Cover` con `radius`** rellena una forma con la imagen (`ShapePath.fillItem`), sin capa ni
+  máscara aparte; la forma se recrea con `Theme.renderEpoch`, como `Icon`.
 - Los iconos (trazos) están en `Theme.qml` (`iconPlay`, `iconQueue`…).
 
 ## Archivos
@@ -52,7 +55,8 @@ esta ficha), no se copia con otro nombre.
 
 ## Estado actual
 
-- **Última verificación:** sin registrar.
+- **Última verificación:** 2026-11-16, carátula redonda en la barra y el panel, capturas
+  ([historial](../history/verificacion/interfaz-comun.md)).
 - **Pruebas:** ninguna automática.
-- **Sin verificar:** —
+- **Sin verificar:** `Cover` con `radius` tras ocultar y volver a mostrar la ventana.
 - **Historial:** [docs/history/verificacion/interfaz-comun.md](../history/verificacion/interfaz-comun.md).
