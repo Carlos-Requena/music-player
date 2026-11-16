@@ -168,6 +168,8 @@ extern "C" {
     fn musicplayer_tune_windows();
     /// `src/window.cpp`: no usar el proxy automático del sistema (WPAD) en Qt.
     fn musicplayer_configure_network();
+    /// `src/signals.cpp`: SIGTERM, SIGINT y SIGHUP cierran la app como salir de la ventana.
+    fn musicplayer_handle_signals();
 }
 
 #[cfg(target_os = "macos")]
@@ -192,6 +194,9 @@ fn main() {
     cxx_qt::init_qml_module!("app.musicplayer");
 
     let mut app = QGuiApplication::new();
+    // SAFETY: función C++ sin argumentos; con la aplicación de Qt ya creada, en su hilo. Así
+    // un `kill` también destruye el `Player` y cierra mpv en vez de dejarlo huérfano.
+    unsafe { musicplayer_handle_signals() };
     // SAFETY: función C++ sin argumentos; antes de que QML empiece a descargar imágenes.
     unsafe { musicplayer_configure_network() };
     let mut engine = QQmlApplicationEngine::new();

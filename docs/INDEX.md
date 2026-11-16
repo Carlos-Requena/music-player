@@ -107,6 +107,7 @@ Qué leer para cada tarea. Las tablas a partir de [Áreas](#áreas) las escribe
 | [`src/plugins/lastfm.rs`](../src/plugins/lastfm.rs) | [Plugins (Discord y Last.fm)](areas/plugins.md) |
 | [`src/resolver.rs`](../src/resolver.rs) | [Resolución del audio y arranque instantáneo](areas/resolucion.md) |
 | [`src/settings.rs`](../src/settings.rs) | [Opciones, skins y aspecto](areas/personalizacion.md) |
+| [`src/signals.cpp`](../src/signals.cpp) | [Reproducción y cola](areas/reproduccion.md) |
 | [`src/stream.rs`](../src/stream.rs) | [Resolución del audio y arranque instantáneo](areas/resolucion.md) |
 | [`src/window.cpp`](../src/window.cpp) | [Ventana y navegación](areas/ventana.md) |
 | [`src/ytdlp_daemon.py`](../src/ytdlp_daemon.py) | [Resolución del audio y arranque instantáneo](areas/resolucion.md) |
