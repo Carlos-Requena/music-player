@@ -120,15 +120,23 @@ fn probe(args: &[String]) -> bool {
             return true;
         }
         "lyrics" => {
+            // `--probe lyrics <título> <artista> [segundos]`: qué tiene cada fuente.
             let artist = args.get(at + 3).map(String::as_str).unwrap_or_default();
-            match lyrics::fetch(argument, artist, 0.0) {
-                Some(lines) => {
-                    for line in lines.iter().take(6) {
-                        println!("[{:.2}] {}", line.t, line.text);
+            let duration = args.get(at + 4).and_then(|d| d.parse().ok()).unwrap_or(0.0);
+            let query = lyrics::Query::new(argument, artist, duration);
+            println!("buscando «{}» de «{}»", query.title, query.artist);
+            for source in lyrics::SOURCES {
+                match lyrics::fetch(source, &query) {
+                    Some(found) => {
+                        let delta = found.delta.map_or("?".to_owned(), |d| format!("{d:.1} s"));
+                        let kind = if found.words { "por palabra" } else { "por línea" };
+                        println!("{}: {} líneas, {kind}, diferencia de duración {delta}", found.label, found.lines.len());
+                        for line in found.lines.iter().filter(|line| !line.text.is_empty()).take(3) {
+                            println!("  [{:.2}] {} ({} palabras)", line.t, line.text, line.w.len());
+                        }
                     }
-                    println!("{} líneas", lines.len());
+                    None => println!("{}: sin letra sincronizada", source.id()),
                 }
-                None => println!("sin letra sincronizada"),
             }
             return true;
         }

@@ -10,8 +10,10 @@ import app.musicplayer
 //   suave en los extremos; las de abajo llegan algo después (efecto cascada). El desplazamiento
 //   empieza medio segundo antes de que se cante la línea, para que llegue a su sitio a tiempo.
 // - Las palabras se rellenan con un barrido de izquierda a derecha y se elevan un poco al
-//   cantarse; la línea activa lleva un brillo suave que se apaga poco a poco. Si el LRC trae el
-//   tiempo de cada palabra se usa; si no, se estima repartiendo la línea según su largo.
+//   cantarse; la línea activa lleva un brillo suave que se apaga poco a poco. El barrido sigue
+//   el tiempo real de cada palabra o sílaba (NetEase y Kugou lo dan casi siempre). Si la letra
+//   solo trae el de la línea, se ilumina entera de golpe; con `letraSinTiempos: estimado`, el
+//   barrido se estima repartiendo la línea (ver `timing`).
 // - Las pausas instrumentales (líneas vacías del LRC, o una intro larga) son tres puntos que se
 //   encienden a medida que pasa la pausa.
 //
@@ -53,6 +55,64 @@ Item {
     property real anchorRatio: centered ? 0.5 : 0.37
 
     readonly property var lines: Catalog.lyrics
+
+    // Líneas sin tiempo por palabra: entera de golpe (por defecto) o barrido estimado.
+    readonly property bool estimate: { void AppSettings.revision; return AppSettings.opcion("letraSinTiempos") === "estimado" }
+    // Japonés, chino y coreano: no separan las palabras con espacios y se puede partir el
+    // renglón entre dos caracteres cualesquiera.
+    readonly property var cjk: /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uac00-\ud7af\uff66-\uff9f]/
+
+    // Palabras de la línea `i` con su comienzo y su final en segundos, y `join` si van pegadas
+    // a la siguiente (sílabas de una palabra, o japonés y chino).
+    function timing(i) {
+        const line = lines[i]
+        if (!line || line.text === "")
+            return []
+        const next = i + 1 < lines.length ? lines[i + 1].t : line.t + 6
+        const timed = line.w || []
+        if (timed.length > 0)
+            return timed.map((w, k) => ({
+                text: w.text, join: !!w.join, start: w.t,
+                end: w.d > 0 ? w.t + w.d : k + 1 < timed.length ? timed[k + 1].t : Math.min(next, w.t + 1.5)
+            }))
+
+        // Sin tiempos: palabras separadas por espacios y, en japonés y chino, cada carácter
+        // (pegado al siguiente). `units` pesa lo que se tarda en cantarlo: un carácter de
+        // japonés o chino es una sílaba o más; uno latino, mucho menos.
+        const parts = []
+        for (const piece of line.text.split(/\s+/)) {
+            if (piece === "")
+                continue
+            let run = ""
+            for (const c of piece) {
+                if (!cjk.test(c)) {
+                    run += c
+                    continue
+                }
+                if (run !== "")
+                    parts.push({ text: run, join: true, units: run.length })
+                run = ""
+                parts.push({ text: c, join: true, units: 3 })
+            }
+            if (run !== "")
+                parts.push({ text: run, join: true, units: run.length + 1 })
+            parts[parts.length - 1].join = false
+        }
+        // Entera de golpe: todas empiezan y acaban con la línea.
+        if (!estimate)
+            return parts.map(p => ({ text: p.text, join: p.join, start: line.t, end: line.t }))
+        // Estimado: repartido por toda la línea, hasta la siguiente (sin pasar de 0,2 s por
+        // unidad, por si detrás viene un solo instrumental sin pausa marcada).
+        const units = parts.reduce((sum, p) => sum + p.units, 0)
+        const total = Math.min(0.92 * (next - line.t), Math.max(1.0, units * 0.2))
+        let at = line.t
+        return parts.map(p => {
+            const length = total * p.units / units
+            const word = { text: p.text, join: p.join, start: at, end: at + length }
+            at += length
+            return word
+        })
+    }
     // Modo de la letra (ver arriba). La opción vieja «letraAnimada: ligera» equivale a «bajo».
     readonly property string mode: {
         void AppSettings.revision
@@ -82,16 +142,11 @@ Item {
     function advance(seconds) {
         smooth = Math.min(smooth + seconds, position + 0.15)
     }
-    // Hasta cuándo dura el barrido de la línea activa (estimado como en `words`).
+    // Hasta cuándo dura el barrido de la línea activa (con la línea entera de golpe, nada: el
+    // reloj propio no llega a ponerse en marcha).
     readonly property real fillEnd: {
-        if (current < 0 || current >= lines.length || lines[current].text === "")
-            return -1
-        const line = lines[current]
-        const next = current + 1 < lines.length ? lines[current + 1].t : line.t + 6
-        const timed = line.w || []
-        if (timed.length > 0)
-            return Math.min(next, timed[timed.length - 1].t + 1.5) + 0.3
-        return line.t + Math.min(next - line.t, Math.max(1.0, line.text.length * 0.075)) + 0.3
+        const words = timing(current)
+        return words.length ? words.reduce((last, w) => Math.max(last, w.end), 0) + 0.3 : -1
     }
     // «Calidad»: con cada fotograma de la pantalla.
     FrameAnimation {
@@ -220,50 +275,45 @@ Item {
                     readonly property bool gapShown: gap && end - start >= 2.5
 
                     // Palabras con su comienzo y su final, en segundos.
-                    readonly property var words: {
-                        if (gap)
-                            return []
-                        const timed = modelData.w || []
-                        if (timed.length > 0)
-                            return timed.map((w, i) => ({
-                                text: w.text, start: w.t,
-                                end: i + 1 < timed.length ? timed[i + 1].t : Math.min(line.end, w.t + 1.5)
-                            }))
-                        // Sin tiempos: la línea dura lo que tarda en cantarse (unos 75 ms por letra,
-                        // sin pasar del comienzo de la siguiente) y cada palabra, según su largo.
-                        const parts = modelData.text.split(" ").filter(p => p !== "")
-                        const total = Math.min(line.end - line.start, Math.max(1.0, modelData.text.length * 0.075))
-                        const weight = parts.reduce((sum, p) => sum + p.length + 1, 0)
-                        let at = line.start
-                        return parts.map(p => {
-                            const length = total * (p.length + 1) / weight
-                            const word = { text: p, start: at, end: at + length }
-                            at += length
-                            return word
-                        })
-                    }
+                    readonly property var words: gap ? [] : root.timing(index)
 
                     // Las palabras repartidas en renglones según su ancho (lo que hacía un `Flow`, que
-                    // no sabe centrar cada renglón). Una palabra más ancha que la línea va sola y se
-                    // encoge (`fit`, abajo).
+                    // no sabe centrar cada renglón). Las sílabas de una palabra no se separan; en
+                    // japonés y chino, que no usan espacios, se parte entre dos caracteres
+                    // cualesquiera. Una palabra más ancha que la línea va sola y se encoge (`fit`,
+                    // abajo). Cada palabra lleva `gap` si detrás va un espacio.
                     readonly property var rows: {
-                        const out = []
+                        void (root.fontSize, Theme.lyricsFamily, Theme.lyricsWeight)
                         const room = column.width * 0.98
                         const gapWidth = root.fontSize * 0.27
+                        const chunks = []
+                        for (let k = 0; k < words.length; ++k) {
+                            const w = words[k]
+                            const prev = k > 0 ? words[k - 1] : null
+                            const together = prev && prev.join
+                                && !root.cjk.test(prev.text.slice(-1)) && !root.cjk.test(w.text.charAt(0))
+                            if (!together)
+                                chunks.push({ words: [], width: 0, spaced: !prev || !prev.join })
+                            const chunk = chunks[chunks.length - 1]
+                            chunk.words.push(w)
+                            chunk.width += Math.min(room, metrics.advanceWidth(w.text) - 0.3 * w.text.length)
+                        }
+                        const out = []
                         let row = []
                         let used = 0
-                        for (const w of words) {
-                            void (root.fontSize, Theme.lyricsFamily, Theme.lyricsWeight)
-                            const size = Math.min(room, metrics.advanceWidth(w.text) - 0.3 * w.text.length)
-                            const next = row.length ? used + gapWidth + size : size
-                            if (row.length && next > room) {
+                        for (const chunk of chunks) {
+                            const gapBefore = row.length && chunk.spaced ? gapWidth : 0
+                            if (row.length && used + gapBefore + chunk.width > room) {
                                 out.push(row)
-                                row = [w]
-                                used = size
-                            } else {
-                                row.push(w)
-                                used = next
+                                row = []
+                                used = 0
+                            } else if (gapBefore > 0) {
+                                row[row.length - 1].gap = true
+                                used += gapBefore
                             }
+                            for (const w of chunk.words)
+                                row.push({ text: w.text, start: w.start, end: w.end, gap: false })
+                            used += chunk.width
                         }
                         if (row.length)
                             out.push(row)
@@ -360,7 +410,6 @@ Item {
 
                             Row {
                                 required property var modelData
-                                spacing: root.fontSize * 0.27
                                 anchors.horizontalCenter: root.centered ? parent.horizontalCenter : undefined
 
                                 Repeater {
@@ -384,7 +433,8 @@ Item {
                                         readonly property real lift: !line.active || fill <= 0 ? 0
                                             : Math.round((fill < 1 ? -0.05 : -0.02) * root.fontSize)
 
-                                        width: dim.implicitWidth
+                                        // El espacio detrás de la palabra, si lo lleva, va dentro de su ancho.
+                                        width: dim.implicitWidth + (modelData.gap ? root.fontSize * 0.27 : 0)
                                         height: dim.implicitHeight
                                         // Animado solo en «calidad»: cada animación redibuja la ventana a 60 Hz
                                         // y, con una palabra cada pocas décimas, casi no paran.
@@ -423,7 +473,7 @@ Item {
                                             sourceComponent: Item {
                                                 // Borde del barrido: una franja a media luz delante de lo cantado.
                                                 Item {
-                                                    width: Math.min(word.width, word.fill * word.width + 0.12 * word.width)
+                                                    width: Math.min(dim.width, word.fill * dim.width + 0.12 * dim.width)
                                                     height: word.height
                                                     clip: true
                                                     Text {
@@ -434,7 +484,7 @@ Item {
                                                 }
                                                 // Cantado: brillante.
                                                 Item {
-                                                    width: word.fill * word.width
+                                                    width: word.fill * dim.width
                                                     height: word.height
                                                     clip: true
                                                     Text {

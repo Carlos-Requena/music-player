@@ -29,9 +29,10 @@ reescribe: si algo cambia, se añade otra y se actualiza el estado de la antigua
 | [ADR-10](ADR-10-mini-reproductor-oculta-la-ventana.md) | El mini reproductor oculta la ventana grande y libera su memoria gráfica | aceptada | [ventana](../areas/ventana.md) | 2026-11-13 |
 | [ADR-11](ADR-11-skins-en-json-y-opciones-genericas.md) | Skins en JSON y opciones de disposición como un mapa clave → valor | aceptada | [personalizacion](../areas/personalizacion.md) | 2026-11-13 |
 | [ADR-12](ADR-12-historial-con-los-avisos-del-reproductor.md) | Registrar las escuchas con los avisos del reproductor de YouTube Music, activado por defecto | aceptada | [historial](../areas/historial.md) | 2026-11-14 |
-| [ADR-13](ADR-13-letra-de-lrclib-con-un-solo-gestor.md) | Letra de LRCLIB y un solo gestor de clics para toda la vista, sin hover | aceptada | [letra](../areas/letra.md) | 2026-11-14 |
+| [ADR-13](ADR-13-letra-de-lrclib-con-un-solo-gestor.md) | Letra de LRCLIB y un solo gestor de clics para toda la vista, sin hover | ampliada por ADR-18 | [letra](../areas/letra.md) | 2026-11-14 |
 | [ADR-14](ADR-14-lomos-con-matrices-propias.md) | La estantería Lomos con matrices 3D propias y funciones continuas | aceptada | [vistas](../areas/vistas.md) | 2026-11-13 |
 | [ADR-15](ADR-15-plugins-en-un-hilo-propio.md) | Los plugins reciben los eventos del reproductor en un hilo propio | aceptada | [plugins](../areas/plugins.md) | 2026-11-13 |
 | [ADR-16](ADR-16-documentacion-por-areas.md) | Documentación por áreas, una fuente por tema y comprobada con scripts/docs.py | aceptada | — | 2026-11-15 |
 | [ADR-17](ADR-17-fondo-fluido-con-sombreador-propio.md) | El fondo «Fluido» es un sombreador propio, precompilado con qsb y guardado en el repositorio | aceptada | [personalizacion](../areas/personalizacion.md) | 2026-11-16 |
+| [ADR-18](ADR-18-letra-de-varias-fuentes.md) | Letra de varias fuentes (LRCLIB, NetEase y Kugou), pedidas a la vez y elegidas en la interfaz | aceptada | [letra](../areas/letra.md) | 2026-11-16 |
 <!-- /generado -->

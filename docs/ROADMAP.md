@@ -20,7 +20,7 @@ necesita una decisión del propietario antes de empezar; en diseño, con alterna
 4. **Skins claras**: hacen falta tokens para los velos y fondos de superposición, que asumen fondo
    oscuro.
 5. **Skins con QML propio** (decidir): sustituir componentes enteros, no solo colores.
-6. **Más plugins**: letras de otras fuentes, ecualizador (filtros de mpv), notificaciones.
+6. **Más plugins**: ecualizador (filtros de mpv), notificaciones; traducción y romaji de la letra (NetEase y Kugou ya los dan).
 
 ## Rendimiento
 

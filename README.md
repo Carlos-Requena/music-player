@@ -234,7 +234,7 @@ siguientes, unos 10 s.
 | Mini reproductor | `M` o el botón junto al volumen; `Esc` o la flecha vuelven a la ventana completa |
 | Pantalla «Sonando» | Se abre sola al elegir una canción, o con un clic en la canción de la barra de reproducción: la carátula en grande sobre sus colores, y a la derecha la letra (si la hay) y la cola. Se cierra con un clic en la carátula, la flecha o `Esc` |
 | Letra | Al estilo de Better Lyrics: la línea que suena, grande y brillante a un tercio de la altura, con sus palabras rellenándose al cantarse; las demás, atenuadas, y en las pausas instrumentales tres puntos. Clic en una línea salta a ese momento. Si en «Sonando» no quieres letra ni cola, el botón del panel de la barra las quita y centra la carátula. Opciones › Apariencia › «Calidad de la letra»: Calidad (todo a 60 Hz, ~32 % de CPU), Equilibrado (~20 %, por defecto) o Bajo (~14 %, lo mismo que con la cola a la vista) |
-| Letra desincronizada | Bajo la letra (o en su cabecera en «Sonando»): `−` la adelanta y `+` la atrasa medio segundo; se guarda para esa canción. Clic en el texto la deja en hora. Tamaño, fuente y grosor en Opciones › Apariencia |
+| Letra desincronizada | Bajo la letra: `−` la adelanta y `+` la atrasa medio segundo; se guarda para esa canción. Clic en el texto la deja en hora. Si no encaja, prueba otra fuente: pulsa su nombre («· NetEase ↻») y pasa a la siguiente (también se recuerda). Origen preferido, tamaño, tipo de letra y grosor en Opciones › Apariencia |
 | Lista temporal | Clic derecho en una canción, álbum o playlist › «Añadir a la lista temporal». Se ve en la pestaña «Temporal» del panel: «Reproducir en bucle», quitar canciones o vaciarla. No se guarda al cerrar la app |
 | Repetir | Botón de repetir junto a «Siguiente»: cada pulsación pasa de desactivado a repetir la cola y a repetir solo la canción (el icono lleva un «1»), y vuelta a desactivado. «Siguiente» sigue saltando de canción |
 | Categorías de playlists | En Playlists, pestañas bajo la navegación (Todas, las tuyas y «+»). ↑/↓ o RePág/AvPág cambian de pestaña. Clic derecho en una playlist › «Categorías» › marca las suyas o «Nueva categoría…»; clic derecho en una pestaña para renombrarla o borrarla. Se guardan en este ordenador (YouTube Music no tiene carpetas) |
@@ -253,8 +253,9 @@ Las opciones se guardan en `~/Library/Application Support/musicplayer/settings.j
   `sudo pacman -Syu yt-dlp`) y vuelve a intentarlo pasados unos minutos.
 - **«No se pudo iniciar el motor de audio (mpv)».** mpv no está instalado o no está en
   `/opt/homebrew/bin`, `/usr/local/bin` ni en el `PATH`.
-- **Sin letra.** La letra sincronizada viene de [LRCLIB](https://lrclib.net); no todas las
-  canciones la tienen.
+- **Sin letra.** La letra sincronizada viene de [LRCLIB](https://lrclib.net), NetEase Cloud
+  Music y Kugou; no todas las canciones la tienen. Si la que sale no es la buena, pulsa el nombre
+  de la fuente bajo la letra para probar la siguiente.
 
 ## Documentación
 

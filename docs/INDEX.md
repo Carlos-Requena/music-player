@@ -37,7 +37,7 @@ Qué leer para cada tarea. Las tablas a partir de [Áreas](#áreas) las escribe
 | [Detalle e inspeccionar](areas/detalle.md) | Detalle de un álbum, playlist o artista con Reproducir y Aleatorio, y el modo inspeccionar que gira la caja, la abre y saca el disco. | — | — |
 | [Registro de escuchas](areas/historial.md) | Apunta en el historial de YouTube Music lo que suena, con los mismos avisos que manda su reproductor, sin retrasar el arranque. | `historial` | [ADR-12](decisions/ADR-12-historial-con-los-avisos-del-reproductor.md) |
 | [Piezas comunes de la interfaz](areas/interfaz-comun.md) | Vidrio, carátula, icono, botones, deslizador y campo de texto que usan todas las pantallas. | — | — |
-| [Letra sincronizada](areas/letra.md) | Letra de LRCLIB línea a línea y, si la trae, palabra a palabra, al estilo Better Lyrics, con tres calidades y retraso ajustable por canción. | `letraCalidad`, `letraTamano`, `letraFuente`, `letraPeso`, `letraAlineacion`, `letraAnimada`, `retraso:*` | [ADR-13](decisions/ADR-13-letra-de-lrclib-con-un-solo-gestor.md) |
+| [Letra sincronizada](areas/letra.md) | Letra de LRCLIB, NetEase y Kugou, a elegir, palabra a palabra con los tiempos reales de cada sílaba, al estilo Better Lyrics, con tres calidades y retraso ajustable por canción. | `letraOrigen`, `letraSinTiempos`, `letraCalidad`, `letraTamano`, `letraFuente`, `letraPeso`, `letraAlineacion`, `letraAnimada`, `retraso:*`, `origen:*` | [ADR-13](decisions/ADR-13-letra-de-lrclib-con-un-solo-gestor.md), [ADR-18](decisions/ADR-18-letra-de-varias-fuentes.md) |
 | [Mascotas](areas/mascotas.md) | Una imagen que cambia de pose según lo que pasa en el reproductor, reacciona unos segundos a lo que haces (pincharla, pasar canción, guardar en una playlist) y puede dar «Me gusta»; carpetas del usuario con PNG por pose. | — | — |
 | [Opciones, skins y aspecto](areas/personalizacion.md) | Preferencias guardadas (vista por sección, skin, opciones genéricas), la hoja de Opciones, los tokens visuales de Theme, el vidrio y el modo ambiente. | `ambiente`, `ambienteMovimiento`, `desenfoque` | [ADR-11](decisions/ADR-11-skins-en-json-y-opciones-genericas.md), [ADR-17](decisions/ADR-17-fondo-fluido-con-sombreador-propio.md) |
 | [Plugins (Discord y Last.fm)](areas/plugins.md) | Discord Rich Presence («Escuchando…») y scrobbling a Last.fm, alimentados por los eventos del reproductor en un hilo propio. | — | [ADR-15](decisions/ADR-15-plugins-en-un-hilo-propio.md) |
@@ -138,8 +138,11 @@ Claves de `AppSettings.opcion`. Vacío es el valor por defecto (el `fallback` de
 | `letraAnimada` | — (interna) | [Letra sincronizada](areas/letra.md) |
 | `letraCalidad` | Calidad de la letra (apariencia) | [Letra sincronizada](areas/letra.md) |
 | `letraFuente` | Fuente de la letra (apariencia) | [Letra sincronizada](areas/letra.md) |
+| `letraOrigen` | Origen de la letra (apariencia) | [Letra sincronizada](areas/letra.md) |
 | `letraPeso` | Grosor de la letra (apariencia) | [Letra sincronizada](areas/letra.md) |
+| `letraSinTiempos` | Letra sin tiempo por palabra (apariencia) | [Letra sincronizada](areas/letra.md) |
 | `letraTamano` | Tamaño de la letra (apariencia) | [Letra sincronizada](areas/letra.md) |
+| `origen:*` | — (interna) | [Letra sincronizada](areas/letra.md) |
 | `panel` | Panel de letra y cola (vistas) | [Ventana y navegación](areas/ventana.md) |
 | `retraso:*` | — (interna) | [Letra sincronizada](areas/letra.md) |
 | `sonando` | Pantalla Sonando (vistas) | [Ventana y navegación](areas/ventana.md) |

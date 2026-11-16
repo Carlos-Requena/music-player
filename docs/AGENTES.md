@@ -249,6 +249,9 @@ añadas más casos, y actualiza la lista.
   [personalizacion](areas/personalizacion.md)).
 - **Registrar las escuchas en YouTube Music**, activado por defecto y desactivable
   ([historial](areas/historial.md)).
+- **Letra de varias fuentes** (LRCLIB, NetEase y Kugou; mucho anime): la fuente se cambia en
+  cada canción pulsando su nombre en el pie de la letra, y las líneas sin tiempo por palabra se
+  iluminan enteras (el estimado, como opción) ([letra](areas/letra.md)).
 - **Letra centrada** en horizontal y en vertical, y el ajuste de retraso como un pie discreto de
   texto tenue bajo ella ([letra](areas/letra.md)).
 - **Iniciar sesión con una ventana propia** (WebKit del sistema en macOS, Qt WebEngine opcional en

@@ -1,10 +1,10 @@
 ---
 area: letra
 titulo: Letra sincronizada
-resumen: Letra de LRCLIB línea a línea y, si la trae, palabra a palabra, al estilo Better Lyrics, con tres calidades y retraso ajustable por canción.
+resumen: Letra de LRCLIB, NetEase y Kugou, a elegir, palabra a palabra con los tiempos reales de cada sílaba, al estilo Better Lyrics, con tres calidades y retraso ajustable por canción.
 archivos: [src/lyrics.rs, qml/LyricsView.qml, qml/LyricsTiming.qml]
-opciones: [letraCalidad, letraTamano, letraFuente, letraPeso, letraAlineacion, letraAnimada, retraso:*]
-adr: [ADR-13]
+opciones: [letraOrigen, letraSinTiempos, letraCalidad, letraTamano, letraFuente, letraPeso, letraAlineacion, letraAnimada, retraso:*, origen:*]
+adr: [ADR-13, ADR-18]
 ---
 
 # Letra sincronizada
@@ -14,8 +14,21 @@ retraso, bajo la propia letra.
 
 ## Qué hace
 
-- La línea que suena, entera y brillante; las palabras con tiempo se iluminan con un barrido; las
-  líneas vacías son pausas instrumentales (y la intro larga también).
+- **Tres fuentes** a la vez, sin cuenta: LRCLIB, NetEase y Kugou (estas dos, con mucho anime y
+  J-pop y el tiempo de cada sílaba). **Origen** (Opciones › Apariencia, `letraOrigen`): Automática (por defecto: la que
+  encaja con la duración de la pista y trae tiempos por palabra), LRCLIB, NetEase o Kugou. En cada
+  canción, el nombre de la fuente va en el pie («· NetEase ↻», **diseño A** elegido por el
+  propietario entre tres): pulsarlo pasa a la siguiente que tenga letra y lo recuerda para esa
+  canción (`origen:<videoId>`).
+- La línea que suena, entera y brillante; las palabras se iluminan con un barrido que sigue el
+  tiempo real de cada palabra o sílaba (y su duración); las líneas vacías son pausas
+  instrumentales (y la intro larga también, y un hueco de más de 4 s entre líneas de NetEase o
+  Kugou).
+- **Líneas sin tiempo por palabra** (`letraSinTiempos`): por defecto se iluminan **enteras de
+  golpe** (lo eligió el propietario: el barrido inventado no encajaba con la voz); «Estimado»
+  reparte el barrido por toda la línea, carácter a carácter en japonés y chino.
+- Japonés y chino no llevan espacios inventados entre sílabas; el renglón se parte entre dos
+  caracteres cualesquiera, pero nunca entre las sílabas de una palabra latina.
 - **Calidad** (`letraCalidad`): «Calidad» (todo a 60 Hz), «Equilibrado» (barrido a 30 Hz, por
   defecto) y «Bajo» (10 Hz, sin cascada ni brillo).
 - **Tamaño, fuente y grosor** (`letraTamano`, `letraFuente`, `letraPeso`) y animación
@@ -35,8 +48,16 @@ retraso, bajo la propia letra.
 
 ## Reglas y decisiones
 
-- **LRCLIB**, una base de datos abierta, sin sesión
-  ([ADR-13](../decisions/ADR-13-letra-de-lrclib-con-un-solo-gestor.md)).
+- **Varias fuentes pedidas a la vez; elige la interfaz**
+  ([ADR-18](../decisions/ADR-18-letra-de-varias-fuentes.md)): `Player.lyrics` lleva todas las
+  letras encontradas, de mejor a peor (`rank`), y `Catalog.lyricsChosen` escoge. Cada fuente se
+  publica en cuanto llega; las respuestas de una pista anterior se descartan (`lyrics_token`).
+- **La versión importa:** de cada búsqueda gana el resultado con la duración más parecida (la
+  versión de TV o un videoclip con intro no encajan). Sin título parecido solo vale con la
+  duración casi exacta (el título de YouTube puede ir en romaji y la fuente, en japonés). El
+  título se limpia antes (`clean_title`: 『』, 「」, paréntesis, «-TV ver.-», el artista delante).
+- **Créditos fuera:** NetEase y Kugou ponen «作词: …» o «Composed by: …» como primeras líneas;
+  `without_credits` las quita.
 - **Un solo gestor de clics para toda la vista**, que calcula la línea con `childAt`, y **sin
   «hover»**: un gestor por línea sobre contenido animado subía la CPU a ~25 %
   ([TRAMPAS](../TRAMPAS.md#qt-quick-y-qml)).
@@ -71,16 +92,25 @@ desenfocado.
 
 | Archivo | Contenido |
 |---|---|
-| `src/lyrics.rs` | Petición a LRCLIB y lectura del LRC: líneas, pausas y palabras |
+| `src/lyrics.rs` | Fuentes (LRCLIB, NetEase, Kugou), elección del resultado y lectura de LRC, YRC y KRC |
 | `qml/LyricsView.qml` | La vista de la letra |
-| `qml/LyricsTiming.qml` | Ajuste del retraso |
+| `qml/LyricsTiming.qml` | Ajuste del retraso y fuente de la letra |
 
 ### Dónde está cada cosa
 
 | Concepto | Símbolo |
 |---|---|
-| Pedir la letra | [`fetch`](../../src/lyrics.rs) |
+| Pedir la letra a una fuente | [`fetch`](../../src/lyrics.rs) |
+| Pedirla a todas a la vez | [`fetch_lyrics`](../../src/player.rs) |
+| Ordenar las fuentes | [`rank`](../../src/lyrics.rs) |
+| Elegir el resultado de una búsqueda | [`best`](../../src/lyrics.rs) |
+| Limpiar el título de YouTube | [`clean_title`](../../src/lyrics.rs) |
 | Leer el LRC | [`parse`](../../src/lyrics.rs) |
+| Leer KRC y YRC | [`parse_timed`](../../src/lyrics.rs) |
+| Descifrar el KRC de Kugou | [`decrypt_krc`](../../src/lyrics.rs) |
+| Fuente que se muestra | [`lyricsChosen`](../../qml/Catalog.qml) |
+| Cambiar de fuente | [`nextLyricsSource`](../../qml/Catalog.qml) |
+| Tiempos de cada palabra | [`timing`](../../qml/LyricsView.qml) |
 | Pausa larga de la intro | [`INTRO_GAP`](../../src/lyrics.rs) |
 | Línea bajo el clic | [`lineUnder`](../../qml/LyricsView.qml) |
 | Reloj del barrido | [`advance`](../../qml/LyricsView.qml) |
@@ -97,13 +127,17 @@ desenfocado.
 
 ## Estado actual
 
-- **Última verificación:** 2026-11-14, medidas de CPU y memoria de los tres modos en release
-  (M4 Pro).
-- **Pruebas:** `mod tests` de `src/lyrics.rs` (pausas e intro, varios tiempos por línea y
-  palabras, sin texto no hay letra).
-- **Sin verificar:** el coste de cada modo en Linux con el controlador de CachyOS.
+- **Última verificación:** 2026-11-16, varias fuentes: `--probe lyrics` contra las tres, capturas
+  del panel con letra japonesa y cambio de fuente con un clic simulado
+  ([historial](../history/verificacion/letra.md)).
+- **Pruebas:** `mod tests` de `src/lyrics.rs` (pausas e intro, LRC con palabras, KRC y YRC,
+  créditos, limpieza del título, elección por duración, orden de las fuentes).
+- **Sin verificar:** el barrido sílaba a sílaba con música sonando (YouTube pedía sesión) y su
+  CPU (más `Text` por línea con KRC y YRC); el coste de cada modo en Linux con el controlador de
+  CachyOS.
 - **Historial:** [docs/history/verificacion/letra.md](../history/verificacion/letra.md).
 
 ## Pendiente
 
-- Letras de otras fuentes cuando LRCLIB no la tenga ([ROADMAP](../ROADMAP.md)).
+- Traducción y romaji: NetEase y Kugou los traen y no se muestran.
+- Medir la CPU de la letra por sílaba en los tres modos.

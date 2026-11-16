@@ -53,8 +53,35 @@ QtObject {
     // Lista temporal: pistas con el mismo formato que la cola.
     readonly property var temporal: parse(Player.temporal)
 
-    // Líneas `{ t, text }` de la pista que suena; vacío si no hay letra sincronizada.
-    readonly property var lyrics: parse(Player.lyrics)
+    // Letras de la pista que suena, una por fuente y de mejor a peor:
+    // `[{ id, label, words, lines }]` (`words`: trae el tiempo de cada palabra).
+    readonly property var lyricsSources: parse(Player.lyrics)
+    // Fuente que se muestra: la elegida para esta canción (`origen:<videoId>`, pulsando el pie
+    // de la letra), si no la preferida en Opciones (`letraOrigen`) y, si no, la mejor.
+    readonly property var lyricsChosen: {
+        void AppSettings.revision
+        const sources = lyricsSources
+        if (sources.length === 0)
+            return null
+        const wanted = [currentVideoId !== "" ? AppSettings.opcion("origen:" + currentVideoId) : "",
+                        AppSettings.opcion("letraOrigen")]
+        for (const id of wanted)
+            for (const source of sources)
+                if (id !== "" && source.id === id)
+                    return source
+        return sources[0]
+    }
+    // Líneas `{ t, text, w }` de la letra que se muestra; vacío si no hay letra sincronizada.
+    readonly property var lyrics: lyricsChosen ? lyricsChosen.lines : []
+
+    // Pasa a la siguiente fuente que tenga letra de esta canción y lo recuerda para ella.
+    function nextLyricsSource() {
+        if (lyricsSources.length < 2 || currentVideoId === "" || !lyricsChosen)
+            return
+        const at = lyricsSources.findIndex(source => source.id === lyricsChosen.id)
+        const next = lyricsSources[(at + 1) % lyricsSources.length]
+        AppSettings.setOpcion("origen:" + currentVideoId, next.id)
+    }
 
     function parse(json) {
         if (json === "")

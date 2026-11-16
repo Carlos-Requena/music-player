@@ -42,6 +42,8 @@ pub mod qobject {
         #[qproperty(QString, thumb)]
         #[qproperty(i32, index)]
         #[qproperty(QString, queue)]
+        /// Letras encontradas para la pista que suena, de mejor a peor (JSON de
+        /// `[lyrics::Found]`): la interfaz elige cuál mostrar.
         #[qproperty(QString, lyrics)]
         #[qproperty(QString, error)]
         #[qproperty(f64, volume)]
@@ -172,6 +174,11 @@ pub struct PlayerRust {
     lyrics: QString,
     error: QString,
     volume: f64,
+
+    /// Letras que han llegado para la pista que suena (cada fuente responde por su cuenta).
+    lyrics_found: Vec<lyrics::Found>,
+    /// Cambia con cada petición de letra; descarta las respuestas de la anterior.
+    lyrics_token: u64,
 
     mpv: Option<Mpv>,
     tracks: Vec<Track>,
@@ -305,6 +312,8 @@ impl Default for PlayerRust {
             lyrics: QString::default(),
             error: QString::default(),
             volume: 100.0,
+            lyrics_found: Vec::new(),
+            lyrics_token: 0,
             mpv: None,
             tracks: Vec::new(),
             request: 0,
@@ -980,20 +989,31 @@ impl qobject::Player {
         }
     }
 
+    /// Pide la letra a todas las fuentes a la vez y publica cada una según llega, ordenadas de
+    /// mejor a peor (la primera aparece en cuanto responde la fuente más rápida).
     fn fetch_lyrics(mut self: Pin<&mut Self>, track: Track) {
+        let token = self.lyrics_token + 1;
+        self.as_mut().rust_mut().lyrics_token = token;
+        self.as_mut().rust_mut().lyrics_found.clear();
         self.as_mut().set_lyrics(QString::default());
-        let qt = self.qt_thread();
-        thread::spawn(move || {
-            let lines = lyrics::fetch(&track.title, &track.artist, track.duration);
-            let json = lines.and_then(|lines| serde_json::to_string(&lines).ok()).unwrap_or_default();
-            let _ = qt.queue(move |mut player| {
-                // Solo vale si la pista sigue siendo la misma.
-                let current = player.tracks.get(*player.index() as usize).map(|t| t.video_id.as_str());
-                if current == Some(track.video_id.as_str()) {
+        let query = std::sync::Arc::new(lyrics::Query::new(&track.title, &track.artist, track.duration));
+        for source in lyrics::SOURCES {
+            let qt = self.qt_thread();
+            let query = query.clone();
+            thread::spawn(move || {
+                let Some(found) = lyrics::fetch(source, &query) else { return };
+                let _ = qt.queue(move |mut player| {
+                    if player.lyrics_token != token {
+                        return;
+                    }
+                    let mut rust = player.as_mut().rust_mut();
+                    rust.lyrics_found.push(found);
+                    lyrics::rank(&mut rust.lyrics_found);
+                    let json = serde_json::to_string(&rust.lyrics_found).unwrap_or_default();
                     player.as_mut().set_lyrics(QString::from(&json));
-                }
+                });
             });
-        });
+        }
     }
 
     fn on_event(mut self: Pin<&mut Self>, event: Event) {

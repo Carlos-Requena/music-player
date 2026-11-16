@@ -1,14 +1,14 @@
 ---
 adr: ADR-13
 titulo: Letra de LRCLIB y un solo gestor de clics para toda la vista, sin hover
-estado: aceptada
+estado: ampliada por ADR-18
 fecha: 2026-11-14
 areas: [letra]
 ---
 
 # ADR-13 · Letra de LRCLIB y un solo gestor de clics para toda la vista, sin hover
 
-- **Estado:** Aceptada.
+- **Estado:** Ampliada por [ADR-18](ADR-18-letra-de-varias-fuentes.md) (varias fuentes de letra).
 - **Registrada:** 2026-11-14 (reconstruida el 2026-11-15 a partir de la documentación de entonces; las alternativas sin medida son razonadas, no probadas)
 - **Ámbito:** [letra](../areas/letra.md)
 

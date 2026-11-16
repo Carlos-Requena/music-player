@@ -5,6 +5,20 @@ son de cuando se escribieron. El estado actual está en su [ficha](../../areas/l
 
 Lo nuevo va arriba: añade una sección `## AAAA-MM-DD · qué se verificó` encima de las anteriores.
 
+## 2026-11-16 · Letra de varias fuentes y palabra a palabra con tiempos reales
+
+- **Cambio:** fuentes LRCLIB, NetEase (YRC) y Kugou (KRC), pedidas a la vez; opción
+  `letraOrigen` y cambio por canción en el pie (diseño A, `origen:<videoId>`). Las líneas sin
+  tiempo por palabra se iluminan enteras (`letraSinTiempos`, con «Estimado» como alternativa).
+  Japonés y chino sin espacios inventados entre sílabas.
+- **Verificado:** `cargo test` (pruebas nuevas de KRC, YRC, créditos, títulos, duración y
+  orden); `--probe lyrics` con «紅蓮華», «Idol», «Unravel» y «Blinding Lights»: NetEase o Kugou
+  dan tiempos por sílaba con la duración exacta en las cuatro; captura del panel con la letra de
+  «紅蓮華 -TV ver.-» y el pie «letra en hora · NetEase ↻»; un clic simulado en el nombre guarda
+  `origen:<videoId>` y cambia la letra.
+- **No verificado:** el barrido con música sonando (YouTube pedía sesión también a `yt-dlp`); la
+  CPU con letra por sílaba; «Estimado» en captura; Linux.
+
 ## 2026-11-16 · Letra centrada también en vertical y retraso como pie discreto
 
 - **Cambio:** con la letra centrada, la línea que suena va al 50 % de la altura y la letra no deja
