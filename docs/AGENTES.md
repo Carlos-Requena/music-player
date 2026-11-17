@@ -220,7 +220,7 @@ añadas más casos, y actualiza la lista.
   plugins y precarga van aparte) ([resolucion](areas/resolucion.md)).
 - **Ventana de vidrio con la navegación superior**; el panel de letra y cola, oculto al arrancar,
   a la derecha por defecto y movible ([ventana](areas/ventana.md)).
-- **Vistas por sección**: Inicio, Explorar, Me gusta y Búsqueda en Muro; Playlists y Álbumes en
+- **Vistas por sección**: Inicio, Explorar, Me gusta, Historial y Búsqueda en Muro; Playlists y Álbumes en
   Lomos; cualquier sección puede usar cualquier vista ([vistas](areas/vistas.md)).
 - **Diseño con alternativas**: mockups y decisiones visuales con 2–4 opciones a elegir, no una sola
   propuesta (§6).
@@ -254,6 +254,13 @@ añadas más casos, y actualiza la lista.
   iluminan enteras (el estimado, como opción) ([letra](areas/letra.md)).
 - **Letra centrada** en horizontal y en vertical, y el ajuste de retraso como un pie discreto de
   texto tenue bajo ella ([letra](areas/letra.md)).
+- **Explorar con ListenBrainz (Troi)**: Explorar muestra las listas y recomendaciones de
+  ListenBrainz pedidas a su API desde Rust, sin Troi local en Python; en Opciones se puede volver
+  al Explorar de YouTube Music. Las escuchas se envían con el plugin de ListenBrainz
+  ([catalogo](areas/catalogo.md), [ADR-19](decisions/ADR-19-explorar-con-listenbrainz.md),
+  [ADR-20](decisions/ADR-20-fuente-de-explorar-a-elegir.md)).
+- **Sección Historial** en la navegación: el historial de escucha de la cuenta de YouTube Music
+  ([catalogo](areas/catalogo.md)).
 - **Iniciar sesión con una ventana propia** (WebKit del sistema en macOS, Qt WebEngine opcional en
   Linux) y, como alternativa, importar del navegador; sin disfrazar el agente de usuario
   ([sesion](areas/sesion.md)).

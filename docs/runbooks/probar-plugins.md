@@ -1,4 +1,4 @@
-# Probar Discord y Last.fm
+# Probar Discord, Last.fm y ListenBrainz
 
 `cargo test` cubre el protocolo de Discord (contra un socket simulado), la firma de Last.fm y sus
 reglas de scrobble. Para Discord de extremo a extremo, un servidor falso.
@@ -26,3 +26,21 @@ El formato de los mensajes está en [plugins](../areas/plugins.md#cómo-funciona
 No hay servidor falso: las reglas se prueban con `cargo test` (`src/plugins/lastfm.rs`). Con una
 cuenta real lo prueba el propietario (que «escuchando ahora» aparezca y que el scrobble llegue tras
 la mitad de la pista).
+
+## ListenBrainz y Explorar
+
+- **Envío de escuchas:** `cargo test` (`src/plugins/listenbrainz.rs`). Con un token real lo prueba
+  el propietario: en listenbrainz.org/user/<usuario> aparece «Playing now» y, tras la mitad de la
+  pista, la escucha.
+- **Explorar sin cuenta propia:** cualquier usuario público sirve, sin token.
+  `HOME="$PRUEBA" ./target/release/musicplayer --probe explore mr_monkey` imprime las zonas.
+  Para verlo en la ventana, un `plugins.json` de prueba con un token falso (no se valida al
+  leerlo; el envío queda desactivado):
+
+  ```bash
+  echo '{"listenbrainz_token": "falso", "listenbrainz_user": "mr_monkey"}' > "$DIR/plugins.json"
+  ```
+
+- La primera carga busca cada canción en YouTube Music (unas 150): no la repitas sin motivo; la
+  caché de búsquedas (`<caché>/musicplayer/listenbrainz-youtube.json` del `HOME` de pruebas) hace
+  que las siguientes solo pidan a ListenBrainz.

@@ -12,7 +12,8 @@ QtObject {
         { id: "explorar", label: "Explorar" },
         { id: "playlists", label: "Playlists", cuenta: true },
         { id: "albumes", label: "Álbumes" },
-        { id: "megusta", label: "Me gusta", cuenta: true }
+        { id: "megusta", label: "Me gusta", cuenta: true },
+        { id: "historial", label: "Historial", cuenta: true }
     ]
 
     readonly property var views: [
@@ -27,6 +28,7 @@ QtObject {
     readonly property var albumes: parse(Library.albumes)
     readonly property var busqueda: parse(Library.busqueda)
     readonly property var megusta: parse(Library.megusta)
+    readonly property var historial: parse(Library.historial)
 
     // Detalle abierto (álbum, playlist o artista) o `null`.
     readonly property var detalle: Library.detalle === "" ? null : parse(Library.detalle)
@@ -240,6 +242,7 @@ QtObject {
         case "albumes": return albumes
         case "buscar": return busqueda
         case "megusta": return megusta
+        case "historial": return historial
         default: return inicio
         }
     }
@@ -257,6 +260,7 @@ QtObject {
         switch (section) {
         case "playlists": return "tus playlists"
         case "megusta": return "tus «Me gusta»"
+        case "historial": return "tu historial de escucha"
         default: return "tu biblioteca"
         }
     }

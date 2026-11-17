@@ -82,7 +82,7 @@ nombre desde cualquier archivo QML):
 | `Library` | `src/library.rs` | Secciones (Inicio, Álbumes…), búsqueda, detalle abierto; portada de una playlist y guardar canciones en ella |
 | `Account` | `src/account.rs` | Iniciar/cerrar sesión |
 | `AppSettings` | `src/settings.rs` | Preferencias, skins y mascotas |
-| `Plugins` | `src/plugins.rs` | Discord, Last.fm, controles del sistema |
+| `Plugins` | `src/plugins.rs` | Discord, Last.fm, ListenBrainz, controles del sistema |
 
 Y dos singletons escritos en QML: `Theme` (colores y tamaños) y `Catalog` (convierte los datos
 de Rust en objetos que QML entiende).

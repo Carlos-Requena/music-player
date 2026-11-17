@@ -5,6 +5,31 @@ son de cuando se escribieron. El estado actual está en su [ficha](../../areas/c
 
 Lo nuevo va arriba: añade una sección `## AAAA-MM-DD · qué se verificó` encima de las anteriores.
 
+## 2026-11-17 · Fuente de Explorar a elegir y sección Historial (rama `feature/explorar-listenbrainz`)
+
+- **Cambio:** opción `explorarFuente` (ListenBrainz o YouTube Music,
+  [ADR-20](../../decisions/ADR-20-fuente-de-explorar-a-elegir.md)); sección Historial
+  (`FEmusic_history`, con sesión) que se vuelve a pedir al abrirla; `--probe explore-youtube|history`.
+- **Verificado:** compila sin avisos y `cargo test` en verde; capturas de Opciones › Vistas (fila
+  nueva y vista de Historial), de Explorar con `explorarFuente: youtube` en el `settings.json` de
+  prueba (zonas de YouTube) y de Historial sin sesión (aviso de iniciar sesión). Sin errores de QML.
+- **No verificado:** Historial con sesión real (no se usan las cookies del propietario); cambiar la
+  fuente pulsando en Opciones con la app abierta.
+
+## 2026-11-17 · Explorar con ListenBrainz (rama `feature/explorar-listenbrainz`)
+
+- **Cambio:** Explorar deja `FEmusic_explore` y sale de ListenBrainz (`src/listenbrainz.rs`,
+  [ADR-19](../../decisions/ADR-19-explorar-con-listenbrainz.md)), en su propio hilo; las listas de
+  ListenBrainz se abren como detalle (`lb:<mbid>`); `ytm::search_one_kind`.
+- **Verificado:** `--probe explore mr_monkey` (usuario público de la documentación de
+  ListenBrainz) con `HOME` temporal: 24,7 s con la caché vacía y 7,8 s con ella llena; las 50
+  canciones de «Exploración semanal» encontradas y comprobadas a mano contra la lista. Capturas de
+  Explorar con usuario (`plugins.json` de prueba con token falso) y sin él, y del detalle de una
+  lista con Aleatorio (`--autoplay --open --shuffle`): `sonando true`, cola de 50, sin `error` ni
+  errores de QML. `cargo test` en verde.
+- **No verificado:** con el usuario del propietario (aún sin escuchas en ListenBrainz); música
+  japonesa y anime; Linux.
+
 ## 2026-11-17 · Cliente HTTP común y búsqueda en paralelo (rama `perf/letra`)
 
 - **Cambio:** `ytm::http`, un cliente HTTP para toda la app que reutiliza las conexiones; la

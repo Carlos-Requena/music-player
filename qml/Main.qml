@@ -8,6 +8,11 @@ Window {
 
     // Sección visible: una de `Catalog.sections` o "buscar" (resultados de búsqueda).
     property string section: "inicio"
+    // El historial cambia al escuchar: se vuelve a pedir cada vez que se abre su sección.
+    onSectionChanged: if (section === "historial") Library.loadHistorial()
+    // Fuente de Explorar (ListenBrainz o YouTube Music): al cambiarla se vuelve a cargar.
+    readonly property string explorarFuente: { void AppSettings.revision; return AppSettings.opcion("explorarFuente") }
+    onExplorarFuenteChanged: Library.load()
     property bool settingsOpen: false
     property bool inspecting: false
     readonly property bool detailOpen: Catalog.detalle !== null
@@ -539,6 +544,8 @@ Window {
     Connections {
         target: Plugins
         function onMediaOnChanged() { Player.applyMediaControls() }
+        // Explorar muestra las recomendaciones del usuario de ListenBrainz conectado.
+        function onListenbrainzUserChanged() { Library.load() }
     }
 
     // Al iniciar o cerrar sesión cambia todo el contenido y las cookies de yt-dlp.

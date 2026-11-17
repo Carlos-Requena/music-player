@@ -10,6 +10,27 @@ Nota de la tarea larga que está a medias, para quien la retome sin memoria de l
 
 ---
 
+## Explorar con ListenBrainz (Troi) · rama `feature/explorar-listenbrainz`
+
+- **Objetivo:** el propietario pidió «incorporar Troi» (troi-recommendation-playground) para que
+  Explorar muestre sus recomendaciones en vez del Explorar de YouTube Music.
+- **Áreas:** [catalogo](areas/catalogo.md), [plugins](areas/plugins.md).
+- **Decisiones tomadas en la conversación (2026-11-17):** opción A, la API de ListenBrainz desde
+  Rust (ListenBrainz ya ejecuta Troi en su servidor), sin Troi local en Python; Explorar de
+  YouTube **se sustituye**; el propietario no tiene cuenta de ListenBrainz, así que se añade un
+  plugin que envía las escuchas (token). Escrito en
+  [ADR-19](decisions/ADR-19-explorar-con-listenbrainz.md) y en AGENTES §11.
+- **Hecho (sin commit):** `src/listenbrainz.rs`, `src/plugins/listenbrainz.rs`, Explorar en su
+  hilo en `src/library.rs`, detalle `lb:<mbid>`, fila en Opciones › Plugins; fichas, historiales,
+  README, ARCHITECTURE, runbook; build, tests y capturas.
+- **Después pidió (hecho, sin commit):** elegir en Opciones la fuente de Explorar (ListenBrainz o
+  YouTube Music, [ADR-20](decisions/ADR-20-fuente-de-explorar-a-elegir.md)) y una sección
+  Historial con su historial de escucha (YouTube Music, con sesión).
+- **Falta:** visto bueno del propietario para el commit y unir a `master`; que el propietario
+  conecte su token, compruebe el envío de escuchas y mire Historial con su sesión.
+- **Cómo retomarla:** `git switch feature/explorar-listenbrainz`, `git status`.
+- **Cuidado:** ListenBrainz pide como mucho una petición por segundo y un User-Agent propio.
+
 ## Rendimiento: letra y resto de la auditoría · rama `perf/letra`
 
 - **Objetivo:** bajar CPU y memoria según la auditoría de rendimiento del 2026-11-16. El

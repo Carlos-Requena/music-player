@@ -568,6 +568,14 @@ pub fn search(query: &str) -> Result<Vec<Zone>> {
     Ok(out)
 }
 
+/// Primeros resultados de una búsqueda de canciones (`albums` falso) o de álbumes, en su orden.
+/// La usa ListenBrainz para encontrar en YouTube Music lo que recomienda.
+pub fn search_one_kind(query: &str, albums: bool) -> Result<Vec<Item>> {
+    let params = if albums { SEARCH_ALBUMS } else { SEARCH_SONGS };
+    let page = post("search", json!({ "query": query, "params": params }))?;
+    Ok(zones(&page).into_iter().flat_map(|zone| zone.items).collect())
+}
+
 fn seconds(clock: &str) -> f64 {
     clock
         .split(':')

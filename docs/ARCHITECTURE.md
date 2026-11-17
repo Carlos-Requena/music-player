@@ -12,12 +12,13 @@ Cómo encajan las piezas. El detalle de cada una (reglas, mecanismo, medidas) es
 │        │ propiedades y llamadas (cxx-qt)                      │
 │  Rust                                                         │
 │    Library ── ytm.rs ──────────── HTTPS → music.youtube.com   │
+│      └─ listenbrainz.rs ─ hilo ── HTTPS → api.listenbrainz.org│
 │    Player ─┬─ ytm.rs (colas)                                  │
 │            ├─ resolver.rs ─┬─ stream.rs ─ HTTPS → /player     │
 │            │               └─ yt-dlp (residente o proceso)    │
 │            ├─ lyrics.rs ───────── HTTPS → lrclib.net          │
 │            ├─ history.rs ──────── HTTPS → avisos de escucha   │
-│            ├─ plugins.rs ─ hilo ─→ Discord (IPC) · Last.fm    │
+│            ├─ plugins.rs ─ hilo ─→ Discord · Last.fm · LB     │
 │            └─ audio.rs ── socket IPC JSON ─┐                  │
 │    Account ── cookies.txt · firma          │                  │
 │    AppSettings ── settings.json            │                  │
@@ -104,9 +105,9 @@ memoria que muestra el Monitor de Actividad), 2026-11-13:
 |---|---|---|
 | `<config>/musicplayer/settings.json` | Vistas, skin, mascota, opciones | [personalizacion](areas/personalizacion.md) |
 | `<config>/musicplayer/cookies.txt`, `account.json` | Sesión (permisos 600) | [sesion](areas/sesion.md) |
-| `<config>/musicplayer/plugins.json` | Discord y Last.fm (permisos 600) | [plugins](areas/plugins.md) |
+| `<config>/musicplayer/plugins.json` | Discord, Last.fm y ListenBrainz (permisos 600) | [plugins](areas/plugins.md) |
 | `<config>/musicplayer/skins/`, `mascotas/` | Skins y mascotas del usuario | [personalizacion](areas/personalizacion.md), [mascotas](areas/mascotas.md) |
-| `<caché>/musicplayer/` | Copia de cada sección | [catalogo](areas/catalogo.md) |
+| `<caché>/musicplayer/` | Copia de cada sección y búsquedas de ListenBrainz en YouTube (`listenbrainz-youtube.json`) | [catalogo](areas/catalogo.md) |
 
 `<config>` es `~/Library/Application Support` en macOS y `~/.config` en Linux; `<caché>`,
 `~/Library/Caches` y `~/.cache`. **Son datos del propietario**: no se tocan en pruebas

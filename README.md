@@ -11,7 +11,7 @@ carátula), letra sincronizada palabra a palabra, y tres formas de recorrer la b
 |---|---|---|
 | **Lomos** | Estantería de cajas en 3D: la elegida de frente y más grande, sus vecinas giradas hacia ella y el resto como lomos, con reflejo en el suelo y halo de color | Playlists, Álbumes |
 | **Cubeta** | Pasar discos de uno en uno, como en una tienda | — |
-| **Muro** | Cuadrícula de carátulas por zonas | Inicio, Explorar |
+| **Muro** | Cuadrícula de carátulas por zonas | Inicio, Explorar, Me gusta, Historial |
 
 Cada sección puede usar cualquier vista (Opciones → «Vista de cada sección», el selector de
 arriba a la derecha o la tecla `V`). La letra y la cola van en un panel lateral que se puede
@@ -152,8 +152,20 @@ En **Opciones › Plugins**:
   [last.fm/api/account/create](https://www.last.fm/api/account/create), pega la clave y el
   secreto, pulsa **Conectar con Last.fm**, acepta en la web que se abre y pulsa **Ya lo he
   autorizado**. Envía «escuchando ahora» y hace el scrobble al escuchar la mitad o 4 minutos.
+- **ListenBrainz**: crea una cuenta gratis en [listenbrainz.org](https://listenbrainz.org),
+  copia tu token de [listenbrainz.org/settings](https://listenbrainz.org/settings/), pégalo y
+  pulsa **Conectar**. Envía tus escuchas como Last.fm y, con ellas, **Explorar** te muestra las
+  listas que ListenBrainz genera para ti cada semana (Exploración semanal, Jams), tus
+  recomendaciones y las novedades de tus artistas. Tarda unos días en tener datos; puedes
+  importar tu historial de Last.fm desde su web. Sin cuenta, Explorar muestra lo más escuchado
+  de la semana en ListenBrainz. En Opciones › Vistas › **Fuente de Explorar** puedes volver al
+  Explorar de YouTube Music (novedades, listas de éxitos y ánimos).
 
-La configuración de los plugins (con el secreto y la sesión de Last.fm) se guarda en
+La sección **Historial** (con sesión) muestra lo que has escuchado en tu cuenta de YouTube Music,
+por días.
+
+La configuración de los plugins (con el secreto y la sesión de Last.fm y el token de
+ListenBrainz) se guarda en
 `plugins.json`, legible solo por tu usuario.
 
 ## Cuenta

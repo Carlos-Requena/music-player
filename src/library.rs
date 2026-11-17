@@ -1,7 +1,8 @@
 //! Catálogo expuesto a QML como singleton `Library`.
 //!
 //! Cada sección se publica como JSON (`[{ titulo, items: [...] }]`) que la interfaz
-//! convierte en sus zonas. Sin sesión de usuario no hay biblioteca personal: «Álbumes»
+//! convierte en sus zonas. Explorar sale de ListenBrainz (`listenbrainz.rs`); las demás, de
+//! YouTube Music. Sin sesión de usuario no hay biblioteca personal: «Álbumes»
 //! muestra solo las novedades y «Playlists» y «Me gusta» quedan vacías.
 
 use std::{pin::Pin, thread};
@@ -9,7 +10,7 @@ use std::{pin::Pin, thread};
 use cxx_qt::Threading;
 use cxx_qt_lib::QString;
 
-use crate::ytm::{self, Zone};
+use crate::{listenbrainz, ytm::{self, Zone}};
 
 #[cxx_qt::bridge]
 pub mod qobject {
@@ -29,6 +30,8 @@ pub mod qobject {
         #[qproperty(QString, albumes)]
         #[qproperty(QString, busqueda)]
         #[qproperty(QString, megusta)]
+        /// Historial de escucha de la cuenta de YouTube Music (zonas por día); vacío sin sesión.
+        #[qproperty(QString, historial)]
         /// JSON de `ytm::Detail` del álbum, playlist o artista abierto; vacío si no hay.
         #[qproperty(QString, detalle)]
         #[qproperty(bool, detalle_loading)]
@@ -40,6 +43,10 @@ pub mod qobject {
         /// Descarga las cuatro secciones; cada una aparece en cuanto llega.
         #[qinvokable]
         fn load(self: Pin<&mut Library>);
+
+        /// Vuelve a pedir solo el historial de escucha (al abrir su sección: cambia al escuchar).
+        #[qinvokable]
+        fn load_historial(self: Pin<&mut Library>);
 
         /// Abre el detalle de un elemento del catálogo (JSON de `ytm::Item`).
         #[qinvokable]
@@ -104,6 +111,9 @@ pub struct LibraryRust {
     detalle: QString,
     detalle_loading: bool,
     megusta: QString,
+    historial: QString,
+    /// Descarta historiales que llegan después de pedir otro.
+    history_request: u64,
     /// Descarta detalles que llegan después de abrir otro.
     detail_request: u64,
 }
@@ -160,6 +170,25 @@ fn signed_in() -> bool {
 
 type Setter = fn(Pin<&mut qobject::Library>, QString);
 
+/// Explorar sale de YouTube Music en vez de ListenBrainz (opción `explorarFuente`).
+static EXPLORAR_YOUTUBE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Lo fija `AppSettings` al arrancar y al cambiar la opción `explorarFuente`.
+pub fn set_explorar_youtube(on: bool) {
+    EXPLORAR_YOUTUBE.store(on, std::sync::atomic::Ordering::Relaxed);
+}
+
+/// Nombre de la copia en disco de Explorar según su fuente. La de ListenBrainz no depende de la
+/// sesión de YouTube, sino del usuario de ListenBrainz.
+fn explorar_cache(youtube: bool) -> &'static str {
+    if youtube { "explorar" } else { "explorar-listenbrainz" }
+}
+
+/// Historial de escucha de la cuenta; sin sesión, vacío.
+fn history() -> ytm::Result<Vec<Zone>> {
+    if signed_in() { ytm::browse("FEmusic_history") } else { Ok(Vec::new()) }
+}
+
 /// Elementos por zona que se envían a la interfaz; las páginas traen cientos.
 const ZONE_LIMIT: usize = 60;
 
@@ -191,7 +220,6 @@ impl qobject::Library {
 
         let sections: [(&str, fn() -> ytm::Result<Vec<Zone>>, Setter); 5] = [
             ("inicio", || ytm::browse("FEmusic_home"), |library, json| library.set_inicio(json)),
-            ("explorar", || ytm::browse("FEmusic_explore"), |library, json| library.set_explorar(json)),
             (
                 "albumes",
                 || {
@@ -216,6 +244,7 @@ impl qobject::Library {
             ),
             // Secciones solo con sesión; sin ella quedan vacías y la interfaz lo explica.
             ("megusta", || Ok(if signed_in() { personal(ytm::liked_songs()) } else { Vec::new() }), |library, json| library.set_megusta(json)),
+            ("historial", || Ok(personal(history())), |library, json| library.set_historial(json)),
         ];
 
         // Lo guardado la última vez se muestra ya; la red lo sustituye al llegar.
@@ -225,6 +254,8 @@ impl qobject::Library {
                 set(self.as_mut(), QString::from(&json));
             }
         }
+
+        self.as_mut().load_explorar(generation);
 
         let qt = self.qt_thread();
         thread::spawn(move || {
@@ -253,6 +284,77 @@ impl qobject::Library {
         });
     }
 
+    /// Explorar sale de ListenBrainz ([ADR-19](../docs/decisions/ADR-19-explorar-con-listenbrainz.md))
+    /// o, si se elige en Opciones, de YouTube Music ([ADR-20](../docs/decisions/ADR-20-fuente-de-explorar-a-elegir.md)).
+    /// Va en su propio hilo: la primera vez ListenBrainz busca cada canción recomendada en YouTube
+    /// Music y tarda, y no debe retrasar las demás secciones. Cada zona aparece en cuanto está lista.
+    fn load_explorar(mut self: Pin<&mut Self>, generation: u64) {
+        let youtube = EXPLORAR_YOUTUBE.load(std::sync::atomic::Ordering::Relaxed);
+        let name = explorar_cache(youtube);
+        // Sin copia de esta fuente se vacía: no se muestra la de la otra mientras llega.
+        let stored = cache::read(name, false).unwrap_or_default();
+        self.as_mut().set_explorar(QString::from(&stored));
+        let qt = self.qt_thread();
+        thread::spawn(move || {
+            let partial = qt.clone();
+            let result = if youtube {
+                ytm::browse("FEmusic_explore")
+            } else {
+                let user = crate::plugins::listenbrainz_user();
+                listenbrainz::explorar(user.as_deref(), |zones| {
+                    let json = to_json(zones);
+                    let _ = partial.queue(move |library| {
+                        if library.load_generation == generation {
+                            library.set_explorar(QString::from(&json));
+                        }
+                    });
+                })
+            };
+            match result {
+                Ok(zones) => {
+                    let json = to_json(&zones);
+                    cache::write(name, false, &json);
+                    let _ = qt.queue(move |library| {
+                        if library.load_generation == generation {
+                            library.set_explorar(QString::from(&json));
+                        }
+                    });
+                }
+                Err(error) => {
+                    let _ = qt.queue(move |library| {
+                        if library.load_generation == generation {
+                            library.set_error(QString::from(&error));
+                        }
+                    });
+                }
+            }
+        });
+    }
+
+    fn load_historial(mut self: Pin<&mut Self>) {
+        use cxx_qt::CxxQtType;
+        let request = self.history_request + 1;
+        self.as_mut().rust_mut().history_request = request;
+        let qt = self.qt_thread();
+        thread::spawn(move || {
+            let result = history();
+            let json = result.as_ref().ok().map(|zones| to_json(zones));
+            if let Some(json) = &json {
+                cache::write("historial", true, json);
+            }
+            if let Err(error) = &result {
+                eprintln!("historial de escucha: {error}");
+            }
+            let _ = qt.queue(move |library| {
+                if library.history_request == request {
+                    if let Some(json) = json {
+                        library.set_historial(QString::from(&json));
+                    }
+                }
+            });
+        });
+    }
+
     fn open_detail(mut self: Pin<&mut Self>, item: &QString) {
         use cxx_qt::CxxQtType;
         let Ok(item) = serde_json::from_str::<ytm::Item>(&item.to_string()) else { return };
@@ -272,7 +374,11 @@ impl qobject::Library {
 
         let qt = self.qt_thread();
         thread::spawn(move || {
-            let result = ytm::detail(&item);
+            let result = if item.browse_id.starts_with(listenbrainz::PLAYLIST_PREFIX) {
+                listenbrainz::detail(&item)
+            } else {
+                ytm::detail(&item)
+            };
             let _ = qt.queue(move |mut library| {
                 if library.detail_request != request {
                     return;

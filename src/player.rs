@@ -650,10 +650,13 @@ impl qobject::Player {
     fn announce(mut self: Pin<&mut Self>) {
         if !self.announced {
             self.as_mut().rust_mut().announced = true;
+            let index = *self.index() as usize;
+            let video_id = self.tracks.get(index).map(|track| track.video_id.clone()).unwrap_or_default();
             plugins::emit(plugins::Event::Track(plugins::Track {
                 title: self.title().to_string(),
                 artist: self.artist().to_string(),
                 thumb: self.thumb().to_string(),
+                video_id,
                 duration: *self.duration(),
             }));
         } else {

@@ -76,6 +76,9 @@ Item {
           options: [{ id: "grande", label: "Grande" }, { id: "clasica", label: "Clásica" }] },
         { cat: "vistas", key: "sonandoTitulo", label: "Título en Sonando", hint: "Título y artista bajo la carátula. Automático: solo en la Clásica.", fallback: "auto",
           options: [{ id: "auto", label: "Automático" }, { id: "si", label: "Siempre" }, { id: "no", label: "Nunca" }] },
+        { cat: "vistas", key: "explorarFuente", label: "Fuente de Explorar",
+          hint: "ListenBrainz: tus listas semanales y recomendaciones (conecta tu cuenta en Plugins). YouTube Music: novedades, listas de éxitos y ánimos.",
+          fallback: "listenbrainz", options: [{ id: "listenbrainz", label: "ListenBrainz" }, { id: "youtube", label: "YouTube Music" }] },
         { cat: "vistas", key: "caratulas", label: "Carátulas del Muro", fallback: "medianas",
           options: [{ id: "pequenas", label: "Pequeñas" }, { id: "medianas", label: "Medianas" }, { id: "grandes", label: "Grandes" }] }
     ]
@@ -1166,6 +1169,68 @@ Item {
                     visible: Plugins.lastfmUser !== ""
                     text: "Desconectar Last.fm"
                     onClicked: Plugins.lastfmDisconnect()
+                }
+
+                Toggle {
+                    label: "ListenBrainz"
+                    hint: Plugins.listenbrainzUser !== "" ? "Conectado como " + Plugins.listenbrainzUser + "."
+                                                          : "Tus escuchas dan forma a Explorar."
+                    on: Plugins.listenbrainzOn
+                    onChanged: on => {
+                        if (on && Plugins.listenbrainzUser === "")
+                            listenbrainzSetup.visible = true
+                        else
+                            Plugins.setListenbrainz(on)
+                    }
+                }
+
+                Column {
+                    id: listenbrainzSetup
+                    visible: false
+                    width: parent.width
+                    spacing: 8
+
+                    Status {
+                        text: "Crea una cuenta gratis en listenbrainz.org, copia tu token de listenbrainz.org/settings y pégalo aquí. Tu historial de Last.fm se puede importar desde su web."
+                    }
+
+                    Row {
+                        width: parent.width
+                        spacing: 8
+
+                        TextField {
+                            id: listenbrainzToken
+                            width: parent.width - listenbrainzConnect.width - 8
+                            secret: true
+                            placeholder: "Token de ListenBrainz"
+                            onCommitted: text => Plugins.listenbrainzConnect(text)
+                        }
+
+                        PillButton {
+                            id: listenbrainzConnect
+                            text: "Conectar"
+                            primary: true
+                            onClicked: Plugins.listenbrainzConnect(listenbrainzToken.text)
+                        }
+                    }
+
+                    Connections {
+                        target: Plugins
+                        function onListenbrainzUserChanged() {
+                            if (Plugins.listenbrainzUser !== "") {
+                                listenbrainzSetup.visible = false
+                                listenbrainzToken.text = ""
+                            }
+                        }
+                    }
+                }
+
+                Status { text: Plugins.listenbrainzStatus }
+
+                PillButton {
+                    visible: Plugins.listenbrainzUser !== ""
+                    text: "Desconectar ListenBrainz"
+                    onClicked: Plugins.listenbrainzDisconnect()
                 }
             }
         }

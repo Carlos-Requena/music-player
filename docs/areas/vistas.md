@@ -15,7 +15,7 @@ Cómo se recorre cada sección. Opciones › Vistas, el selector de arriba a la 
 
 | Vista | Qué es | Por defecto en |
 |---|---|---|
-| **Muro** | Cuadrícula de carátulas por zonas, la enfocada ampliada | Inicio, Explorar, Me gusta, Búsqueda |
+| **Muro** | Cuadrícula de carátulas por zonas, la enfocada ampliada | Inicio, Explorar, Me gusta, Historial, Búsqueda |
 | **Lomos** | Estantería 3D: la elegida de frente y más grande, sus vecinas giradas hacia ella, el resto como lomos; reflejo en el suelo y halo de color | Playlists, Álbumes |
 | **Cubeta** | Discos de uno en uno, como en una caja de tienda | — |
 

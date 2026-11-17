@@ -3,6 +3,7 @@ mod audio;
 mod daemon;
 mod history;
 mod library;
+mod listenbrainz;
 mod lyrics;
 mod player;
 mod plugins;
@@ -22,8 +23,15 @@ fn probe(args: &[String]) -> bool {
 
     let zones = match what {
         "home" => ytm::browse("FEmusic_home"),
-        "explore" => ytm::browse("FEmusic_explore"),
+        // Explorar de ListenBrainz; `argumento`: un usuario de ListenBrainz (si no, el conectado).
+        "explore" => {
+            let user = if argument.is_empty() { plugins::listenbrainz_user() } else { Some(argument.to_owned()) };
+            listenbrainz::explorar(user.as_deref(), |_| {})
+        }
         "albums" => ytm::browse("FEmusic_new_releases_albums"),
+        // Explorar de YouTube Music (la otra fuente de Explorar) y el historial (con sesión).
+        "explore-youtube" => ytm::browse("FEmusic_explore"),
+        "history" => ytm::browse("FEmusic_history"),
         "playlists" => ytm::mood_playlists(3),
         "search" => ytm::search(argument),
         "queue" | "album" => {

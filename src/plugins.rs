@@ -1,15 +1,17 @@
-//! Plugins: controles multimedia del sistema, Discord Rich Presence y Last.fm.
+//! Plugins: controles multimedia del sistema, Discord Rich Presence, Last.fm y ListenBrainz.
 //!
 //! El reproductor avisa de lo que pasa con `emit(Event)`; un hilo propio reparte los
-//! eventos a Discord y Last.fm, que hablan con la red y nunca deben frenar la interfaz.
+//! eventos a Discord, Last.fm y ListenBrainz, que hablan con la red y nunca deben frenar la interfaz.
 //! Los controles del sistema viven en el reproductor (en macOS deben estar en el hilo
 //! principal) y usan `media_enabled`.
 //!
-//! La configuración (incluido el secreto y la sesión de Last.fm) se guarda en
+//! La configuración (incluidos el secreto y la sesión de Last.fm y el token de ListenBrainz) se
+//! guarda en
 //! `<config>/musicplayer/plugins.json`, legible solo por el usuario.
 
 mod discord;
 mod lastfm;
+mod listenbrainz;
 
 use std::{
     fs,
@@ -48,6 +50,10 @@ pub mod qobject {
         #[qproperty(QString, lastfm_status)]
         /// Hay un token esperando a que el usuario lo autorice en el navegador.
         #[qproperty(bool, lastfm_pending)]
+        #[qproperty(bool, listenbrainz_on)]
+        /// Usuario de ListenBrainz del token guardado; vacío si no hay.
+        #[qproperty(QString, listenbrainz_user)]
+        #[qproperty(QString, listenbrainz_status)]
         type Plugins = super::PluginsRust;
 
         /// Arranca el hilo de los plugins (una vez, al abrir la app).
@@ -77,6 +83,18 @@ pub mod qobject {
 
         #[qinvokable]
         fn lastfm_disconnect(self: Pin<&mut Plugins>);
+
+        /// Comprueba el token de ListenBrainz y, si vale, lo guarda y activa el envío.
+        #[qinvokable]
+        fn listenbrainz_connect(self: Pin<&mut Plugins>, token: &QString);
+
+        /// Activa o pausa el envío de escuchas (el token se conserva).
+        #[qinvokable]
+        fn set_listenbrainz(self: Pin<&mut Plugins>, on: bool);
+
+        /// Olvida el token: Explorar vuelve a mostrar solo lo general.
+        #[qinvokable]
+        fn listenbrainz_disconnect(self: Pin<&mut Plugins>);
     }
 
     impl cxx_qt::Threading for Plugins {}
@@ -88,6 +106,7 @@ pub struct Track {
     pub title: String,
     pub artist: String,
     pub thumb: String,
+    pub video_id: String,
     pub duration: f64,
 }
 
@@ -123,6 +142,9 @@ struct Config {
     lastfm_secret: String,
     lastfm_session: String,
     lastfm_user: String,
+    listenbrainz: bool,
+    listenbrainz_token: String,
+    listenbrainz_user: String,
 }
 
 impl Config {
@@ -183,6 +205,13 @@ fn update(change: impl FnOnce(&mut Config)) {
     emit(Event::Reload);
 }
 
+/// Usuario de ListenBrainz cuyas recomendaciones muestra Explorar (aunque el envío de escuchas
+/// esté en pausa); `None` sin token.
+pub fn listenbrainz_user() -> Option<String> {
+    let settings = config();
+    (!settings.listenbrainz_token.is_empty() && !settings.listenbrainz_user.is_empty()).then_some(settings.listenbrainz_user)
+}
+
 /// ¿Están activados los controles multimedia del sistema?
 pub fn media_enabled() -> bool {
     config().media_on()
@@ -202,11 +231,12 @@ fn open_browser(url: &str) {
     let _ = Command::new(opener).arg(url).spawn();
 }
 
-/// Hilo de Discord y Last.fm.
+/// Hilo de Discord, Last.fm y ListenBrainz.
 fn worker(events: mpsc::Receiver<Event>, qt: CxxQtThread<qobject::Plugins>) {
     let mut settings = config();
     let mut discord: Option<discord::Discord> = None;
     let mut scrobbler: Option<lastfm::Scrobbler> = None;
+    let mut submitter: Option<listenbrainz::Submitter> = None;
     let mut current: Option<Track> = None;
     let mut playing = false;
     let mut position = 0.0;
@@ -250,6 +280,13 @@ fn worker(events: mpsc::Receiver<Event>, qt: CxxQtThread<qobject::Plugins>) {
         } else {
             scrobbler = None;
         }
+        if settings.listenbrainz && !settings.listenbrainz_token.is_empty() {
+            if submitter.as_ref().map(|s| s.token != settings.listenbrainz_token) != Some(false) {
+                submitter = Some(listenbrainz::Submitter::new(settings.listenbrainz_token.clone()));
+            }
+        } else {
+            submitter = None;
+        }
 
         let mut discord_update: Option<Option<serde_json::Value>> = None;
         match event {
@@ -262,6 +299,13 @@ fn worker(events: mpsc::Receiver<Event>, qt: CxxQtThread<qobject::Plugins>) {
                         Ok(()) => format!("Escuchando ahora: {} — {}", track.title, track.artist),
                         Err(error) => error,
                     }));
+                }
+                if let Some(submitter) = submitter.as_mut() {
+                    let result = submitter.start(&track);
+                    listenbrainz_status(&qt, match result {
+                        Ok(()) => format!("Escuchando ahora: {} — {}", track.title, track.artist),
+                        Err(error) => error,
+                    });
                 }
                 discord_update = Some(Some(discord::activity(&track, 0.0)));
                 current = Some(track);
@@ -292,6 +336,16 @@ fn worker(events: mpsc::Receiver<Event>, qt: CxxQtThread<qobject::Plugins>) {
                         Err(error) => status(&qt, None, Some(error)),
                     }
                 }
+                if let Some(submitter) = submitter.as_mut() {
+                    match submitter.progress(position, playing) {
+                        Ok(true) => {
+                            let title = current.as_ref().map(|t| t.title.clone()).unwrap_or_default();
+                            listenbrainz_status(&qt, format!("Escucha enviada: {title}"));
+                        }
+                        Ok(false) => {}
+                        Err(error) => listenbrainz_status(&qt, error),
+                    }
+                }
             }
             Event::Stopped => {
                 playing = false;
@@ -317,6 +371,10 @@ fn worker(events: mpsc::Receiver<Event>, qt: CxxQtThread<qobject::Plugins>) {
     }
 }
 
+fn listenbrainz_status(qt: &CxxQtThread<qobject::Plugins>, text: String) {
+    let _ = qt.queue(move |plugins| plugins.set_listenbrainz_status(QString::from(&text)));
+}
+
 pub struct PluginsRust {
     media_on: bool,
     discord_on: bool,
@@ -328,6 +386,9 @@ pub struct PluginsRust {
     lastfm_user: QString,
     lastfm_status: QString,
     lastfm_pending: bool,
+    listenbrainz_on: bool,
+    listenbrainz_user: QString,
+    listenbrainz_status: QString,
     /// Token de Last.fm a la espera de autorización.
     token: String,
 }
@@ -346,6 +407,9 @@ impl Default for PluginsRust {
             lastfm_user: QString::from(&config.lastfm_user),
             lastfm_status: QString::default(),
             lastfm_pending: false,
+            listenbrainz_on: config.listenbrainz,
+            listenbrainz_user: QString::from(&config.listenbrainz_user),
+            listenbrainz_status: QString::default(),
             token: String::new(),
         }
     }
@@ -463,6 +527,48 @@ impl qobject::Plugins {
         self.as_mut().set_lastfm_on(false);
         self.as_mut().set_lastfm_pending(false);
         self.as_mut().set_lastfm_status(QString::default());
+    }
+
+    fn listenbrainz_connect(mut self: Pin<&mut Self>, token: &QString) {
+        let token = token.to_string().trim().to_owned();
+        if token.is_empty() {
+            self.as_mut().set_listenbrainz_status(QString::from("Pega primero tu token de ListenBrainz."));
+            return;
+        }
+        self.as_mut().set_listenbrainz_status(QString::from("Comprobando el token…"));
+        let qt = self.qt_thread();
+        thread::spawn(move || {
+            let result = crate::listenbrainz::validate_token(&token);
+            let _ = qt.queue(move |mut plugins| match result {
+                Ok(user) => {
+                    update(|config| {
+                        config.listenbrainz_token = token;
+                        config.listenbrainz_user = user.clone();
+                        config.listenbrainz = true;
+                    });
+                    plugins.as_mut().set_listenbrainz_on(true);
+                    plugins.as_mut().set_listenbrainz_user(QString::from(&user));
+                    plugins.as_mut().set_listenbrainz_status(QString::from(&format!("Conectado como {user}.")));
+                }
+                Err(error) => plugins.as_mut().set_listenbrainz_status(QString::from(&error)),
+            });
+        });
+    }
+
+    fn set_listenbrainz(mut self: Pin<&mut Self>, on: bool) {
+        update(|config| config.listenbrainz = on);
+        self.as_mut().set_listenbrainz_on(on);
+    }
+
+    fn listenbrainz_disconnect(mut self: Pin<&mut Self>) {
+        update(|config| {
+            config.listenbrainz_token.clear();
+            config.listenbrainz_user.clear();
+            config.listenbrainz = false;
+        });
+        self.as_mut().set_listenbrainz_on(false);
+        self.as_mut().set_listenbrainz_status(QString::default());
+        self.as_mut().set_listenbrainz_user(QString::default());
     }
 
     fn rust_mut_token(self: Pin<&mut Self>, token: String) {

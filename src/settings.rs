@@ -82,6 +82,7 @@ const DEFAULT_VIEWS: &[(&str, &str)] = &[
     ("playlists", "lomos"),
     ("albumes", "lomos"),
     ("megusta", "muro"),
+    ("historial", "muro"),
     ("buscar", "muro"),
 ];
 
@@ -334,6 +335,7 @@ impl Default for AppSettingsRust {
         crate::daemon::set_enabled(stored.opciones.get("ytdlp").map(String::as_str) != Some("no"));
         crate::resolver::set_premium(stored.opciones.get("calidad").map(String::as_str) == Some("premium"));
         crate::history::set_enabled(stored.opciones.get("historial").map(String::as_str) != Some("no"));
+        crate::library::set_explorar_youtube(stored.opciones.get("explorarFuente").map(String::as_str) == Some("youtube"));
         let skins = all_skins();
         let mascots = all_mascots();
         Self {
@@ -375,6 +377,7 @@ impl qobject::AppSettings {
             "ytdlp" => crate::daemon::set_enabled(valor.to_string() != "no"),
             "calidad" => crate::resolver::set_premium(valor.to_string() == "premium"),
             "historial" => crate::history::set_enabled(valor.to_string() != "no"),
+            "explorarFuente" => crate::library::set_explorar_youtube(valor.to_string() == "youtube"),
             _ => {}
         }
         // Vacío = valor por defecto: se borra la clave (así no se acumulan, p. ej., los retrasos

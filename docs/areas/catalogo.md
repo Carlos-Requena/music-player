@@ -1,10 +1,10 @@
 ---
 area: catalogo
 titulo: Catálogo de YouTube Music
-resumen: Secciones (Inicio, Explorar, Álbumes, Playlists, Me gusta), búsqueda, detalle abierto y categorías de playlists, pedidos a InnerTube y publicados como JSON.
-archivos: [src/ytm.rs, src/library.rs, qml/Catalog.qml, qml/CategoryBar.qml]
-opciones: [categoria, categorias]
-adr: [ADR-04, ADR-06, ADR-09]
+resumen: Secciones (Inicio, Explorar, Álbumes, Playlists, Me gusta, Historial), búsqueda, detalle abierto y categorías de playlists, pedidos a InnerTube (Explorar, a ListenBrainz si se elige) y publicados como JSON.
+archivos: [src/ytm.rs, src/library.rs, src/listenbrainz.rs, qml/Catalog.qml, qml/CategoryBar.qml]
+opciones: [categoria, categorias, explorarFuente]
+adr: [ADR-04, ADR-06, ADR-09, ADR-19, ADR-20]
 ---
 
 # Catálogo de YouTube Music
@@ -17,9 +17,20 @@ búsqueda y el detalle de un álbum, playlist o artista. Cómo se pinta cada sec
 
 - **Sin sesión:** Inicio, Explorar, Álbumes (novedades), «Ánimo y géneros» y búsqueda de
   canciones, álbumes, playlists y artistas.
+- **Explorar sale de ListenBrainz** ([ADR-19](../decisions/ADR-19-explorar-con-listenbrainz.md))
+  o, si se elige en Opciones › Vistas › «Fuente de Explorar» (opción `explorarFuente`:
+  vacío = ListenBrainz, `youtube`), del Explorar de YouTube Music
+  ([ADR-20](../decisions/ADR-20-fuente-de-explorar-a-elegir.md)). Con el usuario de ListenBrainz conectado en [plugins](plugins.md):
+  «Hecho para ti» (Exploración semanal, Jams semanales y Jams diarias, las listas que Troi genera
+  en el servidor de ListenBrainz, que se abren como un detalle con Reproducir y Aleatorio),
+  «Recomendado para ti» (recomendaciones colaborativas) y «Novedades de tus artistas» (álbumes).
+  Siempre, también sin cuenta: «Lo más escuchado esta semana» en ListenBrainz.
 - **Con sesión:** además, la biblioteca de la cuenta: Playlists (`FEmusic_liked_playlists`),
-  álbumes guardados (`FEmusic_liked_albums`) y Me gusta (`VLLM`). Sin sesión, Playlists y Me gusta
-  quedan vacías.
+  álbumes guardados (`FEmusic_liked_albums`), Me gusta (`VLLM`) e **Historial**
+  (`FEmusic_history`: lo escuchado en la cuenta, en zonas por día como «Hoy» y «Ayer»; incluye lo
+  que esta app registra, ver [historial](historial.md)). Sin sesión, Playlists, Me gusta e
+  Historial quedan vacías. El historial se vuelve a pedir cada vez que se abre su sección
+  (`Library.loadHistorial`), porque cambia al escuchar.
 - **Categorías de playlists:** pestañas propias sobre la sección Playlists («Todas», las del
   usuario y «+»), con clic derecho para renombrar o borrar, y ↑/↓ o RePág/AvPág desde la
   estantería. Son locales (opción `categorias`, JSON) y la elegida se recuerda (`categoria`).
@@ -52,6 +63,18 @@ búsqueda y el detalle de un álbum, playlist o artista. Cómo se pinta cada sec
   crean uno de un solo uso y cada petición pagaba una conexión TLS nueva: no se usan.
 - **La búsqueda pide sus cuatro listas a la vez** (artistas, canciones, álbumes y playlists): tarda
   lo que la más lenta.
+- **De ListenBrainz a YouTube Music, una búsqueda por canción** (`ytm::search_one_kind`, cuatro
+  a la vez) que se guarda por MBID en `<caché>/musicplayer/listenbrainz-youtube.json`, también
+  cuando no se encuentra; si la búsqueda falla por la red no se guarda y se reintenta en la
+  próxima carga. De los tres primeros resultados vale el primero cuyo título o artista coincide
+  (`pick`): basta con uno porque ListenBrainz y YouTube escriben a veces el mismo nombre en
+  alfabetos distintos (japonés y romaji).
+- **ListenBrainz, una petición por segundo** (`wait_turn`) y User-Agent propio
+  (`musicplayer/<versión>`). Por eso Explorar va en su propio hilo (`load_explorar`) y publica cada
+  zona en cuanto está lista: no retrasa las demás secciones.
+- **Una lista de ListenBrainz es un elemento `playlist` con `browseId` `lb:<mbid>`** y sin
+  `playlistId`: `Library.openDetail` la abre con `listenbrainz::detail` (de memoria si ya se
+  convirtió al cargar Explorar). No se puede guardar entera en la cuenta; sus canciones, sí.
 - **Lo que no cambia no se reconstruye en QML:** `Catalog.categorias` sale del texto guardado
   (`categoriasJson`), no de `AppSettings.revision`, para que tocar otra opción no rehaga
   Playlists. Lomos y Cubeta juntan las zonas con `Catalog.allItems`.
@@ -62,13 +85,21 @@ búsqueda y el detalle de un álbum, playlist o artista. Cómo se pinta cada sec
   `qt_thread().queue(...)` y se descarta si su `load_token` ya no es el último. La búsqueda
   igual con `search_request`.
 - Con sesión, cada petición se firma con [sesion](sesion.md) (`account::with_session`).
-- Caché en `<caché>/musicplayer/<anonimo|cuenta>-<sección>.json`.
+- Caché en `<caché>/musicplayer/<anonimo|cuenta>-<sección>.json`; Explorar, en
+  `anonimo-explorar-listenbrainz.json` o `anonimo-explorar.json` según su fuente (no depende de la
+  sesión de YouTube); al cambiar de fuente se vacía y no se muestra la copia de la otra.
+- Explorar: `listenbrainz::explorar(usuario, publicar)` pide `/user/{u}/playlists/createdfor`, cada
+  `/playlist/{mbid}`, `/cf/recommendation/user/{u}/recording` (+ `/metadata/recording`),
+  `/user/{u}/fresh_releases` y `/stats/sitewide/recordings?range=week`. El usuario sale de
+  `plugins::listenbrainz_user()`; al cambiar, `Main.qml` vuelve a llamar a `Library.load`.
 
 ## Medidas
 
 | Situación | Medida | Fecha y máquina |
 |---|---|---|
 | Búsqueda («Vetusta Morla», `--probe search`, cuatro listas a la vez) | 0,50–0,57 s | 2026-11-17, M4 Pro, release |
+| Explorar de ListenBrainz (`--probe explore mr_monkey`, 2 listas, 30 recomendaciones, 15 novedades, 30 más escuchadas), caché vacía | 24,7 s, 50 de 50 canciones de una lista encontradas y correctas | 2026-11-17, M4 Pro, release |
+| Lo mismo con la caché de búsquedas llena (solo las peticiones a ListenBrainz, una por segundo) | 7,8 s | 2026-11-17, M4 Pro, release |
 | Canciones de una playlist de 500 pistas (`playlist_tracks`) | ~3 s | 2026-11-14, M4 Pro, release |
 | Sección visible al abrir, desde la caché | ~300 ms con carátulas | 2026-11-14, M4 Pro, release |
 
@@ -78,6 +109,7 @@ búsqueda y el detalle de un álbum, playlist o artista. Cómo se pinta cada sec
 |---|---|
 | `src/ytm.rs` | Cliente InnerTube: secciones, búsqueda, detalle, colas, biblioteca, guardar |
 | `src/library.rs` | Singleton `Library`: publica secciones, búsqueda y detalle; caché en disco |
+| `src/listenbrainz.rs` | Explorar: API de ListenBrainz, paso a YouTube Music y su caché; token de ListenBrainz |
 | `qml/Catalog.qml` | Singleton: JSON → objetos, lista de secciones, categorías, retraso de la letra |
 | `qml/CategoryBar.qml` | Pestañas de categorías de Playlists |
 
@@ -92,6 +124,11 @@ búsqueda y el detalle de un álbum, playlist o artista. Cómo se pinta cada sec
 | Biblioteca de la cuenta | [`library_playlists`](../../src/ytm.rs), [`liked_songs`](../../src/ytm.rs) |
 | Dar o quitar «Me gusta» | [`like`](../../src/ytm.rs), [`remove_like`](../../src/ytm.rs), [`like`](../../src/library.rs) |
 | Límite de cada zona | [`ZONE_LIMIT`](../../src/library.rs) |
+| Zonas de Explorar y su fuente | [`explorar`](../../src/listenbrainz.rs), [`load_explorar`](../../src/library.rs), [`set_explorar_youtube`](../../src/library.rs) |
+| Historial de escucha | [`history`](../../src/library.rs), [`load_historial`](../../src/library.rs) |
+| Buscar en YouTube Music lo que recomienda ListenBrainz | [`find`](../../src/listenbrainz.rs), [`pick`](../../src/listenbrainz.rs), [`search_one_kind`](../../src/ytm.rs) |
+| Detalle de una lista de ListenBrainz | [`detail`](../../src/listenbrainz.rs) |
+| Una petición por segundo | [`wait_turn`](../../src/listenbrainz.rs) |
 | Qué secciones hay y cuáles exigen sesión | [`sections`](../../qml/Catalog.qml) |
 | Zonas de una sección para su vista | [`zonas`](../../qml/Catalog.qml) |
 | Categorías de playlists | [`saveCategorias`](../../qml/Catalog.qml), [`inCategoria`](../../qml/Catalog.qml) |
@@ -102,8 +139,9 @@ búsqueda y el detalle de un álbum, playlist o artista. Cómo se pinta cada sec
   saber si hay biblioteca. No hace falta leerla salvo para tocar la firma.
 - **[reproduccion](reproduccion.md)** (`player::forget_queue`, `Player`): olvidar la cola de una
   lista al guardarla; `Catalog` lee la cola y la letra que publica `Player`.
-- **[personalizacion](personalizacion.md)** (`AppSettings`): vista elegida por sección y opciones
-  de categorías.
+- **[personalizacion](personalizacion.md)** (`AppSettings`): vista elegida por sección, opciones
+  de categorías y la fuente de Explorar (`library::set_explorar_youtube` desde `settings.rs`).
+- **[plugins](plugins.md)** (`plugins::listenbrainz_user`): el usuario de ListenBrainz de Explorar.
 - `Catalog.lyricsDelay` y `Catalog.setLyricsDelay` guardan el retraso de la letra por comodidad;
   sus reglas están en [letra](letra.md).
 - **La usan:** casi todas: [vistas](vistas.md), [detalle](detalle.md), [ventana](ventana.md),
@@ -112,14 +150,22 @@ búsqueda y el detalle de un álbum, playlist o artista. Cómo se pinta cada sec
 
 ## Estado actual
 
-- **Última verificación:** 2026-11-17, cliente HTTP común y búsqueda en paralelo ([historial](../history/verificacion/catalogo.md)).
+- **Última verificación:** 2026-11-17, fuente de Explorar a elegir y sección Historial ([historial](../history/verificacion/catalogo.md)).
 - **Pruebas:** ninguna en `ytm.rs` ni `library.rs` (dependen de la red); se prueban con
-  `--probe home|explore|albums|playlists|search|album|queue`.
-- **Sin verificar:** biblioteca con sesión en Linux; `like/like` y `like/removelike` con una
+  `--probe home|explore|explore-youtube|history|albums|playlists|search|album|queue`
+  (`--probe explore <usuario>` para otro usuario de ListenBrainz; `history` necesita sesión). `mod tests` de `src/listenbrainz.rs`: nombres comparables,
+  primer artista del crédito, elección del resultado, MBID y fecha.
+- **Sin verificar:** la sección Historial con una sesión real (que `FEmusic_history` dé sus
+  zonas por día con este recorrido); el cambio de fuente de Explorar pulsado en Opciones (sí al
+  arrancar con la opción puesta); Explorar con el usuario del propietario (sin escuchas aún en ListenBrainz);
+  la calidad de la búsqueda con música japonesa y anime; biblioteca con sesión en Linux; `like/like` y `like/removelike` con una
   sesión real.
 - **Historial:** [docs/history/verificacion/catalogo.md](../history/verificacion/catalogo.md).
 
 ## Pendiente
+
+- Explorar sin cuenta de ListenBrainz es pobre (solo lo más escuchado): una zona de LB Radio
+  sembrada con los artistas de «Me gusta» ([ADR-19](../decisions/ADR-19-explorar-con-listenbrainz.md)).
 
 - Guardar álbumes en la biblioteca y dar o quitar «Me gusta» desde el menú contextual (hoy desde
   la barra y la mascota) ([ROADMAP](../ROADMAP.md)).
