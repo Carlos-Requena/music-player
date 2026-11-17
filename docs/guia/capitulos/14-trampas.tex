@@ -1,5 +1,171 @@
-\chapter{Trampas conocidas}\label{cap:trampas}
+\chapter{Trampas conocidas}
+\label{cap:trampas}
 
-\begin{trampa}[Capítulo pendiente]
-Este capítulo aún no está escrito. Mientras tanto, la información equivalente está en \archivo{docs/INDEX.md} (las fichas de \archivo{docs/areas/}) y \archivo{docs/ARCHITECTURE.md}.
+Cada entrada de este capítulo es un error que ya costó horas encontrar. Están agrupadas por
+tecnología. La fuente viva es \archivo{docs/TRAMPAS.md}: cuando descubras una nueva, añade allí
+una línea (síntoma, causa y arreglo) y, si merece explicación, un párrafo aquí.
+
+\begin{idea}[Léelo antes de tocar]
+Antes de cambiar algo de Qt, cxx-qt, mpv o YouTube, lee la sección que toque. Es la norma de
+\archivo{docs/AGENTES.md} (§2): leer una trampa cuesta un minuto; reencontrarla, una tarde.
+\end{idea}
+
+\section{Compilación y cxx-qt}
+
+\begin{description}[style=nextline, leftmargin=0pt]
+  \item[Un archivo QML nuevo «no existe»] \emph{Síntoma:} QML dice que el tipo no existe.
+  \emph{Causa:} no está en \cod{QML_FILES} (o en \cod{QML_SINGLETONS}) de
+  \archivo{build.rs}. \emph{Arreglo:} añádelo. \cod{python3 scripts/docs.py check} lo comprueba.
+  \item[Un puente Rust nuevo no aparece] Añádelo al \cod{.files([...])} de \archivo{build.rs}
+  \emph{y} como \cod{mod} en \archivo{main.rs}.
+  \item[Los nombres cambian en QML] \cod{#[auto_cxx_name]} convierte \cod{snake_case} en
+  \cod{camelCase}: \cod{play_item} es \cod{Player.playItem} y \cod{vista_inicio} es
+  \cod{AppSettings.vistaInicio}. Buscar el nombre de Rust desde QML no encuentra nada.
+  \item[«Unsupported verbatim input in ForeignItem»] \emph{Causa:} metiste el \emph{cuerpo} de
+  una función (o un método auxiliar) dentro del bloque \cod{extern "RustQt"}. \emph{Arreglo:}
+  en el bloque va solo la firma de lo invocable; el cuerpo va en \cod{impl qobject::Nombre}.
+\end{description}
+
+\section{Qt Quick y QML}
+
+\begin{description}[style=nextline, leftmargin=0pt]
+  \item[\texttt{font.pixelSize} es entero] Un \cod{12.5} \emph{hace fallar la carga del
+  componente entero}, no solo ese texto. Usa \cod{Math.round}.
+  \item[No llames \texttt{palette} a tu propiedad] Choca con la propiedad \cod{palette} de
+  \cod{Item} y QML ignora la tuya, sin avisar.
+  \item[Un \texttt{id} tapa una propiedad del mismo nombre] En \archivo{NowPlayingView}, \cod{art}
+  era una propiedad de la raíz \emph{y} el \cod{id} de la carátula: en los enlaces de la raíz,
+  \cod{art} daba el elemento y la cuenta salía \cod{NaN}. Usa \cod{root.art}, o no repitas el
+  nombre.
+  \item[Cambiar un índice dentro del aviso de cambio de la misma propiedad] Hacerlo en
+  \cod{onCurrentItemChanged} deja enlaces sin actualizar. Aplázalo: \cod{Qt.callLater(...)}.
+  \item[Los clics atraviesan] Un \cod{TapHandler} normal solo toma un agarre \emph{pasivo}: el
+  clic sigue hacia lo que haya debajo (cerrar «Sonando» pulsaba también el botón de opciones
+  que estaba en el mismo sitio). En botones y opciones:
+\begin{qml}
+TapHandler { gesturePolicy: TapHandler.ReleaseWithinBounds; onTapped: ... }
+\end{qml}
+  Un \cod{MouseArea} debajo no lo arregla.
+  \item[La rueda atraviesa las capas de encima] Con Opciones o el menú abiertos, la rueda
+  desplaza la sección de debajo: un \cod{Flickable} que llega al tope, o que no se desplaza,
+  deja pasar la rueda. Solución: bajo la capa, un \cod{MouseArea} con
+  \cod{acceptedButtons: Qt.NoButton} y \cod{onWheel: wheel => wheel.accepted = true}.
+  \item[\texttt{Window.window} dentro de un \texttt{TapHandler} es \texttt{null}] Los
+  \emph{handlers} no son \cod{Item}. Usa el del elemento:
+  \cod{delegado.Window.window.openMenu(...)}.
+  \item[Arrastrar dentro de una lista la desplaza] En vez de mover la fila. Usa un
+  \cod{MouseArea} con \cod{preventStealing: true} (como \archivo{QueueList}).
+  \item[«Hover» sobre algo que se mueve] Un \cod{HoverHandler}, un \cod{MouseArea} con
+  \cod{cursorShape} o un \cod{TapHandler} \emph{por elemento} sobre contenido animado obligan a
+  repasar esa parte de la escena en cada fotograma. En la letra llevaba la CPU de ~5\,\% a
+  ~25\,\%. Un único gestor para toda la vista, con \cod{childAt}, y sin «hover».
+  \item[Rotaciones 3D] Un ángulo positivo en el eje Y \emph{aleja el lado derecho}. Y las
+  rotaciones grandes (más de ~70°) acercan la pieza a la cámara y la agrandan: para abrir la
+  caja se usa un pliegue plano (\cod{Scale} en X).
+  \item[Máscaras de \texttt{MultiEffect}] Sin \cod{maskThresholdMin: 0.5} y
+  \cod{maskSpreadAtMin: 1} la máscara recorta en seco en vez de seguir el degradado.
+  \item[\texttt{TintProbe} (un \texttt{Canvas})] Cada lienzo debe llamar a \cod{loadImage}
+  aunque otro ya tenga la imagen, y repintar con su propio \cod{Timer}; si no, la segunda
+  sonda con la misma carátula no pinta. Una sonda recortada (fuera de la zona visible) tampoco
+  pinta: usa la de \archivo{Main.qml} (\cod{playingProbe}).
+  \item[Una \texttt{Shape} con \texttt{CurveRenderer} no se redibuja tras ocultar la ventana]
+  Al liberar los gráficos (\archivo{window.cpp}) se pierde. \archivo{Icon.qml} se recrea con un
+  \cod{Loader} cada vez que sube \cod{Theme.renderEpoch}; una \cod{Shape} nueva con ese
+  renderizador necesita lo mismo.
+  \item[\texttt{ShapePath.fillItem} no usa el tamaño del elemento] Coloca la textura en la
+  esquina de la forma, con su tamaño en \emph{píxeles físicos} (una imagen de 544 px en Retina
+  ocupa 272). En una forma mayor, el último píxel se repite por la derecha y por abajo: la
+  carátula salía «corrida». Escálala con \cod{fillTransform}, como \archivo{Cover.qml}. La
+  captura sin ventana (\cod{offscreen}) no pinta el relleno: compruébalo con ventana.
+  \item[Una \texttt{ListView} vertical pone cada delegado en \texttt{x = 0}] Aunque el delegado
+  diga otra \cod{x}. El margen va en \cod{leftMargin} de la lista (el Muro salía pegado al
+  borde).
+  \item[Letra en japonés o chino] Partir la línea por espacios deja una sola «palabra»
+  enorme que se encoge en vez de pasar al renglón siguiente, y unir las sílabas con espacios
+  separa los caracteres. Cada sílaba lleva \cod{join} y los renglones se parten entre
+  caracteres CJK (\cod{rows} de \archivo{LyricsView}).
+\end{description}
+
+\begin{trampa}[La más cara: el \emph{hover} en la letra]
+Es la trampa que más CPU costó, porque no falla: todo funciona y solo el consumo lo delata. Si
+algo que se anima va lento o gasta de más, \emph{lo primero que hay que mirar es si hay un
+gestor de puntero por elemento encima}.
 \end{trampa}
+
+\section{YouTube, yt-dlp y mpv}
+
+\begin{description}[style=nextline, leftmargin=0pt]
+  \item[No castigues a YouTube] Muchas peticiones seguidas y rechaza la IP un rato:
+  «Requested format is not available», 403, «Sign in to confirm you're not a bot». Espera unos
+  minutos y compruébalo con \cod{yt-dlp} directamente antes de culpar al código. Agrupa las
+  pruebas que hacen peticiones reales.
+  \item[mpv y las URL de googlevideo] Las de yt-dlp dan 403 con el cliente HTTP de mpv y se
+  cargan como \cod{lavf://URL} (ffmpeg); las de la vía rápida se atascan con ffmpeg y se
+  cargan tal cual. \cod{resolver::run_ytdlp} deja el prefijo según el origen.
+  \item[La vía rápida necesita «visitor data»] Sin él YouTube responde
+  \cod{LOGIN_REQUIRED} (\archivo{stream.rs}).
+  \item[yt-dlp sin sesión] Con los clientes por defecto YouTube pide verificación anti-bot en
+  pistas de YouTube Music. Se usan \cod{web_embedded,mweb} (\cod{resolver::ytdlp_clients}).
+  \item[yt-dlp con sesión] Solo \cod{web_music} da las pistas reservadas a cuentas y los
+  formatos Premium; con \cod{player_skip=webpage,configs} tarda ~1,7 s en vez de ~3 s.
+  Diagnóstico: \cod{--probe playable ID} y \cod{--probe account}.
+  \item[yt-dlp reescribe el archivo de \texttt{--cookies}] Al terminar. \emph{Nunca} le pases el
+  \cod{cookies.txt} original: usa \cod{account::cookies_copy}.
+  \item[mpv solo avisa de la pausa cuando cambia] Al empezar una pista hay que aplicar la
+  última conocida (\cod{mpv_paused}); si no, «sonando» se queda desfasado.
+  \item[El historial de YouTube Music] Los avisos de escucha necesitan \cod{c=WEB_REMIX}; sin
+  él, la canción aparece en el historial de YouTube y no en el de YouTube Music.
+  \item[La cola \texttt{next} de un álbum] Trae versiones en vídeo, se corta en ~50 y mezcla
+  canciones ajenas: se usa la página \cod{VL<id>} (ADR-06).
+\end{description}
+
+\section{macOS y Linux}
+
+\begin{description}[style=nextline, leftmargin=0pt]
+  \item[Minimizar no libera memoria gráfica en macOS] Ocultar la ventana sí
+  (\archivo{window.cpp}).
+  \item[Las apps gráficas de macOS no heredan el \texttt{PATH} de la terminal] Por eso
+  \cod{audio::search_path} añade \cod{/opt/homebrew/bin} y \cod{/usr/local/bin}: mpv y yt-dlp
+  no se encontrarían.
+  \item[El proxy del sistema] Qt ignora el proxy de macOS (\archivo{window.cpp}); con un WPAD
+  roto cada descarga fallaba con «NSURLErrorDomain -1003». Se respetan \cod{HTTPS_PROXY} y
+  \cod{HTTP_PROXY}.
+  \item[Inicio de sesión en WebKit] La prevención de rastreo pierde las cookies en las
+  redirecciones de Google y YouTube acaba en \cod{/oops}; se desactiva.
+  \item[Disfrazar el agente de usuario de Chrome en Qt WebEngine] Google lo bloquea («este
+  navegador puede no ser seguro») porque contradice \cod{Sec-CH-UA}. No lo toques.
+  \item[Los sockets Unix admiten ~104 bytes de ruta] En pruebas de Discord usa una ruta
+  relativa corta (\cod{audio.rs} cae a \cod{/tmp} por la misma razón).
+\end{description}
+
+\section{Medir}
+
+\begin{description}[style=nextline, leftmargin=0pt]
+  \item[Mide siempre en release] Depuración cambia la memoria y los tiempos.
+  \item[Mide la CPU con tiempo acumulado] Con \cod{ps -o time=} al principio y al final de
+  25 s, y comprueba en la línea \cod{estado:} que sonaba la canción esperada (Inicio cambia de
+  una ejecución a otra). \cod{ps %cpu} es una foto de un instante y engaña.
+  \item[Memoria con \texttt{footprint}] La que muestra el Monitor de Actividad. Cualquier
+  ventana de Qt Quick que se redibuje reserva ~100 MB en el controlador gráfico.
+\end{description}
+
+\section{Trampas del trabajo con el repositorio}
+
+Las normas de \archivo{docs/AGENTES.md} existen por errores de método, no de código:
+
+\begin{itemize}
+  \item \textbf{Los datos del propietario no se tocan.} Una prueba que lee o borra
+  \cod{<config>/musicplayer/} se carga la sesión de la persona. Usa un \cod{HOME} temporal.
+  \item \textbf{Nunca importes las cookies del navegador} en una prueba: se prueba el camino
+  con sesión con un \cod{cookies.txt} falso.
+  \item \textbf{\texttt{MUSICPLAYER\_SILENT=1} siempre} en las pruebas automáticas.
+  \item \textbf{Una rama por tarea}: no se trabaja en \cod{master}.
+  \item \textbf{No presentes como probado lo que no lo está}: Linux, Wayland, el sonido real,
+  con sesión y la app empaquetada se dicen explícitamente cuando no se verificaron.
+\end{itemize}
+
+\begin{ejercicio}
+Elige tres trampas de este capítulo y, para cada una, localiza en el código el sitio donde se
+evita (por ejemplo, \cod{preventStealing: true} en \archivo{QueueList.qml}). Si quitaras esa
+línea, ¿cuál sería el síntoma exacto?
+\end{ejercicio}

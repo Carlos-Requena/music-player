@@ -5,6 +5,42 @@ son de cuando se escribieron. El estado actual está en su [ficha](../../areas/l
 
 Lo nuevo va arriba: añade una sección `## AAAA-MM-DD · qué se verificó` encima de las anteriores.
 
+## 2026-11-16 · Menos CPU en la letra (rama `perf/letra`)
+
+- **Cambio:** «Calidad» a 60 Hz como tope (la pantalla ProMotion daba hasta 120); brillo y puntos
+  de las pausas al ritmo del reloj de la letra en vez de animaciones propias a la frecuencia de la
+  pantalla; el brillo desenfoca una instantánea de la línea; cada `LyricsView` solo existe
+  mientras se ve; la letra se pide una vez por canción y no se reconstruye si la fuente no cambia.
+  En otras áreas: con «Sonando» arriba, el escenario, el panel (con su letra) y el detalle no se
+  pintan, y el vidrio de la barra desenfoca solo el fondo de «Sonando» ([ventana](ventana.md));
+  las barras de progreso, en píxeles enteros ([reproduccion](reproduccion.md)).
+- **Verificado:** CPU acumulada en 25 s (de los 12 a los 37 s de «紅蓮華», NetEase por sílaba),
+  dos pasadas por caso, la misma canción con un audio local (`MUSICPLAYER_DEBUG_AUDIO`, `--play`),
+  M4 Pro, release:
+
+  | | Antes | Después |
+  |---|---|---|
+  | Panel, Calidad | 6,3–7,3 s · 418–427 MB | 5,2–5,4 s · 381–383 MB |
+  | Panel, Equilibrado | 4,1–4,4 s · 419–422 MB | 3,2–3,7 s · 380–384 MB |
+  | «Sonando» con el panel, Calidad | 7,6–8,4 s · 447–449 MB | 6,5–6,7 s · 375–376 MB |
+  | «Sonando» con el panel, Equilibrado | 6,0 s · 420–448 MB | 3,1–3,5 s · 373–379 MB |
+  | Panel en la pestaña Cola | 2,9 s · 396–397 MB | 0,3 s · 318–335 MB |
+
+  Capturas del barrido a media sílaba con su brillo, antes y después (iguales), de «Sonando» y de
+  Opciones encima de «Sonando». La petición fallida a LRCLIB sin artista (la primera de las dos
+  búsquedas) ya no aparece en stderr. `cargo test` en verde.
+- **No verificado:** con el audio real de YouTube (pedía sesión); la fluidez a la vista de la
+  cascada y del brillo; «Bajo»; Linux.
+- **Medidas anteriores** (2026-11-14, otra canción y otro método, sin audio local; no comparables
+  con las de arriba):
+
+  | | Panel lateral | «Sonando» | Memoria |
+  |---|---|---|---|
+  | Calidad (todo a 60 Hz) | 7,4–8,7 s | 9,2 s | ~286 MB |
+  | Equilibrado (barrido a 30 Hz) | 4,8–5,0 s | 6,4 s | ~285 MB |
+  | Bajo (10 Hz, sin cascada ni brillo) | 3,1–3,9 s | 4,2 s | ~276 MB |
+  | Referencia: pestaña Cola | 3,5 s | — | 274 MB |
+
 ## 2026-11-16 · Letra de varias fuentes y palabra a palabra con tiempos reales
 
 - **Cambio:** fuentes LRCLIB, NetEase (YRC) y Kugou (KRC), pedidas a la vez; opción

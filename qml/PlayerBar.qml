@@ -300,11 +300,14 @@ Item {
                 visible: false
                 live: bar.visible && Theme.blur
                 sourceItem: root.backdrop
+                // A media resolución, como `Glass`.
+                textureSize: Qt.size(Math.max(1, Math.ceil(width * Screen.devicePixelRatio / 2)),
+                                     Math.max(1, Math.ceil(height * Screen.devicePixelRatio / 2)))
                 sourceRect: {
                     if (!root.backdrop)
                         return Qt.rect(0, 0, 0, 0)
                     // Dependencias explícitas: mapToItem no es reactivo por sí solo.
-                    void (root.x + root.y + root.width + root.height + root.backdrop.width + root.backdrop.height)
+                    void (root.x + root.y + root.width + root.height + root.backdrop.x + root.backdrop.y + root.backdrop.width + root.backdrop.height)
                     const origin = bar.mapToItem(root.backdrop, 0, 0)
                     return Qt.rect(origin.x, origin.y, bar.width, bar.height)
                 }
@@ -485,7 +488,9 @@ Item {
                 height: 12
                 activeFocusOnTab: true
 
-                readonly property real ratio: Player.duration > 0 ? Math.min(1, Player.position / Player.duration) : 0
+                // En píxeles enteros: sin avanzar un píxel no se redibuja (ver `Slider.drawn`).
+                readonly property real ratio: Player.duration > 0 && width > 0
+                    ? Math.round(Math.min(1, Player.position / Player.duration) * width) / width : 0
 
                 Accessible.role: Accessible.Slider
                 Accessible.name: "Posición"

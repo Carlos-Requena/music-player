@@ -29,8 +29,9 @@ retraso, bajo la propia letra.
   reparte el barrido por toda la línea, carácter a carácter en japonés y chino.
 - Japonés y chino no llevan espacios inventados entre sílabas; el renglón se parte entre dos
   caracteres cualesquiera, pero nunca entre las sílabas de una palabra latina.
-- **Calidad** (`letraCalidad`): «Calidad» (todo a 60 Hz), «Equilibrado» (barrido a 30 Hz, por
-  defecto) y «Bajo» (10 Hz, sin cascada ni brillo).
+- **Calidad** (`letraCalidad`): «Calidad» (barrido y brillo a 60 Hz, también en pantallas de
+  120 Hz), «Equilibrado» (a 30 Hz, por defecto) y «Bajo» (10 Hz, sin cascada ni brillo, y los
+  puntos de las pausas quietos).
 - **Tamaño, fuente y grosor** (`letraTamano`, `letraFuente`, `letraPeso`) y animación
   (`letraAnimada`).
 - **Alineación** (`letraAlineacion`): centrada (por defecto, la pidió el propietario), con cada
@@ -64,6 +65,21 @@ retraso, bajo la propia letra.
 - **El brillo es una copia desenfocada detrás**, no un `layer.effect` sobre la línea (el texto
   pasaría por una textura y se vería borroso). **Sin medios píxeles** en la elevación de las
   palabras: también emborronan.
+- **Un solo reloj** (`clock`) mueve el barrido, el brillo (`glow`) y los puntos de las pausas: a
+  60 Hz como tope en «Calidad» (`FrameAnimation` acumula los fotogramas de una pantalla de
+  120 Hz), a 30 Hz en «Equilibrado» y a los 10 pasos de mpv en las pausas. Una animación propia
+  (`NumberAnimation`, `SequentialAnimation`) va a la frecuencia de la pantalla y redibuja la
+  ventana entera con su vidrio: solo la llevan la cascada y el cambio de tamaño y de opacidad al
+  pasar de línea.
+- **El brillo desenfoca una instantánea** de la línea (`glowSource`, `live: false`), rehecha al
+  encenderse la línea y cada vez que empieza a iluminarse una palabra (`litWords`), no la línea
+  viva: con ella viva, cada paso del barrido la volvía a copiar y desenfocar.
+- **La letra solo existe mientras se ve:** las dos `LyricsView` (panel y «Sonando») van en un
+  `Loader` asíncrono; una letra por sílabas son miles de objetos.
+- **Se pide una sola vez por canción:** al pulsar una tarjeta, `Player` espera a la cola (que trae
+  el artista limpio y la duración) para pedirla (`defer_lyrics`); si la cola falla, la pide con
+  los datos de la tarjeta. `Catalog.lyricsChosen` solo cambia si cambia la fuente: cada fuente
+  que llega o cada opción que se toca no reconstruyen la letra.
 - **Texto sin `Text.CurveRendering`** en «Calidad»: costaba ~95 MB más.
 - **Ninguna palabra se sale de su línea:** una más ancha que la línea (en un recuadro estrecho,
   como «supercalifragilisticexpialidocious») se encoge hasta caber; las demás conservan su tamaño.
@@ -75,18 +91,22 @@ retraso, bajo la propia letra.
 
 ## Medidas
 
-CPU acumulada de la app en 25 s reproduciendo la misma canción (ruido de ±1 s; ×4 = % de un
-núcleo), 2026-11-14, M4 Pro, release ([método](../runbooks/medir-rendimiento.md#cpu)):
+CPU acumulada de la app en 25 s, de los 12 a los 37 s de «紅蓮華» (letra de NetEase con tiempo
+por sílaba), dos pasadas por caso (×4 = % de un núcleo); memoria con `footprint`. 2026-11-16, M4
+Pro con pantalla ProMotion, ventana 1440×900 en Retina, release, audio local
+([método](../runbooks/medir-rendimiento.md#siempre-la-misma-canción-aunque-youtube-no-deje-reproducir)):
 
-| | Panel lateral | «Sonando» | Memoria |
+| | Panel lateral | «Sonando» (con el panel activado) | Memoria |
 |---|---|---|---|
-| Calidad (todo a 60 Hz) | 7,4–8,7 s | 9,2 s | ~286 MB |
-| Equilibrado (barrido a 30 Hz) | 4,8–5,0 s | 6,4 s | ~285 MB |
-| Bajo (10 Hz, sin cascada ni brillo) | 3,1–3,9 s | 4,2 s | ~276 MB |
-| Referencia: pestaña Cola | 3,5 s | — | 274 MB |
+| Calidad (60 Hz) | 5,2–5,4 s | 6,5–6,7 s | 375–383 MB |
+| Equilibrado (30 Hz) | 3,2–3,7 s | 3,1–3,5 s | 373–384 MB |
+| Referencia: pestaña Cola del panel | 0,3 s | — | 318–335 MB |
 
-La diferencia entre modos es de fotogramas: cada uno redibuja la ventana con su vidrio
-desenfocado.
+- Lo que queda es redibujar la ventana entera 30 o 60 veces por segundo mientras se canta; el
+  brillo, el vidrio de la barra y la otra letra ya no añaden trabajo a cada fotograma.
+- La memoria de estas pasadas es más alta que la de [ARCHITECTURE](../ARCHITECTURE.md#memoria-y-arranque)
+  porque el `HOME` de pruebas no tiene la copia de las secciones y Inicio llega de la red con sus
+  carátulas; para comparar, mira la diferencia entre filas.
 
 ## Archivos
 
@@ -114,6 +134,9 @@ desenfocado.
 | Pausa larga de la intro | [`INTRO_GAP`](../../src/lyrics.rs) |
 | Línea bajo el clic | [`lineUnder`](../../qml/LyricsView.qml) |
 | Reloj del barrido | [`advance`](../../qml/LyricsView.qml) |
+| Brillo de la línea activa | [`glow`](../../qml/LyricsView.qml), [`glowSource`](../../qml/LyricsView.qml) |
+| Elegir la fuente sin rehacer la letra | [`chooseLyrics`](../../qml/Catalog.qml) |
+| Pedir la letra cuando llega la cola | [`defer_lyrics`](../../src/player.rs) |
 | Retraso guardado | [`setLyricsDelay`](../../qml/Catalog.qml) |
 
 ## Dependencias
@@ -127,17 +150,19 @@ desenfocado.
 
 ## Estado actual
 
-- **Última verificación:** 2026-11-16, varias fuentes: `--probe lyrics` contra las tres, capturas
-  del panel con letra japonesa y cambio de fuente con un clic simulado
+- **Última verificación:** 2026-11-16, menos CPU en la letra: medida antes y después en «Calidad»
+  y «Equilibrado», en el panel y en «Sonando», y capturas del barrido con su brillo
   ([historial](../history/verificacion/letra.md)).
 - **Pruebas:** `mod tests` de `src/lyrics.rs` (pausas e intro, LRC con palabras, KRC y YRC,
   créditos, limpieza del título, elección por duración, orden de las fuentes).
-- **Sin verificar:** el barrido sílaba a sílaba con música sonando (YouTube pedía sesión) y su
-  CPU (más `Text` por línea con KRC y YRC); el coste de cada modo en Linux con el controlador de
-  CachyOS.
+- **Sin verificar:** el barrido con el audio real de YouTube (pedía sesión: se midió con un audio
+  local, con la misma posición y la misma letra); que la cascada y el brillo se vean igual de
+  fluidos a la vista (las capturas son fotos fijas); «Bajo» después de los cambios; el coste de
+  cada modo en Linux con el controlador de CachyOS.
 - **Historial:** [docs/history/verificacion/letra.md](../history/verificacion/letra.md).
 
 ## Pendiente
 
 - Traducción y romaji: NetEase y Kugou los traen y no se muestran.
-- Medir la CPU de la letra por sílaba en los tres modos.
+- Lo que queda de CPU en «Calidad» es redibujar la ventana entera a 60 Hz: bajarlo pide no
+  redibujar lo que no cambia (Qt Quick no lo hace por zonas).

@@ -1,5 +1,273 @@
 \chapter{Rendimiento y memoria}
+\label{cap:rendimiento}
 
-\begin{trampa}[Capítulo pendiente]
-Este capítulo aún no está escrito. Mientras tanto, la información equivalente está en \archivo{docs/INDEX.md} (las fichas de \archivo{docs/areas/}) y \archivo{docs/ARCHITECTURE.md}.
+El consumo de memoria es la primera prioridad del proyecto, y la respuesta instantánea la
+segunda. Este capítulo explica cómo se mide, en qué se va cada megabyte, y qué técnicas se han
+usado y por qué. Las cifras son de un Apple M4 Pro, ventana de 1440$\times$900 en pantalla
+Retina, compilado en \emph{release}, y llevan su fecha; \emph{no son garantías}, son la
+referencia con la que comparar un cambio.
+
+\begin{trampa}[Mide siempre en release]
+Una compilación de depuración cambia la memoria y los tiempos. Para medir:
+\cod{cargo build --release} y \cod{./target/release/musicplayer}. Una medida de depuración no
+vale para nada.
 \end{trampa}
+
+\section{Cómo se mide}
+
+Hay cuatro cosas que medir y cada una tiene su herramienta; confundirlas da resultados
+engañosos.
+
+\begin{description}[style=nextline, leftmargin=0pt]
+  \item[Memoria: \texttt{footprint}] En macOS, \cod{footprint PID} da la cifra que muestra el
+  Monitor de Actividad (\cod{phys_footprint}). \cod{ps -o rss} \emph{no} sirve: no cuenta la
+  memoria gráfica que reserva el sistema. En Linux, \cod{VmRSS} en \cod{/proc/PID/status}
+  (otra cifra: compara solo con Linux). mpv va aparte: mídelo con su propio PID.
+  \item[CPU: tiempo acumulado, no \texttt{\%cpu}] \cod{ps %cpu} es una foto de un instante y
+  engaña. Se mide el tiempo de CPU consumido en una ventana fija:
+\begin{terminal}
+sleep 12; A=$(ps -o time= -p $APP)    # CPU acumulada al segundo 12
+sleep 25; B=$(ps -o time= -p $APP)    # ...y al 37
+echo "$A -> $B"                        # la diferencia son los 25 s
+\end{terminal}
+  Multiplicado por 4, es el \% de un núcleo en esos 25 s. Se repite al menos dos veces (el
+  ruido es de $\pm$1 s) y se comprueba en la línea \cod{estado:} de stderr que sonaba la
+  canción esperada.
+  \item[Tiempos de arranque de pista] La app imprime «arranque de pista: N ms» en stderr
+  (\cod{Player::on_event}, rama \cod{Started}). \cod{--probe play ID} mide el arranque aislado.
+  \item[Tiempos de red y resolución] \cod{--probe resolve id1,id2}, \cod{--probe fast},
+  \cod{--probe search "texto"} imprimen cuánto tardó cada cosa.
+\end{description}
+
+\subsection{Siempre la misma canción}
+
+Para comparar la letra, o cualquier cosa que se mueva mientras suena, hace falta la misma
+canción en cada pasada, y YouTube a veces pide sesión. Dos ayudas:
+
+\begin{itemize}
+  \item \cod{--play ID} elige la canción (su cola, su letra y su título llegan como con un
+  clic).
+  \item \cod{MUSICPLAYER_DEBUG_AUDIO=archivo} hace que mpv suene un archivo local en vez del
+  audio de YouTube; la posición avanza igual.
+\end{itemize}
+
+\subsection{Qué apuntar y dónde}
+
+En la sección «Medidas» de la ficha del área (o en \archivo{ARCHITECTURE.md} si es global): la
+situación, la cifra, la fecha y la máquina. La medida anterior pasa al historial
+(\archivo{docs/history/verificacion/<area>.md}). Si algo se probó y se descartó por lo que
+costaba, va en las «Reglas y decisiones» de la ficha o en una ADR, \emph{con la cifra}.
+
+\section{En qué se va la memoria}
+
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{@{}Xr@{}}
+\toprule
+Caso & Memoria \\
+\midrule
+Ventana de Qt vacía y quieta (control, sin nuestro código) & 93 MB \\
+Ventana de Qt vacía con \emph{cualquier} redibujado, de 1 a 30 por segundo (control) & 178--247 MB \\
+La app, con Inicio cargado, sin reproducir & 187 MB \\
+La app reproduciendo, con el panel de letra & 300--330 MB \\
+Proceso mpv en reposo / reproduciendo & 20 MB / $\sim$75 MB \\
+yt-dlp residente (mientras vive) & $\sim$120 MB \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+La lección de la tabla es incómoda: \textbf{lo que más pesa no es el código del proyecto}. En
+cuanto una ventana de Qt Quick se redibuja de forma continua (y la barra de progreso y la
+letra lo hacen mientras suena), el controlador gráfico de macOS reserva unos 100 MB para sus
+fotogramas. Lo hace hasta una ventana vacía con un cuadrado de 2 px girando. Con OpenGL en vez
+de Metal es el doble. Lo que añade la app sobre ese mínimo, reproduciendo, son unos 130 MB:
+carátulas, la letra, el vidrio de la barra, el motor QML y el JSON del catálogo.
+
+\begin{idea}[Presupuesto sin obsesión]
+Con esa base, el objetivo realista es moverse entre 150 y 330 MB, frente a los 500 MB a 1 GB
+que suman los procesos de Pear Desktop o una pestaña de YouTube Music en Chrome (estimación,
+no medida en esta máquina). Cada decisión de esta lista es un MB o un punto de CPU ganado
+\emph{sobre ese suelo}.
+\end{idea}
+
+\section{Las técnicas, de las que más ahorran a las que menos}
+
+\subsection{1. Procesos aparte que se pueden cerrar}
+
+Lo pesado y poco usado va en un proceso que desaparece cuando no hace falta:
+
+\begin{itemize}
+  \item El inicio de sesión (Chromium o WebKit): cientos de MB, solo mientras la ventana está
+  abierta (ADR-07).
+  \item yt-dlp: ~120 MB, cerrado tras 60 s sin uso (ADR-08).
+  \item mpv: aislado para que un fallo no tumbe la app, y arrancado sin ninguno de sus
+  scripts de interfaz (unos 10 MB menos) y con caché de 16~MiB.
+\end{itemize}
+
+\subsection{2. Liberar los gráficos de lo que no se ve}
+
+\archivo{window.cpp} marca las ventanas para soltar su grafo de escena y sus recursos al
+ocultarse o minimizarse. Con el mini reproductor, que oculta la ventana grande, la app pasa de
+213 a 148 MB. En macOS, \emph{minimizar} no libera (Qt conserva los búferes): por eso el mini
+\emph{oculta}.
+
+\subsection{3. Crear menos objetos}
+
+\begin{description}[style=nextline, leftmargin=0pt]
+  \item[Un anillo en vez de una caja por álbum] Lomos reutiliza un anillo fijo de cajas y pide
+  la carátula grande (544 px) solo a las cercanas al centro (226 px en las demás). Con el
+  reflejo hecho por un sombreador en vez de una capa con máscara, Álbumes en Lomos bajó de
+  222--226 a 205--207 MB.
+  \item[Una lista que solo crea las filas visibles] El Muro es una \cod{ListView}, no una
+  cuadrícula de todos los elementos.
+  \item[La cola con el número de pistas como modelo] Reordenar no reconstruye la lista.
+  \item[Cada vista, a demanda] \cod{SectionView} usa un \cod{Loader}: solo existe la vista
+  elegida. Cada \cod{LyricsView} existe mientras se ve.
+  \item[Una sola conexión HTTP] \cod{ytm::http()} comparte un agente: reutiliza conexiones y
+  no abre un contexto TLS por petición.
+\end{description}
+
+\subsection{4. Redibujar menos}
+
+Cada fotograma de una animación continua cuesta CPU y, con vidrio desenfocado, mucha más: cada
+panel de vidrio vuelve a capturar y desenfocar lo que tiene detrás.
+
+\begin{itemize}
+  \item \textbf{La deriva del ambiente} avanza con un \cod{Timer} a 10 Hz, no con una animación
+  a 60: un paseo tan lento no deja ver los saltos y cuesta ~5\,\% de CPU en vez de ~30\,\%. Se
+  detiene en pausa, con la ventana oculta o minimizada y en «Plano».
+  \item \textbf{El fondo «Fluido»} se dibuja a media resolución lógica (un cuarto en Retina):
+  16 veces menos píxeles, sin diferencia visible por lo suave del resultado.
+  \item \textbf{La captura de fondo del vidrio} es a media resolución, y no hay copia si no hay
+  \cod{backdrop}.
+  \item \textbf{Con «Sonando» arriba}, el escenario, el panel y el detalle \emph{no se
+  pintan}: nadie los ve. El vidrio de la barra desenfoca solo el fondo de «Sonando».
+  \item \textbf{Las barras de progreso dibujan en píxeles enteros}: la posición cambia diez
+  veces por segundo y un reborde decimal obligaría a repintar de más.
+  \item \textbf{La posición de mpv se filtra} a cambios de al menos 0,1 s y el \emph{bitrate}
+  a cambios de 8~kbps: menos enlaces recalculados en QML.
+\end{itemize}
+
+\subsection{5. Evitar los gestores por elemento}
+
+Un \cod{HoverHandler}, un \cod{MouseArea} con cursor o un \cod{TapHandler} \emph{por línea}
+sobre contenido que se anima obligan a Qt a repasar esa parte de la escena en cada fotograma.
+En la letra, eso llevaba la CPU de ~5 \% a ~25 \%. Un único gestor para toda la vista, con
+\cod{childAt}, resuelve lo mismo.
+
+\subsection{6. Hacer el trabajo por adelantado}
+
+Para la \emph{respuesta}, no la memoria:
+
+\begin{itemize}
+  \item La caché de secciones (300 ms hasta ver contenido).
+  \item La precarga de URL de audio (64--254 ms frente a 0,4--0,6 s sin ella).
+  \item mpv arrancado antes del primer clic (\cod{Player::warm_up}).
+  \item La cola de una canción llega \emph{después} de que suene.
+\end{itemize}
+
+\section{El caso de la letra, medido}
+
+La letra animada es lo más caro del programa: cada fotograma redibuja la ventana entera con
+su vidrio desenfocado. Por eso tiene tres calidades (60 Hz, 30 Hz y 10 Hz sin cascada ni
+brillo) y fue la parte más medida y optimizada. Estas son las cifras de CPU acumulada en 25 s
+de una canción con tiempo por sílaba, antes y después de la última ronda de mejoras (2026-11-16,
+dos pasadas por caso):
+
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{@{}Xrr@{}}
+\toprule
+Caso & Antes & Después \\
+\midrule
+Panel lateral, Calidad & 6,3--7,3 s · 418--427 MB & 5,2--5,4 s · 381--383 MB \\
+Panel lateral, Equilibrado & 4,1--4,4 s · 419--422 MB & 3,2--3,7 s · 380--384 MB \\
+«Sonando» con panel, Calidad & 7,6--8,4 s · 447--449 MB & 6,5--6,7 s · 375--376 MB \\
+«Sonando» con panel, Equilibrado & 6,0 s · 420--448 MB & 3,1--3,5 s · 373--379 MB \\
+Panel con la pestaña Cola (referencia) & 2,9 s · 396 MB & 0,3 s · 318--335 MB \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+Qué se hizo para bajarlo:
+
+\begin{itemize}
+  \item «Calidad» tiene tope en 60 Hz: una pantalla ProMotion daba hasta 120.
+  \item El brillo y los puntos de las pausas siguen el \emph{reloj de la letra} en vez de tener
+  animaciones propias a la frecuencia de la pantalla.
+  \item El brillo desenfoca una instantánea de la línea, no el texto vivo.
+  \item La letra se pide una vez por canción y no se reconstruye si la fuente no cambia.
+  \item Con «Sonando» arriba, lo que queda debajo no se pinta.
+\end{itemize}
+
+Lo que queda, ~3 s de CPU en 25 s en el modo por defecto, es redibujar la ventana entera 30
+veces por segundo mientras se canta. Reducirlo más exigiría quitar el vidrio o bajar los
+fotogramas.
+
+\section{El fondo animado y la deriva}
+
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{@{}Xr@{}}
+\toprule
+Situación (2026-11-16) & Medida \\
+\midrule
+Inicio quieto, sin música & 0,07 s · 195 MB \\
+Deriva «Siempre» en Inicio & 1,3 s ($\sim$5\,\%) · 320 MB \\
+Deriva «En Sonando» con «Sonando» abierta & 1,3 s · 305 MB \\
+Deriva «En Sonando» en Inicio & 0,07 s · 196 MB \\
+Deriva con la ventana minimizada o en el mini & 0,06 s en 20 s \\
+«Fluido» quieto & 0,08 s · 196 MB \\
+«Fluido» moviéndose (15 Hz) & 2,2 s ($\sim$9\,\%) · 301--317 MB \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+Lo importante: \emph{quieto no cuesta nada}. El coste solo aparece cuando algo se mueve y
+suena música. Por eso el movimiento es una opción desactivada por defecto.
+
+\section{Tiempos que importan}
+
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{@{}Xr@{}}
+\toprule
+Situación & Tiempo \\
+\midrule
+Ventana lista & $\sim$0,75 s \\
+Contenido con carátulas, desde la caché & $\sim$300 ms \\
+Clic hasta oír audio, sin precarga & 0,4--0,6 s \\
+Clic hasta oír audio, con precarga & 64--254 ms \\
+Álbum sin precarga (incluye bajar su lista) & $\sim$0,8 s \\
+yt-dlp residente / en proceso & 2,2--2,5 s / 3,5--4,2 s \\
+yt-dlp con sesión (\texttt{web\_music}) & 1,7--2,9 s \\
+Búsqueda (cuatro listas en paralelo) & 0,50--0,57 s \\
+Una playlist de 500 pistas & $\sim$3 s \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+La búsqueda baja de 1,6--1,8 s a 0,5 s por pedir las cuatro listas a la vez en vez de una
+detrás de otra, y por reutilizar la conexión.
+
+\section{Una lista de comprobación antes de añadir una animación}
+
+\begin{enumerate}
+  \item ¿Se mueve \emph{mientras suena la música}? Entonces es continua y hay que medirla.
+  \item ¿Hay un panel de vidrio con \cod{backdrop} por detrás? Cada fotograma lo desenfoca
+  otra vez.
+  \item ¿Hay un \cod{HoverHandler}, cursor o gestor por elemento encima? Quítalo; usa uno por
+  vista con \cod{childAt}.
+  \item ¿Necesita 60 Hz? Casi nunca. Prueba 30 o 10 con un \cod{Timer}.
+  \item ¿Se detiene cuando la ventana está oculta, minimizada, en pausa o la opción está
+  apagada?
+  \item Mide CPU acumulada y memoria \emph{antes y después}, en release, con la misma canción
+  (\cod{MUSICPLAYER_DEBUG_AUDIO}), y apunta ambas cifras en la ficha.
+\end{enumerate}
+
+\begin{ejercicio}
+Mide el coste de la barra de reproducción en sus tres estilos. Usa \cod{--section inicio},
+\cod{--autoplay} y un \cod{HOME} temporal con \cod{{"opciones": {"barra": "compacta"}}} en su
+\cod{settings.json}. Repite con \cod{islas} y \cod{clasica}. ¿Hay diferencia? Apunta tus cifras
+(con fecha y máquina) como si fueran a la ficha de \emph{reproduccion}.
+\end{ejercicio}

@@ -55,81 +55,35 @@ Glass {
         }
     }
 
-    Rectangle {
+    TabStrip {
         id: tabs
         anchors.top: heading.bottom
         anchors.topMargin: 14
         x: root.pad
         width: root.width - 2 * root.pad
-        height: Theme.hit + 8
-        radius: 14
-        color: Qt.rgba(0, 0, 0, 0.25)
         visible: Player.title !== "" || Catalog.temporal.length > 0
-
-        Row {
-            anchors.fill: parent
-            anchors.margins: 4
-            spacing: 4
-
-            Repeater {
-                model: [
-                    { id: "letra", label: "Letra" },
-                    { id: "cola", label: "Cola" },
-                    { id: "temporal", label: "Temporal" + (Catalog.temporal.length ? " · " + Catalog.temporal.length : "") }
-                ]
-
-                Item {
-                    id: tabButton
-                    required property var modelData
-                    readonly property bool chosen: modelData.id === root.tab
-
-                    width: (tabs.width - 16) / 3
-                    height: Theme.hit
-                    activeFocusOnTab: true
-
-                    Accessible.role: Accessible.PageTab
-                    Accessible.name: modelData.label
-                    Accessible.onPressAction: root.tab = modelData.id
-                    Keys.onReturnPressed: root.tab = modelData.id
-
-                    Rectangle {
-                        anchors.fill: parent
-                        radius: 10
-                        color: tabButton.chosen ? Theme.controlActive : (tabHover.hovered ? Theme.control : "transparent")
-                        border.width: tabButton.activeFocus ? 2 : 0
-                        border.color: Theme.text
-                    }
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: tabButton.modelData.label
-                        color: tabButton.chosen ? Theme.text : Theme.textMuted
-                        font.pixelSize: 14
-                        font.weight: tabButton.chosen ? Font.DemiBold : Font.Normal
-                    }
-
-                    HoverHandler {
-                        id: tabHover
-                        cursorShape: Qt.PointingHandCursor
-                    }
-
-                    TapHandler {
-                        onTapped: root.tab = tabButton.modelData.id
-                    }
-                }
-            }
-        }
+        current: root.tab
+        tabs: [
+            { id: "letra", label: "Letra" },
+            { id: "cola", label: "Cola" },
+            { id: "temporal", label: "Temporal" + (Catalog.temporal.length ? " · " + Catalog.temporal.length : "") }
+        ]
+        onPicked: id => root.tab = id
     }
 
-    // Con su pie discreto de retraso (`LyricsTiming`), como en «Sonando».
-    LyricsView {
-        visible: root.tab === "letra"
+    // Con su pie discreto de retraso (`LyricsTiming`), como en «Sonando». Solo existe mientras se
+    // ve: una letra con tiempos por sílaba son miles de objetos, y el panel arranca oculto. Se
+    // crea poco a poco (`asynchronous`) para no trabar la animación al abrir el panel.
+    Loader {
+        active: root.visible && root.tab === "letra"
+        asynchronous: true
         anchors.top: tabs.bottom
         anchors.topMargin: 14
         anchors.bottom: parent.bottom
         anchors.bottomMargin: 6
         x: root.pad
         width: root.width - 2 * root.pad
+        sourceComponent: LyricsView {}
     }
 
     QueueList {

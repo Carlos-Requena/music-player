@@ -1,5 +1,273 @@
 \chapter{Datos y formatos}
+\label{cap:datos}
 
-\begin{trampa}[Capítulo pendiente]
-Este capítulo aún no está escrito. Mientras tanto, la información equivalente está en \archivo{docs/INDEX.md} (las fichas de \archivo{docs/areas/}) y \archivo{docs/ARCHITECTURE.md}.
+Este capítulo reúne en un solo sitio \emph{todos} los formatos de datos del proyecto: lo que
+se guarda en disco, lo que viaja de Rust a QML y los dos protocolos que hablan los procesos
+auxiliares. Cuando busques «¿cómo es exactamente este JSON?», empieza aquí.
+
+\section{Dónde guarda el programa sus cosas}
+
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{@{}lX@{}}
+\toprule
+Ruta & Contenido \\
+\midrule
+\texttt{<config>/musicplayer/settings.json} & Vistas por sección, skin, mascota y opciones \\
+\texttt{<config>/musicplayer/cookies.txt} & Sesión de YouTube (permisos 600) \\
+\texttt{<config>/musicplayer/account.json} & Nombre de la cuenta y navegador de importación \\
+\texttt{<config>/musicplayer/plugins.json} & Discord y Last.fm, con secretos (permisos 600) \\
+\texttt{<config>/musicplayer/skins/} & Skins del usuario (archivo \texttt{.json} o carpeta) \\
+\texttt{<config>/musicplayer/mascotas/} & Mascotas del usuario (una carpeta cada una) \\
+\texttt{<caché>/musicplayer/anonimo-*.json} & Copia de cada sección sin sesión \\
+\texttt{<caché>/musicplayer/cuenta-*.json} & Copia de cada sección de la cuenta \\
+\texttt{<temporal>/musicplayer-mpv-<pid>.sock} & Socket de mpv, solo mientras suena \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\cod{<config>} es \cod{~/Library/Application Support} en macOS y \cod{~/.config} en Linux;
+\cod{<caché>}, \cod{~/Library/Caches} y \cod{~/.cache}. Rust los obtiene con la biblioteca
+\cod{dirs}.
+
+\begin{trampa}[Son datos del propietario]
+Nunca borres ni sobrescribas esas carpetas desde una prueba. Para probar usa un \cod{HOME}
+temporal (\cod{HOME=/ruta/temporal}) y, para que mpv no suene, \cod{MUSICPLAYER_SILENT=1}.
+Está en las normas (\archivo{docs/AGENTES.md}, §7) porque ahí vive la sesión de la persona.
 \end{trampa}
+
+\section{Lo que se guarda en disco}
+
+\subsection{\texttt{settings.json}}
+
+Es la forma serializada de \cod{struct Stored} (\archivo{src/settings.rs}):
+
+\begin{codigo}
+{
+  "vistas":   { "inicio": "muro", "playlists": "lomos", "albumes": "lomos" },
+  "skin":     "vidrio",
+  "mascota":  "ralsei",
+  "opciones": { "ambiente": "fluido", "barra": "clasica", "retraso:dQw4w9WgXcQ": "0.4" }
+}
+\end{codigo}
+
+Cada campo tiene valor por defecto (\cod{#[serde(default)]}): un archivo vacío o parcial es
+válido. Las \cod{opciones} son un mapa de texto a texto; \emph{ausente o vacío significa «el
+valor por defecto»}, que decide quien lee la opción. Algunas claves llevan sufijo con una
+canción: \cod{retraso:<id>} (el ajuste de letra) y \cod{origen:<id>} (la fuente elegida).
+
+\subsection{Una skin}
+
+\begin{codigo}
+{
+  "nombre": "Neón",
+  "descripcion": "Noche de club: magenta intenso y modo ambiente al máximo.",
+  "colores": {
+    "fondo": "#0B0710", "texto": "#FFFFFF", "textoSecundario": "#C8F3D9FF",
+    "textoTenue": "#85E3C2F5", "vidrio": "#1AFF4FD8", "vidrioDenso": "#9E14081A",
+    "bordeVidrio": "#40FF4FD8", "control": "#1FFF4FD8", "controlActivo": "#3DFF4FD8",
+    "acento": "#FF4FD8"
+  },
+  "radio": 26,
+  "ambiente": 1.3
+}
+\end{codigo}
+
+\begin{itemize}
+  \item \cod{nombre} y \cod{colores} son obligatorios; sin ellos la skin se ignora.
+  \item Los colores son \cod{#RRGGBB} o \cod{#AARRGGBB} (\emph{el alfa va primero}, como en
+  QML). Los que falten toman el valor por defecto de \cod{Theme.pick}.
+  \item \cod{radio} (esquinas) y \cod{ambiente} (intensidad del fondo de color) son opcionales.
+  \item Una skin en \emph{carpeta} (\cod{skins/<id>/skin.json}) puede añadir \cod{fondo} (una
+  imagen de la carpeta), \cod{fondoOpacidad} y \cod{fondoVelo}. Rust le añade \cod{carpeta},
+  una URL \cod{file://} que \cod{Theme.skinImage} antepone a los nombres de archivo.
+\end{itemize}
+
+\subsection{Una mascota}
+
+\begin{codigo}
+{
+  "nombre": "Ralsei",
+  "pincharDaMeGusta": true,
+  "poses": {
+    "reposo":  { "imagen": "reojo.png",   "alto": 180 },
+    "sonando": { "imagen": "bufanda.png", "alto": 140 },
+    "clic":    { "imagen": "verguenza.png", "alto": 129, "segundos": 1.5 }
+  }
+}
+\end{codigo}
+
+Una pose es un nombre de archivo o un objeto con \cod{imagen}, \cod{alto} y, en las
+reacciones breves, \cod{segundos}. Solo \cod{reposo} es obligatoria: las demás se sustituyen
+en cadena (\cod{sonando} $\rightarrow$ \cod{reposo}, \cod{megusta} $\rightarrow$ \cod{clic}\dots).
+La tabla completa de poses está en el README.
+
+\subsection{Cookies, cuenta y plugins}
+
+\begin{description}[style=nextline, leftmargin=0pt]
+  \item[\texttt{cookies.txt}] Formato Netscape: una cookie por línea, con siete campos
+  separados por tabuladores (dominio, subdominios, ruta, seguro, caducidad, nombre, valor).
+  Las \emph{HttpOnly} llevan el prefijo \cod{#HttpOnly_} en el dominio. Es lo que leen yt-dlp
+  y mpv; solo se guardan las de \cod{youtube.com}.
+  \item[\texttt{account.json}] \cod{{"name": "...", "browser": "chrome"}}: lo que Opciones
+  muestra de la cuenta.
+  \item[\texttt{plugins.json}] La \cod{struct Config} de \archivo{plugins.rs}: \cod{media},
+  \cod{discord}, \cod{discord_id}, \cod{lastfm}, \cod{lastfm_key}, \cod{lastfm_secret},
+  \cod{lastfm_session}, \cod{lastfm_user}. El \cod{media} y el \cod{discord} son
+  \cod{Option<bool>}: ausente significa activado.
+\end{description}
+
+\subsection{La copia de las secciones}
+
+\cod{library::cache} guarda, para cada sección, exactamente el JSON que se publicó a QML:
+\cod{<caché>/musicplayer/anonimo-inicio.json}, \cod{cuenta-playlists.json}\dots La copia de la
+cuenta se borra al cerrar sesión. Es el mismo texto que ves en la siguiente sección.
+
+\section{Lo que viaja de Rust a QML}
+
+Todo es JSON en una propiedad \cod{QString} (ADR-04). Estos son los formatos exactos; las
+claves van en \emph{camelCase} porque las structs de Rust llevan
+\cod{#[serde(rename_all = "camelCase")]}.
+
+\subsection{Una sección: \texttt{Library.inicio} y las demás}
+
+\begin{codigo}
+[
+  { "titulo": "Selecciones rápidas",
+    "items": [
+      { "title": "Vetusta Morla", "subtitle": "Álbum • 2023", "thumb": "https://...=w544-h544",
+        "kind": "album", "videoId": "", "browseId": "MPREb_...", "playlistId": "OLAK5uy_..." },
+      { "title": "Copenhague", "subtitle": "Canción • Vetusta Morla", "kind": "song",
+        "videoId": "AbCdEfGhIjK", "browseId": "", "playlistId": "" }
+    ] }
+]
+\end{codigo}
+
+Máximo 60 elementos por zona. \cod{kind} es \cod{song}, \cod{album}, \cod{playlist} o
+\cod{artist}. Los campos que no aplican van vacíos, no ausentes.
+
+\subsection{El detalle abierto: \texttt{Library.detalle}}
+
+\begin{codigo}
+{ "title": "...", "subtitle": "...", "thumb": "...", "kind": "album", "playlistId": "OLAK5uy_...",
+  "tracks": [ { "title": "...", "artist": "...", "thumb": "...", "videoId": "...", "duration": 214 } ],
+  "zonas":  [ { "titulo": "Álbumes", "items": [ ... ] } ] }
+\end{codigo}
+
+\cod{zonas} solo lleva algo en un artista (su discografía).
+
+\subsection{La cola y la lista temporal: \texttt{Player.queue}}
+
+Un array de \cod{Track}: \cod{{title, artist, thumb, videoId, duration}}. La duración puede ser
+0 en una canción recién pulsada (la tarjeta no la trae); la completa la cola que llega después.
+
+\subsection{La letra: \texttt{Player.lyrics}}
+
+Una lista con una entrada por fuente encontrada, de mejor a peor:
+
+\begin{codigo}
+[
+  { "id": "netease", "label": "NetEase", "words": true,
+    "lines": [
+      { "t": 12.34, "text": "gu-ren no yu-mi-ya", "w": [ { "t": 12.34, "d": 0.4, "text": "gu" },
+                                                 { "t": 12.74, "d": 0.3, "text": "ren", "join": true } ] },
+      { "t": 20.0, "text": "" }
+    ] },
+  { "id": "lrclib", "label": "LRCLIB", "words": false, "lines": [ ... ] }
+]
+\end{codigo}
+
+\begin{itemize}
+  \item \cod{t} es el segundo de inicio; \cod{text} vacío es una pausa instrumental.
+  \item \cod{w}, si falta o está vacío, quiere decir que la fuente solo da el tiempo de la
+  línea.
+  \item \cod{d} (duración) y \cod{join} (va pegada a la siguiente) se omiten cuando valen 0 o
+  \cod{false} (\cod{skip_serializing_if}), para que el JSON pese menos.
+\end{itemize}
+
+\section{Las opciones}
+
+Todas las claves de \cod{AppSettings.opcion}. Una opción nueva \emph{debe} aparecer también en
+el \cod{opciones:} de la ficha de su área (lo comprueba \archivo{docs.py}).
+
+\begin{center}
+\small
+\begin{longtable}{@{}p{0.2\linewidth}p{0.34\linewidth}p{0.4\linewidth}@{}}
+\toprule
+Clave & Valores (el primero es el por defecto salvo indicación) & Efecto \\
+\midrule
+\endhead
+\texttt{calidad} & \texttt{alta}, \texttt{premium} & 160 o 256 kbps (Premium exige sesión) \\
+\texttt{historial} & \texttt{si}, \texttt{no} & Registrar escuchas en YouTube Music \\
+\texttt{ytdlp} & \texttt{si}, \texttt{no} & yt-dlp residente \\
+\texttt{ambiente} & \texttt{si}, \texttt{suave}, \texttt{tenue}, \texttt{plano}, \texttt{fluido}, \texttt{no} & Fondo de color \\
+\texttt{ambienteMovimiento} & \texttt{no}, \texttt{sonando}, \texttt{siempre} & Deriva de los focos \\
+\texttt{caratulaCalidad} & \texttt{maxima}, \texttt{alta} & Resolución de la carátula de «Sonando» \\
+\texttt{desenfoque} & \texttt{si}, \texttt{no} & Vidrio desenfocado \\
+\texttt{barra} & \texttt{islas}, \texttt{clasica}, \texttt{compacta} & Estilo de la barra \\
+\texttt{letraCalidad} & \texttt{equilibrado}, \texttt{calidad}, \texttt{bajo} & Fotogramas de la letra \\
+\texttt{letraOrigen} & \texttt{auto}, \texttt{lrclib}, \texttt{netease}, \texttt{kugou} & Fuente preferida \\
+\texttt{letraSinTiempos} & \texttt{linea}, \texttt{estimado} & Cómo iluminar sin tiempo por palabra \\
+\texttt{letraTamano} & \texttt{mediana}, \texttt{pequena}, \texttt{grande}, \texttt{enorme} & Tamaño \\
+\texttt{letraFuente} & \texttt{sistema}, \texttt{serif}, \texttt{mono} & Tipografía \\
+\texttt{letraPeso} & \texttt{negrita}, \texttt{normal} & Grosor \\
+\texttt{letraAlineacion} & \texttt{centro}, \texttt{izquierda} & Alineación \\
+\texttt{panel} & \texttt{derecha}, \texttt{izquierda} & Lado del panel de letra y cola \\
+\texttt{sonando} & \texttt{grande}, \texttt{clasica} & Disposición de «Sonando» \\
+\texttt{sonandoTitulo} & \texttt{auto}, \texttt{si}, \texttt{no} & Título bajo la carátula \\
+\texttt{caratulas} & \texttt{medianas}, \texttt{pequenas}, \texttt{grandes} & Columnas del Muro (6, 8 o 4) \\
+\texttt{categorias}, \texttt{categoria} & JSON y texto & Categorías de Playlists y la elegida \\
+\texttt{retraso:<id>} & segundos, con signo & Ajuste de letra de una canción \\
+\texttt{origen:<id>} & \texttt{lrclib}, \texttt{netease}, \texttt{kugou} & Fuente elegida para una canción \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+\section{Los protocolos de los procesos auxiliares}
+
+\subsection{mpv: IPC JSON por socket}
+
+Una línea de JSON por mensaje, en los dos sentidos. Órdenes que enviamos
+(\cod{audio::Mpv::command}):
+
+\begin{codigo}
+{"command": ["loadfile", "<url>", "replace"]}
+{"command": ["set_property", "pause", true]}
+{"command": ["seek", 42.5, "absolute"]}
+{"command": ["observe_property", 1, "time-pos"]}
+\end{codigo}
+
+y eventos que recibimos:
+
+\begin{codigo}
+{"event": "property-change", "id": 1, "name": "time-pos", "data": 12.4}
+{"event": "playback-restart"}
+{"event": "end-file", "reason": "eof"}
+{"event": "log-message", "prefix": "ytdl_hook", "level": "error", "text": "..."}
+\end{codigo}
+
+\subsection{yt-dlp residente: líneas JSON por stdin y stdout}
+
+\begin{codigo}
+-> {"id": "AbCdEfGhIjK"}
+<- {"ready": true}                                        (una vez, al arrancar)
+<- {"id": "AbCdEfGhIjK", "url": "https://...googlevideo..."}
+<- {"id": "AbCdEfGhIjK", "error": "Sign in to confirm you're not a bot"}
+\end{codigo}
+
+El primer argumento del script son las opciones de yt-dlp (también en JSON), que construye
+\cod{daemon::options}.
+
+\subsection{Discord: tramas binarias con JSON}
+
+Cada trama es \cod{[opcode u32 LE][longitud u32 LE][JSON]}. El \emph{handshake} usa el opcode
+0 con \cod{{"v":1,"client_id":"..."}} y las actividades el opcode 1 con
+\cod{SET_ACTIVITY}.
+
+\subsection{InnerTube}
+
+Peticiones \cod{POST} a \cod{https://music.youtube.com/youtubei/v1/<endpoint>} con un cuerpo
+JSON al que \cod{ytm::post} añade \cod{context.client}. Los \emph{endpoints} usados son
+\cod{browse}, \cod{search}, \cod{next}, \cod{player}, \cod{like/like}, \cod{like/removelike},
+\cod{browse/edit_playlist}, \cod{account/account_menu} y la subida de portadas. Las respuestas
+se recorren por nombre (capítulo~\ref{cap:nucleo}).

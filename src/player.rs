@@ -5,15 +5,16 @@
 //! devuelven sus resultados al hilo de Qt con `qt_thread().queue`.
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet, VecDeque},
     pin::Pin,
-    sync::{LazyLock, Mutex},
+    sync::{Condvar, LazyLock, Mutex},
     thread,
     time::Instant,
 };
 
 use cxx_qt::{CxxQtType, Threading};
 use cxx_qt_lib::QString;
+use serde::Deserialize;
 
 use crate::{
     audio::{Event, Mpv},
@@ -179,6 +180,9 @@ pub struct PlayerRust {
     lyrics_found: Vec<lyrics::Found>,
     /// Cambia con cada petición de letra; descarta las respuestas de la anterior.
     lyrics_token: u64,
+    /// La próxima carga no pide la letra: la pedirá la cola al llegar, con el artista limpio y la
+    /// duración (ver `play_item`).
+    defer_lyrics: bool,
 
     mpv: Option<Mpv>,
     tracks: Vec<Track>,
@@ -227,9 +231,9 @@ struct Listen {
 /// `None` si no es una canción (álbum, playlist…).
 fn track_from(value: &serde_json::Value) -> Option<Track> {
     if value.get("artist").is_some() {
-        return serde_json::from_value::<Track>(value.clone()).ok().filter(|track| !track.video_id.is_empty());
+        return Track::deserialize(value).ok().filter(|track| !track.video_id.is_empty());
     }
-    let item = serde_json::from_value::<Item>(value.clone()).ok()?;
+    let item = Item::deserialize(value).ok()?;
     (!item.video_id.is_empty()).then(|| Track {
         artist: artist_from_subtitle(&item.subtitle),
         title: item.title,
@@ -267,34 +271,103 @@ fn shuffle_tracks(tracks: &mut [Track]) {
     }
 }
 
-/// Colas de álbumes y playlists ya descargadas, por `playlist_id`.
-static QUEUES: LazyLock<Mutex<HashMap<String, Vec<Track>>>> = LazyLock::new(Default::default);
+/// Colas de álbumes y playlists ya descargadas (las últimas `QUEUE_LIMIT`) y las que se están
+/// descargando ahora.
+#[derive(Default)]
+struct Queues {
+    lists: HashMap<String, Vec<Track>>,
+    /// Orden de uso, de la más antigua a la más reciente.
+    order: VecDeque<String>,
+    loading: HashSet<String>,
+}
+
+/// Colas guardadas como mucho: recorrer la estantería precarga una por álbum.
+const QUEUE_LIMIT: usize = 24;
+
+static QUEUES: LazyLock<(Mutex<Queues>, Condvar)> = LazyLock::new(Default::default);
 
 fn cached_queue(playlist_id: &str) -> Option<Vec<Track>> {
-    QUEUES.lock().ok()?.get(playlist_id).cloned()
+    QUEUES.0.lock().ok()?.lists.get(playlist_id).cloned()
 }
 
 /// Olvida la cola guardada de una playlist (p. ej. tras añadirle canciones).
 pub fn forget_queue(playlist_id: &str) {
-    if let Ok(mut queues) = QUEUES.lock() {
-        queues.remove(playlist_id);
+    if let Ok(mut queues) = QUEUES.0.lock() {
+        queues.lists.remove(playlist_id);
+        queues.order.retain(|id| id != playlist_id);
     }
 }
 
-/// Cola de un álbum o playlist, desde la caché o la red.
+/// Cola de un álbum o playlist, desde la caché o la red. Si ya se está descargando (una
+/// precarga), espera a esa descarga en vez de empezar otra.
 fn album_queue(playlist_id: &str) -> ytm::Result<Vec<Track>> {
-    if let Some(tracks) = cached_queue(playlist_id) {
-        return Ok(tracks);
+    let (lock, signal) = &*QUEUES;
+    {
+        let mut queues = lock.lock().map_err(|_| "colas envenenadas".to_owned())?;
+        loop {
+            if let Some(tracks) = queues.lists.get(playlist_id) {
+                return Ok(tracks.clone());
+            }
+            if !queues.loading.contains(playlist_id) {
+                break;
+            }
+            queues = signal.wait(queues).map_err(|_| "colas envenenadas".to_owned())?;
+        }
+        queues.loading.insert(playlist_id.to_owned());
     }
     // La lista real del álbum o playlist; si YouTube no la da, la cola de reproducción.
-    let tracks = match ytm::playlist_tracks(playlist_id) {
-        Ok(tracks) if !tracks.is_empty() => tracks,
-        _ => ytm::queue("", playlist_id)?,
+    let result = match ytm::playlist_tracks(playlist_id) {
+        Ok(tracks) if !tracks.is_empty() => Ok(tracks),
+        _ => ytm::queue("", playlist_id),
     };
-    if let Ok(mut queues) = QUEUES.lock() {
-        queues.insert(playlist_id.to_owned(), tracks.clone());
+    if let Ok(mut queues) = lock.lock() {
+        queues.loading.remove(playlist_id);
+        if let Ok(tracks) = &result {
+            queues.lists.insert(playlist_id.to_owned(), tracks.clone());
+            queues.order.retain(|id| id != playlist_id);
+            queues.order.push_back(playlist_id.to_owned());
+            while queues.order.len() > QUEUE_LIMIT {
+                if let Some(oldest) = queues.order.pop_front() {
+                    queues.lists.remove(&oldest);
+                }
+            }
+        }
     }
-    Ok(tracks)
+    signal.notify_all();
+    result
+}
+
+/// Álbum o playlist cuya primera pista se precarga (solo cuenta el último pedido) y si hay un
+/// hilo atendiéndolos. Como `resolver::hint`: pasar el ratón por veinte álbumes no lanza veinte
+/// descargas de su lista, se descarga la del último.
+static WANTED_LIST: LazyLock<Mutex<(Option<String>, bool)>> = LazyLock::new(Default::default);
+
+fn hint_list(playlist_id: &str) {
+    if let Some(first) = cached_queue(playlist_id).and_then(|tracks| tracks.into_iter().next()) {
+        resolver::hint(&first.video_id);
+        return;
+    }
+    let Ok(mut wanted) = WANTED_LIST.lock() else { return };
+    wanted.0 = Some(playlist_id.to_owned());
+    if wanted.1 {
+        return;
+    }
+    wanted.1 = true;
+    thread::spawn(|| loop {
+        let next = match WANTED_LIST.lock() {
+            Ok(mut wanted) => match wanted.0.take() {
+                Some(id) => id,
+                None => {
+                    wanted.1 = false;
+                    return;
+                }
+            },
+            Err(_) => return,
+        };
+        if let Some(first) = album_queue(&next).ok().and_then(|tracks| tracks.into_iter().next()) {
+            resolver::hint(&first.video_id);
+        }
+    });
 }
 
 impl Default for PlayerRust {
@@ -314,6 +387,7 @@ impl Default for PlayerRust {
             volume: 100.0,
             lyrics_found: Vec::new(),
             lyrics_token: 0,
+            defer_lyrics: false,
             mpv: None,
             tracks: Vec::new(),
             request: 0,
@@ -343,9 +417,7 @@ impl qobject::Player {
             return;
         }
 
-        let request = self.request + 1;
-        self.as_mut().rust_mut().request = request;
-        self.as_mut().set_error(QString::default());
+        let request = self.as_mut().new_request();
 
         // Una canción empieza a sonar ya; su cola (la radio) llega después.
         let started = !item.video_id.is_empty();
@@ -365,6 +437,10 @@ impl qobject::Player {
                 duration: 0.0,
             };
             self.as_mut().set_tracks(vec![track]);
+            // La letra se pide una sola vez, cuando llega la cola (unas décimas después): la
+            // tarjeta no trae la duración ni el artista limpio, y pedirla dos veces repetía las
+            // búsquedas y rehacía la letra en pantalla.
+            self.as_mut().rust_mut().defer_lyrics = true;
             self.as_mut().load(0);
         } else {
             self.as_mut().set_loading(true);
@@ -385,8 +461,13 @@ impl qobject::Player {
                     Ok(tracks) if !tracks.is_empty() => player.as_mut().adopt_queue(tracks, started),
                     Ok(_) if !started => player.as_mut().fail("No se encontraron canciones."),
                     Err(error) if !started => player.as_mut().fail(&error),
-                    // La canción ya suena: quedarse sin radio no es un error visible.
-                    _ => {}
+                    // La canción ya suena: quedarse sin radio no es un error visible. La letra se
+                    // pide con lo que se sabe de la tarjeta.
+                    _ => {
+                        if let Some(track) = player.tracks.first().cloned() {
+                            player.as_mut().fetch_lyrics(track);
+                        }
+                    }
                 }
             });
         });
@@ -402,9 +483,7 @@ impl qobject::Player {
             shuffle_tracks(&mut tracks);
             start = 0;
         }
-        let request = self.request + 1;
-        self.as_mut().rust_mut().request = request;
-        self.as_mut().set_error(QString::default());
+        self.as_mut().new_request();
         self.as_mut().set_tracks(tracks);
         self.load(start);
     }
@@ -463,11 +542,7 @@ impl qobject::Player {
         if !item.video_id.is_empty() {
             resolver::hint(&item.video_id);
         } else if !item.playlist_id.is_empty() {
-            thread::spawn(move || {
-                if let Some(first) = album_queue(&item.playlist_id).ok().and_then(|t| t.into_iter().next()) {
-                    resolver::hint(&first.video_id);
-                }
-            });
+            hint_list(&item.playlist_id);
         }
     }
 
@@ -630,7 +705,7 @@ impl qobject::Player {
         let Ok(value) = serde_json::from_str::<serde_json::Value>(&item.to_string()) else { return };
         if let Some(track) = track_from(&value) {
             resolver::prefetch(&track.video_id);
-            let mut tracks = self.temporal_tracks.clone();
+            let mut tracks = std::mem::take(&mut self.as_mut().rust_mut().temporal_tracks);
             tracks.push(track);
             self.as_mut().set_temporal_tracks(tracks);
             return;
@@ -645,7 +720,7 @@ impl qobject::Player {
             let result = album_queue(&item.playlist_id);
             let _ = qt.queue(move |mut player| match result {
                 Ok(added) => {
-                    let mut tracks = player.temporal_tracks.clone();
+                    let mut tracks = std::mem::take(&mut player.as_mut().rust_mut().temporal_tracks);
                     tracks.extend(added);
                     player.as_mut().set_temporal_tracks(tracks);
                 }
@@ -655,11 +730,12 @@ impl qobject::Player {
     }
 
     fn remove_from_temporal(mut self: Pin<&mut Self>, index: i32) {
-        let mut tracks = self.temporal_tracks.clone();
-        if index >= 0 && (index as usize) < tracks.len() {
-            tracks.remove(index as usize);
-            self.as_mut().set_temporal_tracks(tracks);
+        if index < 0 || index as usize >= self.temporal_tracks.len() {
+            return;
         }
+        let mut tracks = std::mem::take(&mut self.as_mut().rust_mut().temporal_tracks);
+        tracks.remove(index as usize);
+        self.as_mut().set_temporal_tracks(tracks);
     }
 
     fn clear_temporal(self: Pin<&mut Self>) {
@@ -686,9 +762,7 @@ impl qobject::Player {
             return;
         }
         let start = (index.max(0) as usize).min(tracks.len() - 1);
-        let request = self.request + 1;
-        self.as_mut().rust_mut().request = request;
-        self.as_mut().set_error(QString::default());
+        self.as_mut().new_request();
         self.as_mut().set_repetir(true);
         self.as_mut().set_repetir_una(false);
         if let Some(mpv) = self.as_mut().rust_mut().mpv.as_mut() {
@@ -733,13 +807,12 @@ impl qobject::Player {
             resolver::prefetch(&track.video_id);
         }
         if self.tracks.is_empty() {
-            let request = self.request + 1;
-            self.as_mut().rust_mut().request = request;
+            self.as_mut().new_request();
             self.as_mut().set_tracks(added);
             self.load(0);
             return;
         }
-        let mut tracks = self.tracks.clone();
+        let mut tracks = std::mem::take(&mut self.as_mut().rust_mut().tracks);
         let at = if next { (*self.index() as usize + 1).min(tracks.len()) } else { tracks.len() };
         tracks.splice(at..at, added);
         self.as_mut().set_tracks(tracks);
@@ -753,7 +826,7 @@ impl qobject::Player {
         }
         let (from, to) = (from as usize, to as usize);
         let current = *self.index() as usize;
-        let mut tracks = self.tracks.clone();
+        let mut tracks = std::mem::take(&mut self.as_mut().rust_mut().tracks);
         let moved = tracks.remove(from);
         tracks.insert(to, moved);
         // La pista que suena conserva su sitio en la cola aunque cambie de posición.
@@ -776,7 +849,7 @@ impl qobject::Player {
         if index < 0 || index as usize >= self.tracks.len() || index == current {
             return;
         }
-        let mut tracks = self.tracks.clone();
+        let mut tracks = std::mem::take(&mut self.as_mut().rust_mut().tracks);
         tracks.remove(index as usize);
         self.as_mut().set_tracks(tracks);
         if index < current {
@@ -790,7 +863,7 @@ impl qobject::Player {
         if start + 1 >= self.tracks.len() {
             return;
         }
-        let mut tracks = self.tracks.clone();
+        let mut tracks = std::mem::take(&mut self.as_mut().rust_mut().tracks);
         shuffle_tracks(&mut tracks[start..]);
         self.as_mut().set_tracks(tracks);
         self.prefetch_next();
@@ -866,6 +939,15 @@ impl qobject::Player {
         self.as_mut().rust_mut().listen = None;
     }
 
+    /// Empieza una petición de reproducción nueva: las respuestas de las anteriores se descartan
+    /// (`request`) y se quita el error que hubiera.
+    fn new_request(mut self: Pin<&mut Self>) -> u64 {
+        let request = self.request + 1;
+        self.as_mut().rust_mut().request = request;
+        self.set_error(QString::default());
+        request
+    }
+
     fn fail(mut self: Pin<&mut Self>, message: &str) {
         self.as_mut().set_loading(false);
         self.as_mut().set_error(QString::from(message));
@@ -923,6 +1005,7 @@ impl qobject::Player {
     }
 
     fn load(mut self: Pin<&mut Self>, index: usize) {
+        let defer_lyrics = std::mem::take(&mut self.as_mut().rust_mut().defer_lyrics);
         let Some(track) = self.tracks.get(index).cloned() else { return };
         if !self.as_mut().ensure_engine() {
             return;
@@ -946,7 +1029,10 @@ impl qobject::Player {
         self.as_mut().rust_mut().load_token = token;
         self.as_mut().rust_mut().load_started = Some(Instant::now());
 
-        match resolver::cached(&track.video_id) {
+        // Depuración: `MUSICPLAYER_DEBUG_AUDIO=archivo` suena ese archivo local en lugar de cada
+        // pista (medir la letra o la interfaz sin depender de que YouTube deje reproducir).
+        let debug_audio = std::env::var("MUSICPLAYER_DEBUG_AUDIO").ok().filter(|file| !file.is_empty());
+        match debug_audio.or_else(|| resolver::cached(&track.video_id)) {
             // Ya resuelta: suena en unas décimas.
             Some(url) => self.as_mut().start_stream(Some(&url), &track.video_id),
             None => {
@@ -973,7 +1059,12 @@ impl qobject::Player {
                 });
             }
         }
-        self.fetch_lyrics(track);
+        if defer_lyrics {
+            // La de la pista anterior no debe quedarse en pantalla mientras llega la cola.
+            self.clear_lyrics();
+        } else {
+            self.fetch_lyrics(track);
+        }
     }
 
     /// Ordena a mpv que reproduzca: la URL resuelta si la hay, si no la página de YouTube.
@@ -981,7 +1072,7 @@ impl qobject::Player {
         let page = format!("https://www.youtube.com/watch?v={video_id}");
         self.as_mut().rust_mut().via_stream = stream_url.is_some();
         let loaded = self.as_mut().rust_mut().mpv.as_mut().map(|mpv| match stream_url {
-            Some(url) => mpv.load_stream(url),
+            Some(url) => mpv.load(url),
             None => mpv.load(&page),
         });
         if !matches!(loaded, Some(Ok(()))) {
@@ -989,13 +1080,19 @@ impl qobject::Player {
         }
     }
 
-    /// Pide la letra a todas las fuentes a la vez y publica cada una según llega, ordenadas de
-    /// mejor a peor (la primera aparece en cuanto responde la fuente más rápida).
-    fn fetch_lyrics(mut self: Pin<&mut Self>, track: Track) {
+    /// Quita la letra publicada y descarta las respuestas pendientes; devuelve el contador nuevo.
+    fn clear_lyrics(mut self: Pin<&mut Self>) -> u64 {
         let token = self.lyrics_token + 1;
         self.as_mut().rust_mut().lyrics_token = token;
         self.as_mut().rust_mut().lyrics_found.clear();
-        self.as_mut().set_lyrics(QString::default());
+        self.set_lyrics(QString::default());
+        token
+    }
+
+    /// Pide la letra a todas las fuentes a la vez y publica cada una según llega, ordenadas de
+    /// mejor a peor (la primera aparece en cuanto responde la fuente más rápida).
+    fn fetch_lyrics(mut self: Pin<&mut Self>, track: Track) {
+        let token = self.as_mut().clear_lyrics();
         let query = std::sync::Arc::new(lyrics::Query::new(&track.title, &track.artist, track.duration));
         for source in lyrics::SOURCES {
             let qt = self.qt_thread();

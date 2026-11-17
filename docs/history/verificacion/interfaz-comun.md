@@ -5,6 +5,24 @@ son de cuando se escribieron. El estado actual está en su [ficha](../../areas/i
 
 Lo nuevo va arriba: añade una sección `## AAAA-MM-DD · qué se verificó` encima de las anteriores.
 
+## 2026-11-17 · TabStrip, vidrio a media resolución y Cover.picture (rama `perf/letra`)
+
+- **Cambio:** `TabStrip`, las pestañas del panel y de «Sonando» en un solo componente (con agarre
+  exclusivo también en el panel, que no lo tenía); `Glass` y la barra copian el fondo a media
+  resolución; `Cover.picture` para el reflejo de Lomos.
+- **Verificado:** Opciones abierta: 253–256 MB → 231–239 MB; capturas de la barra, Opciones y
+  las pestañas, sin diferencias a la vista en el desenfoque.
+- **No verificado:** las pestañas con el teclado; el desenfoque con una skin clara.
+
+## 2026-11-16 · `Slider.drawn` y el recorte del vidrio (rama `perf/letra`)
+
+- **Cambio:** `Slider` dibuja el relleno y el tirador en píxeles enteros (`drawn`); `Glass`
+  incluye `x` e `y` de su `backdrop` en las dependencias del recorte (el de «Sonando» sube con
+  ella).
+- **Verificado:** capturas de la barra de reproducción y del volumen; medida en
+  [reproduccion](reproduccion.md).
+- **No verificado:** arrastrar el deslizador a la vista.
+
 ## 2026-11-16 · `Cover` con `placeholder` y `ready`
 
 - **Cambio:** `placeholder: false` quita el fondo neutro mientras carga, para que se vea la

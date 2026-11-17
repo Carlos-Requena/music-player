@@ -40,6 +40,7 @@ HOME="$PRUEBA" MUSICPLAYER_SILENT=1 ./target/release/musicplayer \
 | `--index n` | Lleva Lomos o Cubeta al elemento `n` |
 | `--step n` | Mueve la vista `n` elementos (negativo = izquierda) a los `--step-delay` ms (1500 por defecto); con `--delay` se captura en mitad del movimiento |
 | `--search texto` | Busca al arrancar |
+| `--play ID` | Reproduce esa canción al arrancar (como un clic en su tarjeta); `--play-title texto` le pone título |
 | `--settings` | Abre las opciones |
 | `--settings-end` | Abre las opciones desplazadas hasta el final |
 | `--settings-cat id` | Abre las opciones en esa categoría (`cuenta`, `reproduccion`, `apariencia`, `vistas`, `plugins`) |

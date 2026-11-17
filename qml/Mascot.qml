@@ -193,8 +193,12 @@ Item {
         width: parent.width
         height: parent.height
         source: root.source
-        // Decodificada a su tamaño en pantalla: unas pocas decenas de KB por pose.
+        // Decodificada a su tamaño en pantalla: unas pocas decenas de KB por pose. Fuera del hilo
+        // de la interfaz (la pose cambia justo al empezar una pista), y con la anterior a la vista
+        // hasta que llega la nueva.
         sourceSize.height: root.tall * Screen.devicePixelRatio
+        asynchronous: true
+        retainWhileLoading: true
         fillMode: Image.PreserveAspectFit
         smooth: true
         mipmap: true

@@ -123,12 +123,13 @@ Window {
             onClicked: mini.restore()
         }
 
-        // Progreso: una línea fina en el borde inferior.
+        // Progreso: una línea fina en el borde inferior, en píxeles enteros (sin avanzar un píxel
+        // no se redibuja).
         Rectangle {
             x: card.radius
             anchors.bottom: parent.bottom
             anchors.bottomMargin: 6
-            width: (parent.width - 2 * card.radius) * (Player.duration > 0 ? Player.position / Player.duration : 0)
+            width: Math.round((parent.width - 2 * card.radius) * (Player.duration > 0 ? Math.min(1, Player.position / Player.duration) : 0))
             height: 3
             radius: 1.5
             color: Theme.accent

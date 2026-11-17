@@ -9,12 +9,7 @@ FocusScope {
     property string titulo: ""
     property int index: 0
 
-    readonly property var items: {
-        let out = []
-        for (const zona of zonas)
-            out = out.concat(zona.items)
-        return out
-    }
+    readonly property var items: Catalog.allItems(zonas)
     readonly property var currentItem: items.length ? items[Math.min(index, items.length - 1)] : null
 
     readonly property real side: Math.min(400, height * 0.6, width * 0.36)

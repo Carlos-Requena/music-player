@@ -47,6 +47,9 @@ Opciones › Mascota. Van aparte de las skins, en `<config>/musicplayer/mascotas
   «Me gusta», el clic no debe llegar también a la tarjeta que haya debajo.
 - Las rutas las resuelve `Theme.mascotImage` a partir de `AppSettings.mascotaData` (que añade
   `carpeta`).
+- **Cada pose se carga fuera del hilo de la interfaz** (`asynchronous`), con la anterior a la vista
+  hasta que llega (`retainWhileLoading`): la pose cambia justo al empezar una pista y un PNG grande
+  trababa ese momento.
 
 ## Archivos
 
@@ -77,8 +80,7 @@ Opciones › Mascota. Van aparte de las skins, en `<config>/musicplayer/mascotas
 
 ## Estado actual
 
-- **Última verificación:** 2026-11-15, capturas con Ralsei: pincharla (vergüenza), cinco veces
-  (enojo), «Siguiente» (desilusión) y en Opciones ([historial](../history/verificacion/mascotas.md)).
+- **Última verificación:** 2026-11-17, poses cargadas en segundo plano ([historial](../history/verificacion/mascotas.md)).
 - **Pruebas:** ninguna automática.
 - **Sin verificar:** el «Me gusta» de verdad (con sesión y música sonando), la reacción a
   «Guardar en una playlist», Linux.

@@ -10,30 +10,28 @@ Nota de la tarea larga que está a medias, para quien la retome sin memoria de l
 
 ---
 
-## Letra de varias fuentes y palabra a palabra · rama `feature/letra`
+## Rendimiento: letra y resto de la auditoría · rama `perf/letra`
 
-- **Objetivo:** «utilizar varias fuentes y que se pueda elegir» (mucho anime que no está en las
-  fuentes normales) y que la letra se ilumine palabra a palabra **a tiempo** («muchas veces no
-  encaja conforme se ilumina»).
-- **Áreas:** [letra](areas/letra.md).
-- **Decisiones tomadas en la conversación (2026-11-16)**, ya escritas en la ficha
-  [letra](areas/letra.md), en [ADR-18](decisions/ADR-18-letra-de-varias-fuentes.md) y en
-  AGENTES §11: fuentes LRCLIB, NetEase y Kugou con «Automática» por defecto (`letraOrigen`, fila
-  «Origen de la letra»); cambio por canción con el **diseño A** (nombre de la fuente en el pie,
-  `origen:<videoId>`); líneas sin tiempos por palabra **enteras** por defecto y «Estimado» como
-  opción (`letraSinTiempos`).
-- **Hecho (sin commit, falta el visto bueno del propietario):** todo el código y la
-  documentación; `cargo build --release` sin avisos, `cargo test` en verde, `--probe lyrics`
-  contra las tres fuentes, capturas del panel y de Opciones, clic simulado en la fuente.
-- **Falta:** ver el barrido sílaba a sílaba con música y medir su CPU en release
-  (`docs/runbooks/medir-rendimiento.md`) cuando YouTube deje reproducir sin sesión (el
-  2026-11-16 pedía sesión también a `yt-dlp`); `--autoplay` de verificar-reproduccion; commit y
-  unir a `master`.
-- **Cómo retomarla:** `git switch feature/letra`, `git status`, y
-  `HOME=$(mktemp -d) MUSICPLAYER_SILENT=1 ./target/release/musicplayer --shot /tmp/x.png --delay 40000 --search "紅蓮華 LiSA" --autoplay --autoplay-delay 5000 --panel --tab letra`.
-- **Cuidado:** en KRC los tiempos de cada sílaba son relativos al comienzo de la línea; en YRC,
-  absolutos. `docs.py check` ya fallaba en `master` por `docs/guia/guia.{aux,log,…}` subidos a git
-  (no es de esta tarea).
+- **Objetivo:** bajar CPU y memoria según la auditoría de rendimiento del 2026-11-16. El
+  propietario aprobó primero el bloque «Letra» (L1–L7 y B1) y después pidió seguir con «el resto»
+  en la misma rama: precarga (R1–R5), vistas (V1–V7), puente (J1–J3) y estructura (S1).
+- **Áreas:** [letra](areas/letra.md), [ventana](areas/ventana.md), [reproduccion](areas/reproduccion.md),
+  [resolucion](areas/resolucion.md), [catalogo](areas/catalogo.md), [vistas](areas/vistas.md),
+  [personalizacion](areas/personalizacion.md), [mascotas](areas/mascotas.md),
+  [interfaz-comun](areas/interfaz-comun.md).
+- **Decisiones tomadas en la conversación:** la cascada de la letra se deja como está (opción A)
+  mientras el propietario no elija otra; todo en la rama `perf/letra`.
+- **Hecho (sin commit, falta el visto bueno del propietario):** todo el código, medidas antes y
+  después (en las fichas y sus historiales), `cargo build --release` sin avisos, `cargo test` en
+  verde, capturas; fichas, historiales y una trampa nueva (`ListView` y `leftMargin`).
+- **No hecho de S1, a propósito:** sacar el arnés de depuración de `Main.qml` a su propio archivo
+  y partir `player.rs`. Son reorganizaciones sin efecto en memoria ni en tiempos y con riesgo de
+  romper las pruebas con `--shot`; se proponen aparte.
+- **Falta:** commits (dos: letra y resto) y unir a `master` con el visto bueno del propietario.
+- **Cómo retomarla:** `git switch perf/letra`, `git status`.
+- **Cuidado:** `docs.py check` sigue marcando los `docs/guia/guia.*` que están en git desde antes
+  (no es de esta tarea). YouTube pedía sesión: las medidas con música usan
+  `MUSICPLAYER_DEBUG_AUDIO` y `--play` ([medir-rendimiento](runbooks/medir-rendimiento.md)).
 
 <!--
 Esqueleto (cópialo encima de «Ninguna tarea en curso» y bórrala):

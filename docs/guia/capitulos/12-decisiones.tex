@@ -1,5 +1,251 @@
 \chapter{Decisiones de diseño}
+\label{cap:decisiones}
 
-\begin{trampa}[Capítulo pendiente]
-Este capítulo aún no está escrito. Mientras tanto, la información equivalente está en \archivo{docs/INDEX.md} (las fichas de \archivo{docs/areas/}) y \archivo{docs/ARCHITECTURE.md}.
-\end{trampa}
+El código dice \emph{qué} hace el programa; este capítulo dice \emph{por qué} es así y qué se
+probó y se descartó. Cada decisión que cruza áreas, o que fijó el propietario, está en un
+documento corto llamado ADR (\emph{Architecture Decision Record}) en
+\archivo{docs/decisions/}. Aquí tienes las dieciocho agrupadas por tema, más las preferencias
+del propietario que no llegaron a ADR.
+
+\begin{idea}[Por qué existen las ADR]
+Dentro de seis meses, alguien (o el mismo agente tras compactar su contexto, que no recuerda
+nada) verá algo raro, como el prefijo \cod{lavf://} o un temporizador a 10 Hz, y querrá
+«arreglarlo». Si el motivo no está escrito, lo romperá. La regla del proyecto es:
+\emph{no se reabre una ADR sin un motivo nuevo}.
+\end{idea}
+
+\section{Las prioridades que mandan}
+
+Antes de las decisiones sueltas, la que las ordena. El propietario fijó cuatro prioridades,
+\emph{en este orden}:
+
+\begin{enumerate}
+  \item Consumo bajo de memoria.
+  \item Respuesta instantánea.
+  \item Personalización total (vistas, disposición, skins).
+  \item Estética cuidada.
+\end{enumerate}
+
+Ante un conflicto gana la de arriba, \emph{y se le explica}. El objetivo declarado es
+sustituir a Pear Desktop y a una pestaña de Chrome con YouTube Music: «lo que no consuma
+menos que ellos no vale». Casi toda decisión de este capítulo es esa frase aplicada.
+
+\section{La base: pila y procesos}
+
+\subsection{ADR-01: Qt/QML para la interfaz, Rust para el núcleo}
+
+\begin{description}[style=nextline, leftmargin=0pt]
+  \item[Se eligió] Qt 6/QML con un núcleo en Rust unido con cxx-qt. Los objetos que ve QML son
+  los cinco singletons de Rust.
+  \item[Se descartó] \emph{Electron o Tauri}: un WebView solo ya cuesta más que la app
+  entera, y es exactamente lo que se quiere sustituir. \emph{GTK o interfaces nativas}: dos
+  interfaces que mantener y sin el 3D ni el vidrio. \emph{Núcleo en C++}: posible, pero Rust
+  da hilos y red más seguros.
+  \item[Consecuencia] Toda la interfaz pasa por QML y sus trampas; cada archivo QML y cada
+  puente hay que registrarlo en \archivo{build.rs}.
+\end{description}
+
+\subsection{ADR-02: mpv en un proceso aparte}
+
+\begin{description}[style=nextline, leftmargin=0pt]
+  \item[Se eligió] Un proceso \cod{mpv --idle} sin vídeo, controlado por su socket IPC JSON.
+  \item[Se descartó] \emph{libmpv embebido}: otra dependencia nativa en dos sistemas, y un
+  fallo de mpv tumbaría la app (queda pendiente medir si ahorra memoria). \emph{QtMultimedia}:
+  no lee bien las URL de googlevideo ni Opus en todos los sistemas.
+  \item[Por qué es buena idea] Si mpv se cuelga, se reinicia sin cerrar la app; ocupa 20 MB
+  en reposo y unos 75 MB sonando; y su propio gancho de yt-dlp es el plan B de la resolución.
+\end{description}
+
+\subsection{ADR-07: la ventana de inicio de sesión, en otro proceso}
+
+\begin{description}[style=nextline, leftmargin=0pt]
+  \item[Se eligió] En macOS, el mismo ejecutable relanzado con \cod{--login} (WebKit del
+  sistema, sin arrancar Qt); en Linux, un binario aparte (\cod{musicplayer-login}, Qt WebEngine,
+  opcional).
+  \item[Se descartó] \emph{Qt WebEngine dentro del reproductor}: cargaría Chromium (cientos
+  de MB) para usarlo una vez. \emph{Disfrazar el agente de usuario de Chrome}: Google lo
+  bloquea porque contradice las cabeceras \cod{Sec-CH-UA}. \emph{Solo importar del
+  navegador}: en macOS exige «Acceso total al disco».
+  \item[Lección general] La memoria es la primera prioridad: lo que se necesita una sola vez
+  vive en un proceso que desaparece.
+\end{description}
+
+\section{Obtener el audio}
+
+\subsection{ADR-03: vía rápida y yt-dlp de respaldo}
+
+\begin{description}[style=nextline, leftmargin=0pt]
+  \item[Se eligió] Pedir la URL a \cod{/player} con el cliente de visionOS (0,2--0,4 s). Si
+  falla, yt-dlp. Las pistas que YouTube reserva a cuentas van directas a yt-dlp con las
+  cookies.
+  \item[Se descartó] \emph{Solo yt-dlp}: 3,5--4,2 s por pista. \emph{El gancho de yt-dlp de
+  mpv}: 8,2--9,5 s. \emph{Otros clientes de InnerTube}: piden descifrado de JavaScript o
+  tokens PO.
+  \item[Consecuencia] La vía rápida sirve unas 9 de cada 10 pistas. Cuando YouTube cambie algo,
+  lo primero que falle será ella: por eso yt-dlp debe seguir funcionando solo.
+\end{description}
+
+\subsection{ADR-05: precargar}
+
+Las URL se resuelven por adelantado: el foco detenido 250 ms, el ratón sobre una carátula, las
+tres pistas siguientes, las seis primeras de un álbum abierto y las cuatro primeras de una
+sección. Con precarga el clic suena en 64--254 ms; sin ella, en 0,4--0,6 s.
+\emph{Se descartó} precargar todo lo visible (decenas de peticiones por pantalla y riesgo de
+que YouTube bloquee la IP). \cod{hint} atiende solo la \emph{última} petición.
+
+\subsection{ADR-08: yt-dlp residente}
+
+Arrancar Python en cada pista cuesta casi un segundo. Un yt-dlp que se queda cargado hace que
+las pistas que lo necesitan suenen ~1 s antes (2,2--2,5 s frente a 3,5--4,2 s). Pero ocupa
+unos 120 MB, así que se cierra solo a los 60 s sin uso y se puede desactivar. \emph{Se
+descartó} dejarlo siempre vivo.
+
+\section{Los datos}
+
+\subsection{ADR-04: JSON en una propiedad \texttt{QString}}
+
+\emph{Se eligió} publicar las listas como JSON en una propiedad de texto, que
+\archivo{Catalog.qml} parsea una vez por cambio. \emph{Se descartó} \cod{QAbstractListModel}
+(mucho código de puente por cada dato nuevo para un volumen pequeño) y \cod{QVariantList} (no
+ahorra nada medible). El límite: 60 elementos por zona. Si un día hubiera listas de miles de
+filas que cambian sueltas, habría que medir y quizá pasar esa lista a un modelo.
+
+\subsection{ADR-06: las canciones de un álbum, de la página \texttt{VL<id>}}
+
+La cola \cod{next} parecía lo natural, pero trae junto a cada canción su versión en vídeo, se
+corta en unas 50 y a veces mezcla canciones ajenas. La página de la lista (\cod{VL} más el
+identificador) trae solo la lista y en orden. Una lista de 500 pistas tarda ~3 s: se muestra
+lo conocido al instante y las canciones después.
+
+\subsection{ADR-09: caché de secciones en disco}
+
+\emph{Esperar a la red} dejaba la ventana vacía medio segundo o más. Ahora cada sección se
+guarda y se muestra al arrancar mientras se pide la nueva: a los 300 ms ya hay contenido y
+carátulas. La contrapartida es que durante medio segundo lo que ves puede ser de la vez
+anterior; y que cerrar sesión debe borrar las copias de la cuenta.
+
+\subsection{ADR-12: registrar las escuchas}
+
+\begin{description}[style=nextline, leftmargin=0pt]
+  \item[Se eligió] Enviar los mismos avisos que el reproductor de YouTube Music
+  (\cod{videostatsPlaybackUrl} al empezar y \cod{videostatsWatchtimeUrl} con los tramos), con
+  \cod{c=WEB_REMIX}. Activado por defecto.
+  \item[Se descartó] \emph{Confiar en la petición del audio} (no cuenta como reproducción) y
+  \cod{yt-dlp --mark-watched} (lo apunta en el historial de YouTube, no en el de YouTube
+  Music, y no envía el tiempo escuchado).
+  \item[Consecuencia] YouTube aplica su límite de un dispositivo a la vez por cuenta. Nada
+  espera a estos avisos; un fallo solo va a stderr.
+\end{description}
+
+\subsection{ADR-18: letra de varias fuentes}
+
+\begin{description}[style=nextline, leftmargin=0pt]
+  \item[Se eligió] Pedir LRCLIB, NetEase y Kugou \emph{a la vez} y publicar todas las que
+  respondan, ordenadas de mejor a peor. La interfaz elige cuál mostrar.
+  \item[Por qué] Solo con LRCLIB faltaba mucho anime y casi nunca había tiempos por palabra:
+  el barrido se inventaba (75 ms por letra) y no encajaba con la voz.
+  \item[Se descartó] \emph{Musixmatch} (token que se saca imitando su aplicación, captchas),
+  \emph{QQ Music} (3DES modificado, catálogo ya cubierto), \emph{Apple Music y Spotify}
+  (exigen la cuenta del usuario), \emph{alinear la letra con la voz en local con un modelo}
+  (cientos de MB de memoria) y \emph{elegir la fuente en Rust} (obligaba a pasar las
+  preferencias por canción al hilo de la letra; en QML cambiar de fuente es instantáneo porque
+  todas ya están en \cod{Catalog.lyricsSources}).
+\end{description}
+
+\section{La interfaz}
+
+\subsection{ADR-10: el mini reproductor oculta la ventana grande}
+
+Al abrir el mini, la ventana grande se \emph{oculta} (no se minimiza) y \archivo{window.cpp}
+libera su memoria gráfica: 213 $\rightarrow$ 148 MB. \emph{Se descartó} minimizar (en macOS Qt
+conserva los búferes) y meter el mini en la misma ventana (no libera nada). El precio: las
+\cod{Shape} con \cod{CurveRenderer} no se redibujan solas, y por eso existe
+\cod{Theme.renderEpoch}.
+
+\subsection{ADR-11: skins en JSON, opciones como mapa}
+
+Una skin es un archivo JSON de colores; una opción es una pareja clave--valor en un mapa
+genérico. \emph{Se descartó} una propiedad de puente por opción (cada una tocaría Rust, el
+puente y QML) y las skins con QML propio (aplazadas; los colores cubren casi todo). El precio:
+las claves no tienen tipo, así que cada una se documenta en la ficha de su área.
+
+\subsection{ADR-13 y ADR-18: la letra y su coste}
+
+\begin{itemize}
+  \item \textbf{Un solo gestor de clics} para toda la vista de la letra, calculado con
+  \cod{childAt}; un gestor por línea (o con «hover») costaba ~25 \% de CPU incluso sin
+  animaciones.
+  \item \textbf{Tres calidades} que cambian los fotogramas por segundo.
+  \item \emph{Descartado}: \cod{Text.CurveRendering} (+95 MB para una nitidez que apenas se
+  nota) y el brillo con \cod{layer.effect} (el texto se veía borroso).
+\end{itemize}
+
+\subsection{ADR-14: Lomos con matrices propias}
+
+\emph{Se descartó} Qt Quick 3D (un motor 3D entero para cajas planas) y la \cod{Rotation} de
+Qt por cara (el eje y el lomo visible cambiaban de lado de golpe al cruzar el centro). Cada
+cara es un \cod{Item} plano con una \cod{Matrix4x4} calculada, y ángulo, escala y sitio son
+funciones continuas de una posición decimal. El reflejo y el halo cuestan unos 7 MB.
+
+\subsection{ADR-17: el fondo «Fluido»}
+
+Un \cod{ShaderEffect} con un sombreador propio, precompilado con \cod{qsb} y guardado en el
+repositorio junto a su \cod{.frag}. La carátula llega diminuta (32 px) y el desenfoque se
+completa en el propio sombreador, dibujado a media resolución lógica. \emph{Se descartó}
+copiar el sombreador de Better Lyrics Shaders (es GPL-3.0: solo se toma la técnica, tal como
+la describe Kawarp, con licencia MIT), compilar con \cod{qsb} en cada \cod{cargo build} (obligaría a tener \cod{qsb}
+instalado) y el desenfoque Kawase en varias texturas (con 32 px no hace falta). Quieto cuesta
+0,08 s de CPU en 25 s y 196 MB (como sin él).
+
+\section{Plugins y documentación}
+
+\subsection{ADR-15: plugins en un hilo propio}
+
+\cod{Player} avisa con \cod{plugins::emit} y un hilo reparte a Discord y Last.fm. \emph{Se
+descartó} llamarlos desde \cod{Player}: la red de un plugin lento frenaría el arranque de una
+pista o la interfaz. Los controles del sistema \emph{no} pasan por ahí porque en macOS deben
+ir en el hilo principal.
+
+\subsection{ADR-16: documentación por áreas}
+
+Normas en \archivo{AGENTES.md}; una ficha por área; ADR; \emph{runbooks}; trampas; historial; y
+\cod{scripts/docs.py} que lo comprueba (sin dependencias: Python 3.9 o más). \emph{Se
+descartó} mover el código a una carpeta por funcionalidad (rompe las rutas planas que esperan
+\archivo{build.rs} y QML) y un solo \archivo{AGENTS.md} largo (crecía con cada tarea y se leía
+entero para cualquier cambio). El motivo es mantener el proyecto con agentes que pierden la
+memoria al compactar el contexto.
+
+\section{Preferencias del propietario que no son ADR}
+
+En \archivo{docs/AGENTES.md} §11 hay una lista de preferencias vigentes que «no se cambian sin
+preguntar». Son decisiones de producto más que de arquitectura. Las principales:
+
+\begin{itemize}
+  \item \textbf{Clic y que suene}: el arranque de una pista no espera a nada que no sea el
+  audio.
+  \item \textbf{Ventana de vidrio con navegación superior}; el panel de letra y cola, oculto al
+  arrancar.
+  \item \textbf{Vistas por sección}: Inicio, Explorar, Me gusta y Búsqueda en Muro;
+  Playlists y Álbumes en Lomos; cualquier sección puede usar cualquier vista.
+  \item \textbf{Diseño con alternativas}: mockups y decisiones visuales con dos a cuatro
+  opciones a elegir, no una sola propuesta.
+  \item \textbf{«Sonando» en dos disposiciones} (Grande y Clásica) y la carátula a máxima
+  calidad por defecto.
+  \item \textbf{La mascota participa}: pincharla da «Me gusta» si su \cod{mascota.json} lo pide.
+  \item \textbf{Letra centrada} en horizontal y vertical; el retraso, un pie discreto.
+  \item \textbf{Iniciar sesión con una ventana propia}, sin disfrazar el agente de usuario.
+\end{itemize}
+
+\begin{porque}[¿Cuándo escribo una ADR?]
+Cuando una decisión cruza áreas, o la fija el propietario, o descartaste una alternativa
+razonable y alguien podría querer reabrirla. El procedimiento es
+\archivo{docs/runbooks/registrar-decision.md}: copias la plantilla, rellenas \emph{Decisión,
+Alternativas descartadas, Motivo y Consecuencias} (con cifras y fecha cuando las haya) y
+ejecutas \cod{python3 scripts/docs.py index}.
+\end{porque}
+
+\begin{ejercicio}
+Elige una ADR y busca en el código dos sitios donde se note su \emph{consecuencia} (por
+ejemplo, ADR-09: \cod{library::cache} y la llamada a \cod{forget_account}). Si quitaras la
+decisión, ¿qué se rompería?
+\end{ejercicio}

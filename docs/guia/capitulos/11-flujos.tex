@@ -1,5 +1,288 @@
 \chapter{Flujos completos de principio a fin}
+\label{cap:flujos}
 
-\begin{trampa}[Capítulo pendiente]
-Este capítulo aún no está escrito. Mientras tanto, la información equivalente está en \archivo{docs/INDEX.md} (las fichas de \archivo{docs/areas/}) y \archivo{docs/ARCHITECTURE.md}.
-\end{trampa}
+Los capítulos anteriores explican las piezas. Este une las piezas: sigue ocho situaciones
+reales de punta a punta, nombrando el archivo y la función de cada paso. Si lees solo uno de
+ellos, que sea el primero.
+
+\begin{idea}[Cómo leer un flujo]
+Casi todos tienen la misma forma: \textbf{(1)} la interfaz emite una señal o llama a una
+función de un singleton; \textbf{(2)} Rust cambia su estado \emph{al instante} para que la
+pantalla reaccione; \textbf{(3)} lo lento se lanza a un hilo; \textbf{(4)} el resultado vuelve
+con \cod{qt.queue}, \emph{comprobando un contador} por si ya no interesa; \textbf{(5)} Rust
+publica una propiedad y QML se redibuja sola.
+\end{idea}
+
+%% ------------------------------------------------------------------------------------------
+\section{El arranque de la aplicación}
+
+\begin{enumerate}
+  \item \textbf{\cod{main()}} (\archivo{src/main.rs}): comprueba \cod{--login} y
+  \cod{--probe}; si no hay ninguno, registra el módulo, crea la \cod{QGuiApplication}, instala
+  el cierre por señales y la configuración de red, y carga \archivo{Main.qml}.
+  \item \textbf{La ventana se crea} y su \cod{Component.onCompleted} lanza cuatro llamadas:
+  \cod{Library.load()}, \cod{Plugins.start()}, \cod{Player.warmUp()} y
+  \cod{Account.verify()}. Cada nombre de singleton \emph{instancia} su objeto Rust la primera
+  vez: \cod{Library}, por ejemplo, ejecuta \cod{LibraryRust::default()}.
+  \item \textbf{\cod{Library::load}} lee de disco la copia de cada sección y la publica
+  \emph{ya}: por eso a los 300 ms hay contenido (ADR-09). En un hilo pide la versión nueva a
+  YouTube, la guarda y la publica cuando llega, sustituyendo a la copia.
+  \item \textbf{\cod{Player::warm_up}} aplica los controles multimedia del sistema y arranca
+  mpv: el primer clic ya no paga el arranque del motor.
+  \item \textbf{\cod{Plugins::start}} lanza el hilo \cod{worker} que repartirá los eventos a
+  Discord y Last.fm.
+  \item \textbf{\cod{Account::verify}}, si hay sesión, pregunta a YouTube el nombre de la
+  cuenta: si ya no la reconoce, la cierra y avisa; sin red, la mantiene.
+  \item Qt entra en \cod{app.exec()}: el bucle de eventos.
+\end{enumerate}
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[node distance=5mm and 8mm]
+  \node[caja] (m) {main.rs};
+  \node[caja, right=of m] (q) {Main.qml};
+  \node[caja, right=of q] (l) {Library.load};
+  \node[caja, below=of q] (w) {Player.warmUp};
+  \node[caja, right=of w] (d) {leer caché de disco};
+  \node[caja, below=of d, fill=acento!8] (p) {pantalla con contenido\\ \footnotesize ~300 ms};
+  \node[caja, below=of l, xshift=3.2cm] (n) {red: sección nueva};
+  \draw[flecha] (m) -- (q);
+  \draw[flecha] (q) -- (l);
+  \draw[flecha] (q) -- (w);
+  \draw[flecha] (l) -- (d);
+  \draw[flecha] (d) -- (p);
+  \draw[flecha] (l.east) -| (n.north);
+  \draw[flecha] (n) |- (p);
+\end{tikzpicture}
+\caption{El arranque: lo guardado se pinta enseguida; lo nuevo, cuando llega.}
+\end{figure}
+
+%% ------------------------------------------------------------------------------------------
+\section{Un clic en una canción hasta que suena}
+
+Es el flujo más importante: de él depende la segunda prioridad del proyecto («clic y que
+suene»).
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[x=1cm,y=1cm,
+  lane/.style={font=\sffamily\small\bfseries, fill=tinta!6, minimum width=2.4cm, minimum height=0.6cm, draw=tinta, rounded corners=2pt},
+  msg/.style={-{Stealth[length=5pt]}, thick, draw=tinta},
+  note/.style={font=\sffamily\scriptsize, fill=white, inner sep=1.5pt}]
+  \node[lane] (A) at (0,0) {QML};
+  \node[lane] (B) at (3.4,0) {Player};
+  \node[lane] (C) at (6.8,0) {Resolver};
+  \node[lane] (D) at (10.2,0) {mpv};
+  \foreach \x in {0,3.4,6.8,10.2} \draw[dashed, draw=borde] (\x,-0.3) -- (\x,-8.2);
+  \draw[msg] (0,-1.0) -- node[note,above]{playItem(json)} (3.4,-1.0);
+  \draw[msg] (3.4,-1.8) -- node[note,above]{resolve(id)} (6.8,-1.8);
+  \draw[msg, draw=acento] (3.4,-2.6) -- node[note,above]{title, artist, thumb} (0,-2.6);
+  \draw[msg] (6.8,-3.4) -- node[note,above]{URL (0,3 s o caché)} (3.4,-3.4);
+  \draw[msg] (3.4,-4.2) -- node[note,above]{loadfile} (10.2,-4.2);
+  \draw[msg, draw=acento] (10.2,-5.0) -- node[note,above]{playback-restart} (3.4,-5.0);
+  \draw[msg, draw=acento] (3.4,-5.8) -- node[note,above]{playing = true} (0,-5.8);
+  \draw[msg] (3.4,-6.6) -- node[note,above]{precarga las 3 siguientes} (6.8,-6.6);
+  \draw[msg, draw=acento] (10.2,-7.4) -- node[note,above]{time-pos cada 0,1 s} (3.4,-7.4);
+\end{tikzpicture}
+\caption{Secuencia de un clic. Las flechas en color son avisos hacia la interfaz o desde mpv.}
+\end{figure}
+
+\begin{enumerate}
+  \item \textbf{La vista.} \archivo{MuroView.qml} (u otra) emite \cod{activated(item)}. Sube
+  por \archivo{SectionView.qml} hasta \archivo{Main.qml}.
+  \item \textbf{\cod{Main.choose(item)}.} Ve que \cod{item.kind} es \cod{"song"}, llama a
+  \cod{Player.playItem(JSON.stringify(item))} y pone \cod{nowOpen = true}: «Sonando» empieza a
+  subir.
+  \item \textbf{\cod{Player::play_item}.} Convierte el JSON en \cod{Item}, sube \cod{request}
+  y crea una cola de \emph{una} pista con los datos de la tarjeta. Marca \cod{defer_lyrics} y
+  llama a \cod{load(0)}.
+  \item \textbf{\cod{Player::load}.} Publica \cod{title}, \cod{artist}, \cod{thumb},
+  \cod{loading = true}, sube \cod{load_token}. La barra y «Sonando» cambian \emph{ya},
+  porque dependen de esas propiedades. Luego busca la URL:
+  \begin{itemize}
+    \item si \cod{resolver::cached} la tiene (precarga o canción repetida), arranca ya;
+    \item si no, un hilo llama a \cod{resolver::resolve}; al volver, comprueba
+    \cod{load_token} y llama a \cod{start_stream}.
+  \end{itemize}
+  \item \textbf{\cod{Resolver}.} Vía rápida (\cod{stream.rs}, ~0,3 s); si falla, yt-dlp
+  residente; si no está, yt-dlp en proceso. La URL se guarda con su caducidad.
+  \item \textbf{\cod{Mpv::load}.} Envía \cod{["loadfile", url, "replace"]} por el socket y
+  quita la pausa.
+  \item \textbf{mpv} abre el flujo y emite \cod{playback-restart}; el hilo lector lo traduce
+  a \cod{Event::Started} y lo encola en el hilo de Qt.
+  \item \textbf{\cod{Player::on_event(Started)}.} Quita \cod{loading}, fija \cod{playing},
+  anuncia la pista a los plugins, empieza a registrar la escucha y precarga las tres pistas
+  siguientes. Imprime «arranque de pista: N ms».
+  \item \textbf{En paralelo, la cola.} Otro hilo pidió \cod{ytm::queue} (la radio). Al llegar,
+  si \cod{request} sigue siendo el mismo, \cod{adopt_queue} instala la cola sin interrumpir
+  el sonido y pide la letra con el artista ya limpio y la duración.
+\end{enumerate}
+
+Todo lo que no es audio (historial, plugins, letra, precarga) ocurre \emph{después} de que
+suene o en hilos aparte. Es la preferencia «el arranque de una pista no espera a nada que no
+sea el audio» (\archivo{docs/AGENTES.md}, §11).
+
+\subsection{Si algo falla}
+
+\begin{itemize}
+  \item \textbf{La URL resuelta es rechazada} por mpv: llega \cod{Event::Failed}. Se olvida
+  la URL (\cod{resolver::forget}) y se prueba con el gancho de yt-dlp de mpv.
+  \item \textbf{Falló también así}: se reintenta \emph{una} vez (\cod{retried}), y después
+  «No se pudo reproducir esta pista».
+  \item \textbf{La pista exige sesión y no la hay}: \cod{resolve} devuelve \cod{NEEDS_SESSION}
+  y la interfaz muestra «Inicia sesión en Opciones».
+  \item \textbf{No se encuentra mpv}: \cod{ensure_engine} falla y publica el error.
+\end{itemize}
+
+%% ------------------------------------------------------------------------------------------
+\section{Abrir un álbum y reproducirlo}
+
+\begin{enumerate}
+  \item Doble clic en un álbum $\rightarrow$ \cod{Main.choose} ve que no es una canción y llama
+  a \cod{Library.openDetail(json)}.
+  \item \textbf{\cod{Library::open_detail}} publica \emph{al momento} un detalle provisional
+  con lo que ya sabe (título, subtítulo, carátula) y \cod{detalle_loading = true}. Sube
+  \cod{detail_request}. En un hilo pide \cod{ytm::detail}.
+  \item \archivo{DetailView.qml} aparece en cuanto \cod{Catalog.detalle} deja de ser
+  \cod{null}: se ve la cabecera, sin canciones.
+  \item Llegan las canciones: se publica el detalle completo (si \cod{detail_request} no ha
+  cambiado). \cod{DetailView.onTracksChanged} pide precargar las seis primeras.
+  \item «Reproducir» $\rightarrow$ \cod{Player.playTracks(JSON.stringify(tracks), 0, false)}.
+  Rust \emph{reemplaza la cola entera} y llama a \cod{load(0)}: no hace falta pedir nada más.
+  «Aleatorio» pasa \cod{shuffle = true} y \cod{shuffle_tracks} las baraja.
+  \item Esc o la flecha $\rightarrow$ \cod{Library.closeDetail()}, que además sube
+  \cod{detail_request} para descartar lo que llegue tarde.
+\end{enumerate}
+
+\section{Buscar}
+
+\begin{enumerate}
+  \item El \cod{SearchField} emite el texto; \cod{Main.search} comprueba que no esté vacío,
+  llama a \cod{Library.search}, cierra el detalle si lo hay y pone \cod{section = "buscar"}.
+  \item \cod{Library::search} sube \cod{search_request}, pone \cod{searching = true} y lanza
+  un hilo con \cod{ytm::search}, que pide \emph{cuatro listas a la vez} (canciones, álbumes,
+  artistas y playlists).
+  \item Al volver: si \cod{search_request} cambió (escribiste otra cosa), se descarta; si no,
+  se publica \cod{busqueda}. \cod{Catalog.busqueda} lo parsea y la vista elegida para «buscar»
+  (el Muro por defecto) lo dibuja.
+\end{enumerate}
+
+%% ------------------------------------------------------------------------------------------
+\section{Cambiar de pista y llegar al final}
+
+\begin{description}[style=nextline, leftmargin=0pt]
+  \item[Pulsar «siguiente»] \cod{Player.next()} llama a \cod{advance}: carga \cod{index + 1}
+  (o la primera pista si se repite la cola). Si lo consigue, \cod{saltada()} avisa a la
+  mascota, que reacciona. Pasar a mano no es lo mismo que terminar: solo lo primero hace
+  reaccionar a la mascota.
+  \item[«Anterior»] Si llevas más de 3 s o estás en la primera, vuelve al principio de la
+  pista (\cod{seek(0)}); si no, carga la anterior.
+  \item[Terminar sola] mpv emite \cod{end-file} con motivo \cod{eof}; el hilo lector envía
+  \cod{Ended}. \cod{on_event} avanza si hay más pistas o se repite la cola; si no, detiene
+  la escucha, avisa de \cod{Stopped} a los plugins y deja \cod{playing = false}. Con «repetir
+  una», mpv ni llega a terminar: \cod{loop-file=inf} lo repite sin volver a resolver la URL.
+  \item[Saltar a otro punto] \cod{seek(segundos)} manda \cod{seek absolute}; \cod{track_listen}
+  detecta el salto y cierra el tramo escuchado.
+\end{description}
+
+\section{De la pista a la letra en pantalla}
+
+\begin{enumerate}
+  \item \cod{Player::fetch_lyrics} limpia la letra anterior (subiendo \cod{lyrics_token}) y
+  lanza \emph{tres hilos}, uno por fuente. Cada uno pide, compara candidatos con la duración y
+  el nombre, y parsea el formato.
+  \item Cada hilo que encuentra algo encola su resultado. En el hilo de Qt, \cod{Player}
+  comprueba \cod{lyrics_token}, lo añade a \cod{lyrics_found}, reordena con
+  \cod{lyrics::rank} y publica \emph{todas} las letras como JSON en \cod{Player.lyrics}.
+  \item \cod{Catalog.lyricsSources} las parsea. \cod{chooseLyrics} decide cuál mostrar: la
+  elegida para esta canción (\cod{origen:<id>}), si no la preferida (\cod{letraOrigen}) y, si
+  no, la mejor.
+  \item \archivo{LyricsView.qml} lee \cod{Catalog.lyrics} y \cod{Catalog.lyricsTime}
+  (la posición menos el retraso de la canción) y calcula la línea actual con
+  \cod{Catalog.lineAt}. Cada \cod{Position} de mpv, cada 0,1 s, la hace avanzar.
+  \item Pulsar el nombre de la fuente llama a \cod{Catalog.nextLyricsSource}, que guarda
+  \cod{origen:<id>}; como todas las letras ya están en QML, el cambio es instantáneo y no
+  toca la red.
+\end{enumerate}
+
+%% ------------------------------------------------------------------------------------------
+\section{Dar «Me gusta»}
+
+\begin{enumerate}
+  \item El corazón de \archivo{PlayerBar.qml} guarda el resultado esperado en
+  \cod{likeOverride} (el corazón cambia \emph{ya}, sin esperar a la red) y llama a
+  \cod{Library.like(videoId, titulo, gusta)}. Pinchar la mascota hace lo mismo.
+  \item \cod{Library::like} lanza un hilo: \cod{ytm::like} o \cod{ytm::remove_like} (según
+  \cod{gusta}), que necesita sesión.
+  \item Al terminar emite la \emph{señal} \cod{gustado(mensaje, error, videoId, gusta)}. La
+  recogen tres sitios a la vez: \archivo{ContextMenu.qml} muestra el aviso,
+  \archivo{PlayerBar.qml} confirma \cod{likeOverride} o lo revierte si hubo error, y
+  \archivo{Mascot.qml} reacciona con \cod{megusta} o \cod{fallo}.
+  \item Si salió bien, el hilo vuelve a pedir la sección «Me gusta», la guarda en la caché y
+  la publica, para que la lista refleje el cambio.
+\end{enumerate}
+
+\begin{idea}[Una señal con muchos oyentes]
+Una señal de Rust (\cod{#[qsignal]}) puede escucharla cualquier \cod{Connections} de QML. Aquí
+el emisor no sabe quién reacciona: añadir otra reacción (un sonido, otra animación) es añadir
+un \cod{Connections} sin tocar Rust.
+\end{idea}
+
+%% ------------------------------------------------------------------------------------------
+\section{Iniciar sesión}
+
+\begin{enumerate}
+  \item Opciones $\rightarrow$ Cuenta $\rightarrow$ «Iniciar sesión» llama a
+  \cod{Account.signInWeb()}.
+  \item \cod{Account::sign_in_web} marca \cod{busy}, muestra «Inicia sesión en la ventana
+  que se ha abierto» y lanza un hilo con \cod{login_web}.
+  \item \cod{login_web} crea un archivo temporal vacío con permisos 600 y lanza el proceso
+  auxiliar con él como argumento (en macOS, el mismo ejecutable con \cod{--login}).
+  \item La persona inicia sesión en la ventana. Cuando la propia página dice que hay sesión,
+  el proceso escribe las cookies de youtube.com y sale con 0.
+  \item \cod{login_web} lee el archivo, lo borra, se queda con las cookies de YouTube y las
+  guarda (\cod{store}); este paso pregunta a YouTube el nombre de la cuenta y, si no la
+  reconoce, olvida la sesión y avisa.
+  \item Rust publica \cod{signed_in = true}. En \archivo{Main.qml}, un \cod{Connections} a
+  \cod{Account.onSignedInChanged} llama a \cod{Player.restartEngine()} (mpv debe recibir las
+  cookies nuevas) y a \cod{Library.load()} (Playlists, Álbumes y «Me gusta» ahora tienen
+  contenido).
+\end{enumerate}
+
+Cerrar sesión recorre el camino inverso: \cod{forget} borra cookies, copias y secciones de la
+cuenta; \cod{signed_in} pasa a \cod{false}; el mismo \cod{Connections} reinicia el motor y
+recarga.
+
+%% ------------------------------------------------------------------------------------------
+\section{Cambiar una opción}
+
+\begin{enumerate}
+  \item La persona pulsa, por ejemplo, «Fluido» en el modo ambiente. \archivo{SettingsSheet.qml}
+  llama a \cod{AppSettings.setOpcion("ambiente", "fluido")}.
+  \item \cod{set_opcion} actualiza el mapa, \emph{sube \cod{revision}} y pide guardar
+  (\cod{write_settings}: el escritor guarda lo último que haya, sin bloquear).
+  \item Todo enlace que escribe \cod{void AppSettings.revision} se reevalúa:
+  \cod{Theme.ambientMode} cambia, \cod{Theme.ambientFluid} pasa a \cod{true} y
+  \archivo{Ambient.qml} cambia de fondo, con su animación.
+\end{enumerate}
+
+Cambiar de \emph{skin} es análogo: \cod{elegir_skin} cambia \cod{skin_data}; \cod{Theme.skin}
+se reevalúa, y con él todos los colores.
+
+%% ------------------------------------------------------------------------------------------
+\section{Cerrar la aplicación}
+
+\begin{enumerate}
+  \item Cerrar la ventana, \cod{kill} o Ctrl+C: la señal llega al manejador de
+  \archivo{signals.cpp}, que escribe un byte; el \cod{QSocketNotifier} llama a
+  \cod{QCoreApplication::quit()}.
+  \item \cod{app.exec()} devuelve el control; los singletons se destruyen. Al destruirse
+  \cod{PlayerRust}, su \cod{Option<Mpv>} hace \cod{drop}: mata a mpv y borra el socket.
+  \item El yt-dlp residente, si seguía vivo, se cierra solo tras 60 s sin peticiones.
+\end{enumerate}
+
+\begin{ejercicio}
+Dibuja en papel el flujo «Cambiar de skin» con el mismo formato de secuencia de la sección del
+clic. ¿Interviene algún hilo? ¿Interviene la red? (Pista: no a las dos.) ¿Qué ocurriría si
+\cod{set_opcion} no subiera \cod{revision}?
+\end{ejercicio}

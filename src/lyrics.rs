@@ -162,7 +162,7 @@ pub fn fetch(source: Source, query: &Query) -> Option<Found> {
 }
 
 fn get(url: &str, query: &[(&str, &str)]) -> Option<Value> {
-    let mut request = ureq::get(url).header("User-Agent", USER_AGENT);
+    let mut request = crate::ytm::http().get(url).header("User-Agent", USER_AGENT);
     for (key, value) in query {
         request = request.query(*key, *value);
     }

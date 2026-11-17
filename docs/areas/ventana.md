@@ -75,6 +75,19 @@ También el arranque del proceso y los argumentos de depuración (`--probe`, `--
   más; por eso la vista previa de 120 px y la opción Alta.
 - **Una lista larga en el menú** (playlists donde guardar) va en una subpágina, no en el menú
   principal.
+- **Precarga al detenerse** (`hint`, `unhint`, `prefetchTimer`): el foco del teclado o el puntero
+  (`SectionView.hinted`) sobre un elemento lo precargan a los 250 ms; si el puntero sale antes, no
+  se pide nada ([resolucion](resolucion.md)).
+- **El fondo de imagen de una skin** se decodifica al tamaño de la ventana en escalones de 256 px:
+  redimensionarla no lo vuelve a decodificar a cada píxel.
+- **Lo que tapa «Sonando» no se pinta:** con la pantalla arriba del todo
+  (`NowPlayingView.covering`), el escenario, el panel lateral (con su letra) y el detalle se ocultan;
+  al bajar, la sección recupera el foco del teclado. Los vidrios que desenfocan el escenario
+  (Opciones, el menú) lo siguen capturando oculto.
+- **El vidrio de la barra, en «Sonando», desenfoca solo su fondo** (`NowPlayingView.backdrop`,
+  el ambiente), no la letra ni la carátula: si no, cada paso del barrido de la letra obligaba a
+  rehacer el desenfoque de la barra. Por eso el ambiente de «Sonando» va fuera de `sheet`, subiendo
+  con ella.
 
 ## Cómo funciona
 
@@ -83,6 +96,9 @@ También el arranque del proceso y los argumentos de depuración (`--probe`, `--
 - `Main.qml` lee sus argumentos de depuración (`args`) para capturas y pruebas: la lista completa
   está en [verificar-interfaz](../runbooks/verificar-interfaz.md#argumentos-de-mainqml).
 - `MUSICPLAYER_DEBUG_CLICK` envía clics de ratón de verdad a la ventana.
+- `MUSICPLAYER_DEBUG_AUDIO=archivo` hace sonar un archivo local en lugar de cada pista (`Player`):
+  con `--play ID`, la misma canción, su cola y su letra aunque YouTube no deje reproducir
+  ([medir-rendimiento](../runbooks/medir-rendimiento.md#siempre-la-misma-canción-aunque-youtube-no-deje-reproducir)).
 
 ## Medidas
 
@@ -142,12 +158,12 @@ También el arranque del proceso y los argumentos de depuración (`--probe`, `--
 
 ## Estado actual
 
-- **Última verificación:** 2026-11-16, «Sonando» con la carátula en Máxima y en Alta, el
-  ambiente «Plano», Grande con título y Clásica sin él, capturas y memoria ([historial](../history/verificacion/ventana.md)).
+- **Última verificación:** 2026-11-17, precarga al detenerse el puntero y fondo de skin en escalones ([historial](../history/verificacion/ventana.md)).
 - **Pruebas:** capturas con `--shot` ([verificar-interfaz](../runbooks/verificar-interfaz.md)).
 - **Sin verificar:** Wayland en CachyOS (panel, desenfoque, mini siempre encima); la carátula
   `hq720` de una canción que es vídeo dentro de la app (solo con `curl`); la vista previa de 120 px
-  mientras carga (en las capturas la grande ya estaba).
+  mientras carga (en las capturas la grande ya estaba); que el teclado vuelva a la sección al
+  cerrar «Sonando».
 - **Historial:** [docs/history/verificacion/ventana.md](../history/verificacion/ventana.md).
 
 ## Pendiente

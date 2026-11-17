@@ -166,7 +166,7 @@ SINGLETONS = {
 # Lo que usa casi todo: no hace falta citarlo en «Dependencias».
 TRANSVERSAL = {
     "qml/Theme.qml", "qml/Icon.qml", "qml/IconButton.qml", "qml/PillButton.qml",
-    "qml/Slider.qml", "qml/TextField.qml", "qml/Glass.qml", "qml/Cover.qml",
+    "qml/Slider.qml", "qml/TextField.qml", "qml/TabStrip.qml", "qml/Glass.qml", "qml/Cover.qml",
 }
 
 

@@ -130,16 +130,11 @@ impl Mpv {
         self.socket.write_all(line.as_bytes())
     }
 
-    /// Carga una URL de página (la resuelve el gancho de yt-dlp de mpv: lento).
+    /// Carga una URL: la de audio ya resuelta, tal cual la dejó `resolver` (con `lavf://` delante
+    /// si debe leerla ffmpeg), o la de la página (la resuelve el gancho de yt-dlp de mpv: lento).
     pub fn load(&mut self, url: &str) -> io::Result<()> {
         self.command(json!(["loadfile", url, "replace"]))?;
         self.set_pause(false)
-    }
-
-    /// Carga una URL de audio ya resuelta, tal cual la dejó `resolver` (con `lavf://`
-    /// delante si debe leerla ffmpeg).
-    pub fn load_stream(&mut self, stream_url: &str) -> io::Result<()> {
-        self.load(stream_url)
     }
 
     pub fn set_pause(&mut self, paused: bool) -> io::Result<()> {
@@ -182,16 +177,42 @@ fn connect(path: &Path, timeout: Duration) -> io::Result<UnixStream> {
     }
 }
 
+/// Un mensaje de mpv con solo los campos que se miran. Los nombres se toman prestados de la
+/// línea leída (nunca llevan escapes): mpv manda la posición muchas veces por segundo y así cada
+/// mensaje no crea un árbol JSON con sus claves. El texto de los avisos sí puede llevarlos.
+#[derive(serde::Deserialize)]
+struct Message<'a> {
+    #[serde(default)]
+    event: Option<&'a str>,
+    #[serde(default)]
+    name: Option<&'a str>,
+    #[serde(default)]
+    data: Value,
+    #[serde(default)]
+    reason: Option<&'a str>,
+    #[serde(default)]
+    prefix: Option<&'a str>,
+    #[serde(default)]
+    text: Option<String>,
+}
+
 fn read_events(socket: UnixStream, on_event: impl Fn(Event)) {
     let mut last_position = f64::MIN;
     let mut last_bitrate = f64::MIN;
-    for line in BufReader::new(socket).lines() {
-        let Ok(line) = line else { break };
-        let Ok(message) = serde_json::from_str::<Value>(&line) else { continue };
-        match message["event"].as_str() {
+    let mut reader = BufReader::new(socket);
+    // Una sola línea que se reutiliza para cada mensaje.
+    let mut line = String::new();
+    loop {
+        line.clear();
+        match reader.read_line(&mut line) {
+            Ok(0) | Err(_) => break,
+            Ok(_) => {}
+        }
+        let Ok(message) = serde_json::from_str::<Message>(&line) else { continue };
+        match message.event {
             Some("property-change") => {
-                let data = &message["data"];
-                match message["name"].as_str() {
+                let data = &message.data;
+                match message.name {
                     Some("time-pos") => {
                         // mpv informa muchas veces por segundo; a la interfaz le bastan diez.
                         if let Some(position) = data.as_f64() {
@@ -231,11 +252,11 @@ fn read_events(socket: UnixStream, on_event: impl Fn(Event)) {
             }
             Some("log-message") => eprintln!(
                 "mpv[{}] {}",
-                message["prefix"].as_str().unwrap_or_default(),
-                message["text"].as_str().unwrap_or_default().trim_end()
+                message.prefix.unwrap_or_default(),
+                message.text.as_deref().unwrap_or_default().trim_end()
             ),
             Some("playback-restart") => on_event(Event::Started),
-            Some("end-file") => match message["reason"].as_str() {
+            Some("end-file") => match message.reason {
                 Some("eof") => on_event(Event::Ended),
                 Some("error") => on_event(Event::Failed),
                 // "stop" y "redirect" ocurren al cambiar de pista o al resolver la URL.
@@ -243,5 +264,24 @@ fn read_events(socket: UnixStream, on_event: impl Fn(Event)) {
             },
             _ => {}
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Message;
+
+    #[test]
+    fn lee_los_mensajes_de_mpv() {
+        let position: Message = serde_json::from_str(r#"{"event":"property-change","id":1,"name":"time-pos","data":12.5}"#).unwrap();
+        assert_eq!((position.event, position.name, position.data.as_f64()), (Some("property-change"), Some("time-pos"), Some(12.5)));
+        // El texto de un aviso lleva escapes (el salto de línea final).
+        let log: Message = serde_json::from_str(r#"{"event":"log-message","prefix":"ffmpeg","level":"error","text":"fallo \"x\"\n"}"#).unwrap();
+        assert_eq!(log.text.as_deref(), Some("fallo \"x\"\n"));
+        let end: Message = serde_json::from_str(r#"{"event":"end-file","reason":"eof","playlist_entry_id":1}"#).unwrap();
+        assert_eq!(end.reason, Some("eof"));
+        // Las respuestas a las órdenes no tienen evento.
+        let reply: Message = serde_json::from_str(r#"{"request_id":0,"error":"success"}"#).unwrap();
+        assert!(reply.event.is_none() && reply.data.is_null());
     }
 }

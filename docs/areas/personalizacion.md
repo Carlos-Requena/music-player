@@ -46,7 +46,11 @@ Vistas y Plugins. Cómo crear una skin o una mascota, para quien usa la app: [RE
 - **Opción nueva**: [runbooks/nueva-opcion.md](../runbooks/nueva-opcion.md). Vacío = valor por
   defecto (`fallback` de su fila).
 - **`TintProbe` (Canvas)** necesita su propio `loadImage` y su `Timer`, y estar dentro de la zona
-  visible ([TRAMPAS](../TRAMPAS.md#qt-quick-y-qml)).
+  visible ([TRAMPAS](../TRAMPAS.md#qt-quick-y-qml)). Al cambiar de carátula suelta la anterior
+  (`unloadImage`): si no, cada sonda guardaba todas las que había visto.
+- **`settings.json` se escribe en un hilo y de una vez** (`write_settings`, `write_atomic`): un
+  solo hilo escribe siempre la última versión, en un archivo aparte que luego se renombra. Si la
+  app se cierra a mitad, queda el anterior entero.
 - **«Fluido» es un sombreador propio** (`shaders/fluido.frag`), precompilado con
   `scripts/shaders.sh` y guardado con su `.qsb`
   ([ADR-17](../decisions/ADR-17-fondo-fluido-con-sombreador-propio.md)). Avanza a 15 Hz con el
@@ -137,8 +141,7 @@ Estas medidas se tomaron quitando a mano la condición de que suene música (You
 
 ## Estado actual
 
-- **Última verificación:** 2026-11-16, ambiente «Plano» en Inicio y en «Sonando» y la fila de
-  Apariencia con sus cinco valores, capturas ([historial](../history/verificacion/personalizacion.md)).
+- **Última verificación:** 2026-11-17, preferencias guardadas en un hilo y sondas que sueltan la carátula ([historial](../history/verificacion/personalizacion.md)).
 - **Pruebas:** `preview_image` y `skins_list` en `cargo test`; capturas con `--settings-cat`.
 - **Sin verificar:** que «Fluido» fluya bien a la vista (la CPU confirma que se redibuja, pero cada
   prueba sacaba otra canción y no se compararon dos fotogramas de la misma carátula); el fundido

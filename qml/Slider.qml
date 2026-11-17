@@ -13,6 +13,10 @@ Item {
 
     signal moved(real value)
 
+    // Parte rellena tal como se dibuja, en píxeles enteros: la posición de la canción cambia diez
+    // veces por segundo y, mientras no avance un píxel, la barra no cambia y no se redibuja.
+    readonly property real drawn: width > 0 ? Math.round(Math.max(0, Math.min(1, value)) * width) / width : 0
+
     implicitHeight: 20
     activeFocusOnTab: true
 
@@ -30,7 +34,7 @@ Item {
         color: Qt.rgba(1, 1, 1, 0.22)
 
         Rectangle {
-            width: parent.width * Math.max(0, Math.min(1, root.value))
+            width: parent.width * root.drawn
             height: parent.height
             radius: 2
             color: root.fill
@@ -38,7 +42,7 @@ Item {
     }
 
     Rectangle {
-        x: root.width * Math.max(0, Math.min(1, root.value)) - width / 2
+        x: root.width * root.drawn - width / 2
         anchors.verticalCenter: parent.verticalCenter
         width: 12
         height: 12

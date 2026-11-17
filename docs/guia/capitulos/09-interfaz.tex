@@ -1,5 +1,341 @@
 \chapter{La interfaz QML, archivo por archivo}
+\label{cap:interfaz}
 
-\begin{trampa}[Capítulo pendiente]
-Este capítulo aún no está escrito. Mientras tanto, la información equivalente está en \archivo{docs/INDEX.md} (las fichas de \archivo{docs/areas/}) y \archivo{docs/ARCHITECTURE.md}.
+Este capítulo recorre \archivo{qml/}: una treintena de archivos, de los que dos son singletons y el resto
+componentes. Si no has leído el capítulo~\ref{cap:qml}, hazlo antes: aquí se da por sabido qué
+es un \emph{binding}, un \cod{Loader} y un singleton.
+
+\section{Cómo se compone la ventana}
+
+\archivo{Main.qml} es una \cod{Window}. Todo lo que ves es hijo suyo, y el \emph{orden de
+declaración} es el orden de apilado: lo que va más abajo en el archivo se dibuja encima.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[x=1cm,y=1cm, every node/.style={font=\sffamily\scriptsize}]
+  % pila de capas, de abajo (fondo) a arriba
+  \foreach \i/\txt/\col in {
+    0/{\textbf{stage}: Ambient + SectionView (el contenido de la sección)}/acento!8,
+    1/{TopNav · SearchField · CategoryBar · ViewSwitcher · botones}/white,
+    2/{NowPlayingPanel (letra y cola a un lado)}/white,
+    3/{NowPlayingView («Sonando», sube desde abajo)}/white,
+    4/{Mascot (a través de un Loader)}/white,
+    5/{PlayerBar (la barra de reproducción)}/white,
+    6/{DetailView · InspectView}/white,
+    7/{ContextMenu (menú de clic derecho y avisos)}/white,
+    8/{SettingsSheet (Opciones)}/white%
+  } {
+    \node[draw=tinta, fill=\col, rounded corners=2pt, minimum width=9.6cm, minimum height=0.62cm,
+      anchor=south west] at (0,{\i*0.72}) {\txt};
+  }
+  \draw[-{Stealth}, thick, draw=acento] (-0.4,0) -- (-0.4,6.4) node[midway, left, rotate=90, anchor=south]{encima};
+  \node[externo, anchor=south west, minimum width=4cm] at (10.2,0.0) {\textbf{MiniPlayer}\\ otra ventana,\\ la grande se oculta};
+\end{tikzpicture}
+\caption{Capas de \archivo{Main.qml}, de abajo arriba. Cada una cubre a las anteriores cuando
+está abierta; el mini reproductor es una ventana aparte.}
+\end{figure}
+
+Lo que tiene \archivo{Main.qml} y ningún otro archivo:
+
+\begin{itemize}
+  \item \textbf{El estado de navegación}: \cod{section} (la sección visible),
+  \cod{settingsOpen}, \cod{nowOpen}, \cod{inspecting}, \cod{lyricsOn} y \cod{detailOpen}
+  (que se deduce de \cod{Catalog.detalle !== null}). Cada vista \emph{no} guarda el estado
+  global: lo pide a la ventana o lo recibe como propiedad.
+  \item \textbf{Las funciones de navegación}: \cod{choose(item)}, \cod{openMenu},
+  \cod{hint}/\cod{unhint}, \cod{closeDetail}, \cod{inspect}, \cod{search}, \cod{cycleView},
+  \cod{showMini}/\cod{restoreFromMini}.
+  \item \textbf{Los atajos de teclado} (\cod{Shortcut}): espacio, \texttt{V} (cambia la
+  vista), \texttt{M} (mini), \texttt{I} (inspeccionar), buscar, preferencias y Esc.
+  \item \textbf{Los argumentos de depuración}: \cod{--shot}, \cod{--section}, \cod{--index},
+  \cod{--autoplay}, \cod{--panel}, \cod{--now}\dots (capítulo~\ref{cap:herramientas}). Están
+  aquí porque este archivo ya posee la ventana y los temporizadores.
+\end{itemize}
+
+\begin{qml}
+// Elegir algo: una canción suena; un álbum, playlist o artista abre su detalle.
+function choose(item) {
+    if (item.kind === "song") { Player.playItem(JSON.stringify(item)); nowOpen = true }
+    else Library.openDetail(JSON.stringify(item))
+}
+\end{qml}
+
+\begin{idea}[Subir por señales y bajar por propiedades]
+Las vistas son «tontas»: no saben qué hacer con un clic. Emiten una señal
+(\cod{activated(item)}, \cod{hinted(item, on)}) y \archivo{Main.qml} decide. A cambio, reciben
+los datos como propiedades (\cod{zonas}, \cod{index}). Gracias a esto, cambiar qué hace un
+clic es una línea en un solo sitio.
+\end{idea}
+
+\section{Los dos singletons}
+
+\subsection{\texttt{Theme.qml}: el aspecto}
+
+Singleton de \emph{tokens visuales}: colores, tamaños y trazos de iconos. Lo importante:
+
+\begin{itemize}
+  \item Los colores salen de la skin activa. \cod{skin} es el \cod{JSON.parse} de
+  \cod{AppSettings.skinData}; \cod{pick("clave", valorPorDefecto)} devuelve el color de la skin
+  o el valor por defecto. Así una skin incompleta no rompe nada.
+  \item Las \emph{opciones que cambian el aspecto} se calculan aquí una sola vez
+  (\cod{blur}, \cod{barStyle}, \cod{ambientMode}, \cod{lyricsScale}, \cod{lyricsFamily}\dots)
+  para que todos los archivos las lean igual. Cada una empieza con \cod{void
+  AppSettings.revision} para recalcularse al cambiar cualquier opción.
+  \item \cod{renderEpoch} es un contador que sube cuando una ventana vuelve de estar oculta;
+  los iconos lo vigilan (ver más abajo).
+  \item Los iconos son trazos SVG en una caja de 24$\times$24 (\cod{iconPlay}, \cod{iconHeart}\dots),
+  guardados como cadenas.
+\end{itemize}
+
+\subsection{\texttt{Catalog.qml}: los datos}
+
+El otro singleton convierte lo que publica Rust en objetos que las vistas pueden usar:
+
+\begin{qml}
+readonly property var inicio: parse(Library.inicio)    // JSON -> array de zonas
+readonly property var queue:  parse(Player.queue)       // JSON -> array de pistas
+\end{qml}
+
+Además guarda lógica que solo tiene sentido en QML:
+
+\begin{itemize}
+  \item \cod{sections} y \cod{views}: las cinco secciones y las tres vistas.
+  \item \cod{zonas(sección)}: qué zonas enseñar (para Playlists, filtradas por la categoría
+  elegida).
+  \item \cod{allItems(zonas)}: aplana las zonas en una lista, para las vistas lineales.
+  \item Las \textbf{categorías de playlists} (\cod{categorias}, \cod{createCategoria},
+  \cod{toggleInCategoria}\dots): YouTube Music no tiene carpetas, así que se guardan en las
+  opciones locales (\cod{categorias}).
+  \item La \textbf{letra}: \cod{lyricsSources} (todas las fuentes), \cod{lyricsChosen} (la
+  elegida, con el retraso por canción \cod{retraso:<id>} y la fuente \cod{origen:<id>}),
+  \cod{lyrics} (sus líneas) y \cod{lineAt(posición)} (qué línea toca ahora).
+\end{itemize}
+
+\begin{trampa}[Una propiedad solo avisa si cambia su valor]
+Un enlace como \cod{readonly property var x: parse(Library.inicio)} se reevalúa \emph{cada vez
+que cambia} \cod{Library.inicio}. Pero si dependes de \cod{AppSettings.revision} (un entero
+que sube con \emph{cualquier} opción), te reevalúas con todas. \cod{Catalog} lo evita para las
+categorías leyendo primero su texto en una propiedad de texto (\cod{categoriasJson}): como una
+cadena solo avisa si cambia, ajustar el retraso de la letra ya no reconstruye la sección de
+Playlists.
 \end{trampa}
+
+\section{Las vistas de una sección}
+
+\subsection{\texttt{SectionView.qml}: el selector}
+
+Recibe la sección y la vista elegida y, con un \cod{Loader}, instancia la vista
+correspondiente (\cod{MuroView}, \cod{LomosView} o \cod{CubetaView}). Las tres comparten
+interfaz: \cod{zonas}, \cod{currentItem}, \cod{activated(item)} y, si son lineales, \cod{index}
+y \cod{step(delta)}. Por eso \cod{SectionView} no sabe qué vista hay dentro; solo reenvía.
+
+Dos detalles de rendimiento: al cambiar las zonas, precarga las cuatro primeras canciones
+sueltas (\cod{Player.prefetchTracks}) y solo existe \emph{una} vista a la vez (la que no está
+cargada no cuesta memoria).
+
+\subsection{\texttt{MuroView.qml}: cuadrícula}
+
+Una cuadrícula de carátulas agrupada por zonas, dentro de una \cod{ListView} que solo crea las
+filas cercanas a lo que se ve: una sección larga no cuesta más memoria que una corta. Cada zona se parte en filas de \cod{cols}
+elementos (6 por defecto; la opción \cod{caratulas} da 8 o 4); solo la primera fila lleva el
+título. La carátula enfocada se amplía. Se navega con flechas y el foco se sigue con
+\cod{row} y \cod{col}.
+
+\subsection{\texttt{LomosView.qml}: la estantería en 3D}
+
+La vista más compleja visualmente. Cada álbum es una caja con frontal y dos lomos, pero no hay
+una caja por elemento: la vista mantiene un \emph{anillo fijo} de cajas (\cod{ring}) que se
+reutilizan al desplazarse (al avanzar uno, solo la caja que sale por un lado pasa al otro), y la
+carátula grande solo se pide a las cercanas al centro. La
+estantería es \emph{continua}: hay una posición \cod{pos} (decimal) que sigue a \cod{index} con
+una animación, y de ella salen, mediante funciones, el ángulo, la escala y el sitio de cada caja
+(\cod{angleAt}, \cod{scaleAt}, \cod{signedAngle}). Como son funciones continuas, una caja que
+cruza el centro \emph{no salta}.
+
+Cada cara se proyecta con una \cod{Matrix4x4} calculada a mano (rotación en Y más
+perspectiva), no con las rotaciones de Qt; es la ADR-14 y la razón se ve en el capítulo~\ref{cap:decisiones}.
+Cada caja tiene un reflejo en el suelo (un \cod{ShaderEffect} con \archivo{shaders/reflejo.frag}) y la
+elegida proyecta un halo con el color de su carátula, que calcula una \cod{TintProbe}.
+
+\subsection{\texttt{CubetaView.qml}: la caja de discos}
+
+Los elementos se pasan de uno en uno, como discos en una caja de tienda: el de delante a
+tamaño completo y los siguientes asoman por detrás, cada vez más pequeños. Es la más simple de
+las tres.
+
+\subsection{\texttt{CategoryBar.qml} y \texttt{ViewSwitcher.qml}}
+
+\cod{CategoryBar} son las pestañas de categorías de Playlists («Todas», las tuyas y «+» para
+crear una); clic derecho en una la renombra o la borra (a través de \cod{ContextMenu}).
+\cod{ViewSwitcher} es el selector rápido de vista (Lomos, Cubeta, Muro) de la sección actual.
+
+\section{Detalle e inspección}
+
+\begin{description}[style=nextline, leftmargin=0pt]
+  \item[\archivo{DetailView.qml}] Álbum, playlist o artista: carátula, datos, botones de
+  reproducir y aleatorio, y la lista de canciones. De un artista muestra además su
+  discografía. Al llegar las canciones, precarga las primeras seis (para que la que elijas
+  suene al instante). Para reproducir envía \emph{toda} la lista a Rust:
+  \cod{Player.playTracks(JSON.stringify(tracks), index, shuffle)}.
+  \item[\archivo{InspectView.qml}] El «modo inspeccionar»: la caja del álbum en grande, que
+  se gira para leer la contraportada (las canciones) y se abre para sacar el disco, que gira
+  mientras suena. Usa un pliegue plano (\cod{Scale} en X) en vez de una rotación 3D grande para
+  abrir la caja (capítulo~\ref{cap:trampas}).
+\end{description}
+
+\section{Reproducir: «Sonando», panel, cola y barra}
+
+\begin{description}[style=nextline, leftmargin=0pt]
+  \item[\archivo{NowPlayingView.qml}] La pantalla «Sonando». Sube desde abajo
+  (\cod{shown} va de 0 a 1 con una animación) al elegir una canción o pulsar la barra. Tiene
+  dos disposiciones (opción \cod{sonando}): \emph{Grande}, con la carátula sola y la letra o la
+  cola estrechas a su derecha, y \emph{Clásica}, con el título bajo la carátula y la letra
+  ancha. Muestra el título según \cod{sonandoTitulo} (\cod{auto}, \cod{si}, \cod{no}).
+  \item[\archivo{NowPlayingPanel.qml}] El panel lateral de letra y cola, a la derecha por
+  defecto y movible a la izquierda (\cod{panel}). Se oculta si la ventana mide menos de 1280
+  píxeles.
+  \item[\archivo{QueueList.qml}] La cola, compartida por el panel y por «Sonando». Es una
+  \cod{ListView} cuyo \emph{modelo es el número de pistas}, no la lista: al reordenar, el
+  tamaño no cambia y la vista no se reconstruye ni vuelve al principio. Cada fila lee su pista
+  de \cod{Catalog.queue}. El arrastre para reordenar usa un \cod{MouseArea} con
+  \cod{preventStealing: true} (si no, la lista se queda el gesto y se desplaza).
+  \item[\archivo{PlayerBar.qml}] La barra, en tres estilos (opción \cod{barra}): \emph{islas}
+  (tres piezas de vidrio sueltas, por defecto), \emph{clásica} y \emph{compacta}. Las piezas
+  son las mismas en los tres. Pulsar en cualquier sitio que no sea un control emite
+  \cod{expandRequested} y abre «Sonando».
+  \item[\archivo{MiniPlayer.qml}] Una \cod{Window} aparte, sin marco y siempre encima. Mientras
+  está abierta, la ventana grande se \emph{oculta}, y eso libera 65 MB (ADR-10).
+\end{description}
+
+\subsection{La letra}
+
+\archivo{LyricsView.qml} es el archivo con más comentarios del proyecto, y con motivo: cada
+efecto tiene un coste. La línea que suena va entera y brillante; las demás, más tenues; al
+cambiar de línea cada una se desplaza con su curva y las de abajo llegan algo después (cascada).
+Las palabras se rellenan con un barrido que sigue el tiempo real de cada palabra o sílaba; si
+solo hay tiempo por línea, se ilumina entera de golpe. Las pausas instrumentales son tres
+puntos que se encienden.
+
+Tres \emph{calidades} (opción \cod{letraCalidad}): calidad (60 Hz), equilibrado (30 Hz, por
+defecto) y bajo (sin barrido suave). Cada fotograma redibuja la ventana entera con su vidrio,
+y por eso se mide (capítulo~\ref{cap:rendimiento}). Un \emph{solo} gestor de clics para toda la
+vista calcula qué línea se pulsó con \cod{childAt}; un gestor por línea, o un «hover», costaría
+20 puntos de CPU (capítulo~\ref{cap:trampas}).
+
+\archivo{LyricsTiming.qml} es el pie bajo la letra: «$-$ letra en hora $+$» ajusta el retraso
+de \emph{esa canción} y lo guarda en \cod{retraso:<id>}; y el nombre de la fuente, que al
+pulsarlo pasa a la siguiente.
+
+\section{Fondo, vidrio y color}
+
+\begin{description}[style=nextline, leftmargin=0pt]
+  \item[\archivo{Ambient.qml}] El «modo ambiente»: dos focos de color suaves, uno teñido
+  por el elemento enfocado y otro por la carátula que suena. Sus variantes son \emph{Plano}
+  (un solo color sólido), \emph{Tenue} y \emph{Suave}, y \emph{Fluido}: la carátula muy
+  desenfocada y deformada, dibujada por un sombreador propio (\archivo{shaders/fluido.frag},
+  ADR-17). Con la «deriva», los focos pasean despacio al ritmo de un \cod{Timer} a 10 Hz; no
+  de una animación a 60, porque con un paseo tan lento nadie nota los saltos y cuesta 5\,\% de
+  CPU en vez de 30\,\%.
+  \item[\archivo{TintProbe.qml}] Un \cod{Canvas} de 8$\times$8 píxeles que calcula el color
+  dominante de una carátula a partir de su miniatura más pequeña (60$\times$60). De ahí salen
+  los colores del ambiente y de los halos. Debe estar visible, aunque quede tapado, para que
+  Qt lo pinte.
+  \item[\archivo{Glass.qml}] El panel de vidrio. Con \cod{backdrop} captura lo que hay detrás
+  (\cod{ShaderEffectSource}), lo desenfoca y lo recorta con una máscara de esquinas redondeadas
+  (\cod{MultiEffect}); sin \cod{backdrop}, solo aplica un tinte translúcido, que es más barato.
+  La copia se hace a media resolución porque se va a desenfocar mucho.
+\end{description}
+
+\begin{porque}[¿Por qué el vidrio es lo que más cuesta?]
+Un vidrio real significa: copiar la parte del fondo que hay detrás, desenfocarla y volver a
+dibujarla, \emph{en cada fotograma} si lo de detrás se mueve. Con la letra animada, eso ocurre
+60 veces por segundo. Por eso el desenfoque es una opción (\cod{desenfoque}) y por eso la
+copia es de media resolución.
+\end{porque}
+
+\section{Piezas reutilizables}
+
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{@{}lX@{}}
+\toprule
+Archivo & Para qué \\
+\midrule
+\archivo{Cover.qml} & Carátula con fondo neutro mientras carga; con \texttt{radius}, esquinas redondeadas (o círculo) sin máscara aparte \\
+\archivo{Icon.qml} & Icono vectorial a partir de un trazo SVG; se recrea al subir \texttt{Theme.renderEpoch} \\
+\archivo{IconButton.qml} & Botón de icono con 44 px de área táctil, foco de teclado y nombre accesible \\
+\archivo{PillButton.qml} & Botón en píldora con texto; \texttt{primary} lo rellena de blanco \\
+\archivo{Slider.qml} & Deslizador de 0 a 1; \texttt{moved} avisa al arrastrar. Dibuja en píxeles enteros \\
+\archivo{TextField.qml} & Campo de una línea con etiqueta accesible; \texttt{committed} al pulsar Intro \\
+\archivo{SearchField.qml} & Búsqueda en píldora de vidrio \\
+\archivo{TopNav.qml} & Pestañas de las secciones, en píldora \\
+\archivo{TabStrip.qml} & Pestañas en cápsula (\texttt{tabs} es \texttt{[\{ id, label \}]}), para el panel y «Sonando» \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\subsection{Accesibilidad como norma}
+
+Las normas del proyecto (\archivo{docs/AGENTES.md} §6) exigen botones de al menos 44 píxeles de
+área, \cod{Accessible.name} en los que solo tienen icono, foco visible por teclado y
+\cod{gesturePolicy: TapHandler.ReleaseWithinBounds} en botones y opciones. \cod{IconButton},
+\cod{PillButton} y \cod{TopNav} ya lo cumplen: úsalos en vez de crear un botón desde cero.
+
+\subsection{El truco de \texttt{Icon.qml}}
+
+Un icono es una \cod{Shape} con un trazo SVG. Con el renderizador de curvas (\cod{CurveRenderer})
+una \cod{Shape} \emph{no se vuelve a dibujar} tras liberar los gráficos de la ventana (que es
+justo lo que hace \archivo{window.cpp} al ocultarla). La solución es envolver la forma en un
+\cod{Loader} cuyo \cod{active} se apaga y enciende al cambiar \cod{Theme.renderEpoch}, que sube
+cuando la ventana reaparece (\cod{onVisibilityChanged} en \archivo{Main.qml} y
+\archivo{MiniPlayer.qml}).
+
+\section{Menús, opciones y mascota}
+
+\begin{description}[style=nextline, leftmargin=0pt]
+  \item[\archivo{ContextMenu.qml}] El menú de clic derecho de una canción, álbum o playlist.
+  Se abre con \cod{show(item, x, y)}. La propiedad \cod{entries} \emph{construye la lista}
+  según lo pulsado (¿canción?, ¿en la cola?, ¿hay sesión?), y \cod{run(action)} ejecuta la
+  elegida. Las listas largas (dónde guardar una canción) van en una \emph{subpágina}
+  (\cod{page}). También hospeda el aviso breve que sale tras una acción
+  (\cod{notify(texto)}).
+  \item[\archivo{SettingsSheet.qml}] Opciones, la hoja más grande (más de mil líneas) porque
+  casi todo es datos. Tiene una barra lateral de cinco categorías (cuenta, reproducción,
+  apariencia, vistas, plugins) y una lista \cod{optionRows}: cada opción simple es un objeto
+  \cod{{cat, key, label, hint, fallback, options}} y la hoja las dibuja todas con el mismo
+  código. Añadir una opción es añadir una fila (capítulo~\ref{cap:recetas}). Lo que no cabe en
+  una fila (cuenta, skins, mascotas, plugins) está escrito a mano.
+  \item[\archivo{Mascot.qml}] Una imagen que cambia de pose según el estado: error, cargando,
+  recién empezada, sonando, navegando, en pausa, reposo, y reacciones breves (pincharla, pasar
+  canción, guardar en una playlist). Cada pose, si falta, usa otra por una tabla de
+  sustitución. Con \cod{"pincharDaMeGusta": true} en su \cod{mascota.json}, pincharla da
+  «Me gusta» a lo que suena.
+\end{description}
+
+\section{Qué vive dónde: un mapa de responsabilidades}
+
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{@{}lX@{}}
+\toprule
+Si quieres cambiar\dots & Mira en \\
+\midrule
+qué hace un clic en una carátula & \texttt{Main.qml}, función \texttt{choose} \\
+cómo se ve una vista (Muro, Lomos, Cubeta) & \texttt{MuroView}, \texttt{LomosView}, \texttt{CubetaView} \\
+qué secciones o vistas existen & \texttt{Catalog.qml} (\texttt{sections}, \texttt{views}) \\
+un color & la skin (\texttt{skins/*.json}) y \texttt{Theme.pick} \\
+una opción nueva & \texttt{SettingsSheet.qml} (\texttt{optionRows}) y quien la lea \\
+qué se puede hacer con el clic derecho & \texttt{ContextMenu.qml} (\texttt{entries}, \texttt{run}) \\
+la barra de reproducción & \texttt{PlayerBar.qml} \\
+la letra y su animación & \texttt{LyricsView.qml} (y \texttt{Catalog} para los datos) \\
+el fondo de color & \texttt{Ambient.qml} (y \texttt{TintProbe.qml}) \\
+un atajo de teclado & \texttt{Main.qml} (\texttt{Shortcut}) \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\begin{ejercicio}
+Elige una vista (por ejemplo \archivo{CubetaView.qml}) y localiza: la señal que emite al
+activar un elemento, quién la recibe en \archivo{SectionView.qml} y quién en
+\archivo{Main.qml}. Dibuja la cadena en papel; debería tener tres eslabones.
+\end{ejercicio}

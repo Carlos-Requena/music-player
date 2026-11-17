@@ -107,7 +107,7 @@ fn probe(args: &[String]) -> bool {
                     match resolver::resolve(argument) {
                         Ok(url) => {
                             println!("resuelta en {} ms", resolved.elapsed().as_millis());
-                            if let Err(error) = mpv.load_stream(&url) {
+                            if let Err(error) = mpv.load(&url) {
                                 eprintln!("{error}");
                             }
                         }

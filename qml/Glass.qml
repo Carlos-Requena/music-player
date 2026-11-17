@@ -19,11 +19,15 @@ Item {
         visible: false
         live: root.visible && Theme.blur
         sourceItem: root.backdrop
+        // A media resolución: se va a desenfocar mucho y la diferencia no se ve, y la copia (la
+        // de Opciones ocupa casi toda la ventana) pesa la cuarta parte.
+        textureSize: Qt.size(Math.max(1, Math.ceil(width * Screen.devicePixelRatio / 2)),
+                             Math.max(1, Math.ceil(height * Screen.devicePixelRatio / 2)))
         sourceRect: {
             if (!root.backdrop)
                 return Qt.rect(0, 0, 0, 0)
             // Dependencias explícitas: mapToItem no es reactivo por sí solo.
-            void (root.x + root.y + root.width + root.height + root.backdrop.width + root.backdrop.height)
+            void (root.x + root.y + root.width + root.height + root.backdrop.x + root.backdrop.y + root.backdrop.width + root.backdrop.height)
             const origin = root.mapToItem(root.backdrop, 0, 0)
             return Qt.rect(origin.x, origin.y, root.width, root.height)
         }

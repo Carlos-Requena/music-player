@@ -69,6 +69,22 @@ Window {
             contextMenu.show(item, point.x, point.y)
     }
 
+    // Elemento que se precargará si sigue enfocado o bajo el puntero 250 ms (`prefetchTimer`).
+    property var prefetchTarget: null
+    function hint(item) {
+        prefetchTarget = item
+        if (item)
+            prefetchTimer.restart()
+        else
+            prefetchTimer.stop()
+    }
+    function unhint(item) {
+        if (prefetchTarget === item) {
+            prefetchTimer.stop()
+            prefetchTarget = null
+        }
+    }
+
     function closeDetail() {
         inspecting = false
         Library.closeDetail()
@@ -150,6 +166,9 @@ Window {
             section = arg("--section")
         if (arg("--search") !== "")
             search(arg("--search"))
+        // Depuración: `--play ID [--play-title texto]` reproduce esa canción al arrancar.
+        if (arg("--play") !== "")
+            Player.playItem(JSON.stringify({ kind: "song", videoId: arg("--play"), title: arg("--play-title"), subtitle: "" }))
         settingsOpen = args.indexOf("--settings") >= 0 || args.indexOf("--settings-end") >= 0
             || args.indexOf("--settings-at") >= 0 || args.indexOf("--settings-cat") >= 0
         if (arg("--settings-cat") !== "")
@@ -223,9 +242,17 @@ Window {
     }
 
     // Escenario: fondo ambiente y contenido de la sección. Es la capa que desenfocan los vidrios.
+    // Con «Sonando» arriba del todo queda tapado entero y no se pinta (los vidrios que lo
+    // desenfocan, como Opciones, lo siguen capturando aunque esté oculto). Al volver, la sección
+    // recupera el foco del teclado, que pierde al ocultarse.
     Item {
         id: stage
         anchors.fill: parent
+        visible: !nowPlayingView.covering
+        onVisibleChanged: {
+            if (visible && !win.settingsOpen && !win.detailOpen && !win.inspecting && !searchField.editing)
+                sectionView.forceActiveFocus()
+        }
 
         Ambient {
             anchors.fill: parent
@@ -242,12 +269,15 @@ Window {
         }
 
         // Fondo de imagen de la skin (si lo trae), sobre el modo ambiente. Se decodifica al
-        // tamaño de la ventana, no al de la imagen original.
+        // tamaño de la ventana, no al de la imagen original, en escalones de 256 px: al
+        // redimensionar la ventana no se vuelve a decodificar a cada píxel.
         Image {
+            readonly property int step: 256
             anchors.fill: parent
             visible: Theme.backdrop !== ""
             source: Theme.backdrop
-            sourceSize: Qt.size(win.width * Screen.devicePixelRatio, win.height * Screen.devicePixelRatio)
+            sourceSize: Qt.size(Math.ceil(win.width * Screen.devicePixelRatio / step) * step,
+                                Math.ceil(win.height * Screen.devicePixelRatio / step) * step)
             fillMode: Image.PreserveAspectCrop
             asynchronous: true
             opacity: Theme.backdropOpacity
@@ -273,9 +303,10 @@ Window {
             visible: !win.detailOpen
 
             onActivated: item => win.choose(item)
+            onHinted: (item, on) => on ? win.hint(item) : win.unhint(item)
 
             onCurrentItemChanged: {
-                prefetchTimer.restart()
+                win.hint(currentItem)
                 if (mascotLoader.item)
                     mascotLoader.item.browsed()
                 if ((win.autoplayPending || win.indexPending) && currentItem) {
@@ -294,12 +325,13 @@ Window {
                 }
             }
 
-            // Precarga lo que el usuario deja enfocado un momento, para que al elegirlo
-            // suene al instante. La espera evita lanzar yt-dlp en cada tecla al pasar.
+            // Precarga lo que el usuario deja enfocado o bajo el puntero un momento, para que al
+            // elegirlo suene al instante. La espera evita una petición por cada tecla o cada
+            // carátula por la que pasa el ratón; si el puntero sale antes, no se pide nada.
             Timer {
                 id: prefetchTimer
                 interval: 250
-                onTriggered: if (sectionView.currentItem) Player.prefetchItem(JSON.stringify(sectionView.currentItem))
+                onTriggered: if (win.prefetchTarget) Player.prefetchItem(JSON.stringify(win.prefetchTarget))
             }
 
             // Depuración: `--step n [--step-delay ms]` mueve la vista n elementos (negativo =
@@ -537,7 +569,9 @@ Window {
         width: win.panelWidth
         height: win.height - win.barHeight - 3 * Theme.gap
         opacity: win.showPanel ? 1 : 0
-        visible: opacity > 0
+        // Tapado por «Sonando» tampoco se pinta (con su letra en marcha costaba tanto como la de
+        // «Sonando»).
+        visible: opacity > 0 && !nowPlayingView.covering
 
         Behavior on opacity { NumberAnimation { duration: Theme.animFast } }
     }
@@ -573,7 +607,7 @@ Window {
         height: win.barHeight
         x: (win.width - width) / 2
         y: win.height - height - Theme.gap
-        backdrop: win.nowOpen ? nowPlayingView : stage
+        backdrop: win.nowOpen ? nowPlayingView.backdrop : stage
         lyricsOn: win.lyricsOn
         onExpandRequested: win.nowOpen = !win.nowOpen
         onLyricsToggled: win.lyricsOn = !win.lyricsOn
@@ -586,7 +620,7 @@ Window {
         y: 84
         width: win.stageWidth
         height: win.height - y - win.barHeight - 2 * Theme.gap
-        visible: win.detailOpen && !win.inspecting
+        visible: win.detailOpen && !win.inspecting && !nowPlayingView.covering
         focus: visible
         onVisibleChanged: if (visible) forceActiveFocus()
         onClosed: win.closeDetail()

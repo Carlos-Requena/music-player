@@ -10,11 +10,14 @@ FocusScope {
 
     readonly property var zonas: Catalog.zonas(section)
     // Las primeras canciones sueltas de la sección quedan resueltas de antemano.
-    onZonasChanged: if (zonas.length) Player.prefetchTracks(JSON.stringify(zonas[0].items), 4)
+    // (Solo se envían esas cuatro, no la fila entera.)
+    onZonasChanged: if (zonas.length) Player.prefetchTracks(JSON.stringify(zonas[0].items.filter(item => item.kind === "song").slice(0, 4)), 4)
     readonly property var currentItem: loader.item ? loader.item.currentItem : null
     readonly property string focusedThumb: currentItem ? currentItem.thumb : ""
 
     signal activated(var item)
+    // Muro y Lomos avisan de lo que hay bajo el puntero (ver `Main.hint`).
+    signal hinted(var item, bool on)
 
     // Playlists con categorías: ↑/↓ (si la vista no los usa, como Lomos) y RePág/AvPág
     // cambian de pestaña. La estantería vuelve al principio al cambiar.
@@ -62,6 +65,7 @@ FocusScope {
             zonas: root.zonas
             focus: true
             onActivated: item => root.activated(item)
+            onHinted: (item, on) => root.hinted(item, on)
         }
     }
 
@@ -72,6 +76,7 @@ FocusScope {
             titulo: Catalog.label(root.section)
             focus: true
             onActivated: item => root.activated(item)
+            onHinted: (item, on) => root.hinted(item, on)
         }
     }
 

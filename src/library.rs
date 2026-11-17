@@ -163,13 +163,17 @@ type Setter = fn(Pin<&mut qobject::Library>, QString);
 /// Elementos por zona que se envían a la interfaz; las páginas traen cientos.
 const ZONE_LIMIT: usize = 60;
 
+/// Una zona recortada a `ZONE_LIMIT` elementos, sin copiarlos: solo se escribe como JSON.
+#[derive(serde::Serialize)]
+struct ZoneView<'a> {
+    titulo: &'a str,
+    items: &'a [ytm::Item],
+}
+
 fn to_json(zones: &[Zone]) -> String {
-    let trimmed: Vec<Zone> = zones
+    let trimmed: Vec<ZoneView> = zones
         .iter()
-        .map(|zone| Zone {
-            titulo: zone.titulo.clone(),
-            items: zone.items.iter().take(ZONE_LIMIT).cloned().collect(),
-        })
+        .map(|zone| ZoneView { titulo: &zone.titulo, items: &zone.items[..zone.items.len().min(ZONE_LIMIT)] })
         .collect();
     serde_json::to_string(&trimmed).unwrap_or_default()
 }

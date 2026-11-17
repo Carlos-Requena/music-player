@@ -34,7 +34,7 @@ fn visitor_data() -> Result<String, String> {
     let body = json!({
         "context": { "client": { "clientName": "WEB_REMIX", "clientVersion": "1.20251101.01.00", "hl": "es", "gl": "ES" } }
     });
-    let response: Value = ureq::post(VISITOR)
+    let response: Value = crate::ytm::http().post(VISITOR)
         .header("Origin", "https://music.youtube.com")
         .header("User-Agent", USER_AGENT)
         .send_json(&body)
@@ -77,7 +77,7 @@ fn request(video_id: &str, visitor: &str) -> Result<Value, String> {
         "contentCheckOk": true,
         "racyCheckOk": true,
     });
-    ureq::post(PLAYER)
+    crate::ytm::http().post(PLAYER)
         .header("User-Agent", USER_AGENT)
         .header("Origin", "https://www.youtube.com")
         .header("X-YouTube-Client-Name", CLIENT_ID)

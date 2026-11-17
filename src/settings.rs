@@ -123,6 +123,47 @@ fn settings_path() -> Option<PathBuf> {
     dirs::config_dir().map(|dir| dir.join("musicplayer").join("settings.json"))
 }
 
+/// Última versión de las preferencias por escribir y si hay un hilo escribiéndolas. Un solo hilo
+/// escribe, y siempre la última: varios cambios seguidos (el retraso de la letra, clic a clic) no
+/// pueden llegar al disco en desorden.
+static PENDING: std::sync::Mutex<(Option<String>, bool)> = std::sync::Mutex::new((None, false));
+
+fn write_settings(text: String) {
+    let Ok(mut pending) = PENDING.lock() else { return };
+    pending.0 = Some(text);
+    if pending.1 {
+        return;
+    }
+    pending.1 = true;
+    std::thread::spawn(|| loop {
+        let text = match PENDING.lock() {
+            Ok(mut pending) => match pending.0.take() {
+                Some(text) => text,
+                None => {
+                    pending.1 = false;
+                    return;
+                }
+            },
+            Err(_) => return,
+        };
+        let Some(path) = settings_path() else { return };
+        if let Err(error) = write_atomic(&path, &text) {
+            eprintln!("No se pudieron guardar las preferencias en {}: {error}", path.display());
+        }
+    });
+}
+
+/// Escribe en un archivo aparte y lo pone en su sitio de una vez: si la app se cierra a mitad,
+/// queda el archivo anterior entero, nunca uno cortado.
+fn write_atomic(path: &std::path::Path, text: &str) -> std::io::Result<()> {
+    if let Some(dir) = path.parent() {
+        fs::create_dir_all(dir)?;
+    }
+    let partial = path.with_extension("json.nuevo");
+    fs::write(&partial, text)?;
+    fs::rename(&partial, path)
+}
+
 fn load() -> Stored {
     let mut stored: Stored = settings_path()
         .and_then(|path| fs::read_to_string(path).ok())
@@ -381,9 +422,9 @@ impl qobject::AppSettings {
         QString::from(&existing(skins_dir()))
     }
 
-    /// Escribe las preferencias; un fallo de disco no debe tumbar la interfaz.
+    /// Guarda las preferencias. El texto se prepara aquí y el disco se toca en un hilo
+    /// (`write_settings`): el hilo de Qt no espera al disco.
     fn save(&self) {
-        let Some(path) = settings_path() else { return };
         let stored = Stored {
             vistas: self.vistas.clone(),
             skin: self.skin().to_string(),
@@ -391,13 +432,8 @@ impl qobject::AppSettings {
             opciones: self.opciones.clone(),
             ..Stored::default()
         };
-        if let Some(dir) = path.parent() {
-            let _ = fs::create_dir_all(dir);
-        }
         if let Ok(text) = serde_json::to_string_pretty(&stored) {
-            if let Err(error) = fs::write(&path, text) {
-                eprintln!("No se pudieron guardar las preferencias en {}: {error}", path.display());
-            }
+            write_settings(text);
         }
     }
 }
@@ -417,6 +453,17 @@ mod tests {
         assert_eq!(preview_image(&larga), "file:///x/reojo.png");
         // Las incluidas no tienen carpeta: sin imagen.
         assert_eq!(preview_image(&serde_json::json!({ "fondo": "fondo.jpg" })), "");
+    }
+
+    #[test]
+    fn guarda_de_una_vez_sin_dejar_el_temporal() {
+        let dir = std::env::temp_dir().join(format!("musicplayer-prueba-{}", std::process::id()));
+        let path = dir.join("settings.json");
+        write_atomic(&path, "{\"skin\": \"vidrio\"}").unwrap();
+        write_atomic(&path, "{\"skin\": \"neon\"}").unwrap();
+        assert_eq!(fs::read_to_string(&path).unwrap(), "{\"skin\": \"neon\"}");
+        assert!(!path.with_extension("json.nuevo").exists());
+        let _ = fs::remove_dir_all(dir);
     }
 
     #[test]

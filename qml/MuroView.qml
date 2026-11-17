@@ -36,6 +36,8 @@ FocusScope {
     }
 
     signal activated(var item)
+    // El puntero entra (`on`) o sale de un elemento: la ventana lo precarga si se queda en él.
+    signal hinted(var item, bool on)
 
     onZonasChanged: {
         row = 0
@@ -57,13 +59,17 @@ FocusScope {
     }
 
     function reveal() {
-        const target = rowRepeater.itemAt(row)
-        if (!target)
+        const target = flick.itemAtIndex(row)
+        // Una fila lejana aún no existe (la lista solo crea las cercanas): se lleva a la vista
+        // sin animar y la siguiente vez ya existe.
+        if (!target) {
+            flick.positionViewAtIndex(row, ListView.Contain)
             return
+        }
         const top = target.y - 16
         const bottom = target.y + target.height + root.tile * 0.2 + 16
         if (top < flick.contentY)
-            flick.contentY = Math.max(0, top)
+            flick.contentY = Math.max(flick.originY - flick.topMargin, top)
         else if (bottom > flick.contentY + flick.height)
             flick.contentY = bottom - flick.height
     }
@@ -75,114 +81,109 @@ FocusScope {
     Keys.onReturnPressed: if (currentItem) activated(currentItem)
     Keys.onEnterPressed: if (currentItem) activated(currentItem)
 
-    Flickable {
+    // Una lista y no una columna con todas las filas: solo existen las filas a la vista y unas
+    // pocas más (`cacheBuffer`), no las de toda la sección.
+    ListView {
         id: flick
         anchors.fill: parent
         anchors.bottomMargin: info.height
-        contentHeight: column.height + 48
+        // Una lista vertical pone cada fila en x = 0: el margen va en la lista.
+        leftMargin: root.margin
+        topMargin: 12
+        bottomMargin: 48
+        spacing: 20
         clip: true
         boundsBehavior: Flickable.StopAtBounds
+        cacheBuffer: Math.max(0, Math.round(root.tile * 2))
+        model: root.rows
 
         Behavior on contentY { NumberAnimation { duration: Theme.animMove; easing.type: Easing.OutCubic } }
 
-        Column {
-            id: column
-            x: root.margin
-            width: root.width - 2 * root.margin
-            topPadding: 12
-            spacing: 20
+        delegate: Column {
+            id: rowItem
+            required property var modelData
+            required property int index
 
-            Repeater {
-                id: rowRepeater
-                model: root.rows
+            spacing: 12
+            z: index === root.row ? 2 : 1
 
-                Column {
-                    id: rowItem
-                    required property var modelData
-                    required property int index
+            Text {
+                visible: text.length > 0
+                text: rowItem.modelData.titulo
+                color: Theme.textMuted
+                font.pixelSize: 12
+                font.weight: Font.DemiBold
+                font.letterSpacing: 1.7
+                font.capitalization: Font.AllUppercase
+                height: 20
+                verticalAlignment: Text.AlignVCenter
+            }
 
-                    spacing: 12
-                    z: index === root.row ? 2 : 1
+            Row {
+                spacing: root.gap
 
-                    Text {
-                        visible: text.length > 0
-                        text: rowItem.modelData.titulo
-                        color: Theme.textMuted
-                        font.pixelSize: 12
-                        font.weight: Font.DemiBold
-                        font.letterSpacing: 1.7
-                        font.capitalization: Font.AllUppercase
-                        height: 20
-                        verticalAlignment: Text.AlignVCenter
-                    }
+                Repeater {
+                    model: rowItem.modelData.items
 
-                    Row {
-                        spacing: root.gap
+                    Item {
+                        id: cell
+                        required property var modelData
+                        required property int index
+                        readonly property bool current: rowItem.index === root.row && index === root.col
 
-                        Repeater {
-                            model: rowItem.modelData.items
+                        width: root.tile
+                        height: root.tile
+                        z: current ? 3 : 1
+                        scale: current ? 1.12 : 1
 
-                            Item {
-                                id: cell
-                                required property var modelData
-                                required property int index
-                                readonly property bool current: rowItem.index === root.row && index === root.col
+                        Accessible.role: Accessible.Button
+                        Accessible.name: modelData.title + ", " + modelData.subtitle
 
-                                width: root.tile
-                                height: root.tile
-                                z: current ? 3 : 1
-                                scale: current ? 1.12 : 1
+                        Behavior on scale { NumberAnimation { duration: Theme.animFast; easing.type: Easing.OutCubic } }
 
-                                Accessible.role: Accessible.Button
-                                Accessible.name: modelData.title + ", " + modelData.subtitle
+                        Cover {
+                            anchors.fill: parent
+                            thumb: cell.modelData.thumb
+                            // Solo descargan y ocupan memoria las filas a la vista o cerca.
+                            load: rowItem.y + rowItem.height > flick.contentY - root.tile * 2
+                                  && rowItem.y < flick.contentY + flick.height + root.tile * 2
+                        }
 
-                                Behavior on scale { NumberAnimation { duration: Theme.animFast; easing.type: Easing.OutCubic } }
+                        Rectangle {
+                            anchors.fill: parent
+                            color: "black"
+                            opacity: cell.current ? 0 : 0.24
+                            Behavior on opacity { NumberAnimation { duration: Theme.animFast } }
+                        }
 
-                                Cover {
-                                    anchors.fill: parent
-                                    thumb: cell.modelData.thumb
-                                    // Solo descargan y ocupan memoria las filas a la vista o cerca.
-                                    load: rowItem.y + rowItem.height > flick.contentY - root.tile * 2
-                                          && rowItem.y < flick.contentY + flick.height + root.tile * 2
-                                }
+                        Rectangle {
+                            anchors.fill: parent
+                            anchors.margins: -4
+                            radius: 4
+                            color: "transparent"
+                            border.width: 3
+                            border.color: Theme.text
+                            visible: cell.current
+                        }
 
-                                Rectangle {
-                                    anchors.fill: parent
-                                    color: "black"
-                                    opacity: cell.current ? 0 : 0.24
-                                    Behavior on opacity { NumberAnimation { duration: Theme.animFast } }
-                                }
+                        HoverHandler {
+                            cursorShape: Qt.PointingHandCursor
+                            onHoveredChanged: root.hinted(cell.modelData, hovered)
+                        }
 
-                                Rectangle {
-                                    anchors.fill: parent
-                                    anchors.margins: -4
-                                    radius: 4
-                                    color: "transparent"
-                                    border.width: 3
-                                    border.color: Theme.text
-                                    visible: cell.current
-                                }
+                        // Clic derecho: menú con «Añadir a la lista temporal».
+                        TapHandler {
+                            acceptedButtons: Qt.RightButton
+                            onTapped: eventPoint => cell.Window.window.openMenu(cell.modelData, eventPoint.scenePosition)
+                        }
 
-                                HoverHandler {
-                    cursorShape: Qt.PointingHandCursor
-                    onHoveredChanged: if (hovered) Player.prefetchItem(JSON.stringify(cell.modelData))
-                }
-
-                                // Clic derecho: menú con «Añadir a la lista temporal».
-                                TapHandler {
-                                    acceptedButtons: Qt.RightButton
-                                    onTapped: eventPoint => cell.Window.window.openMenu(cell.modelData, eventPoint.scenePosition)
-                                }
-
-                                TapHandler {
-                                    onTapped: {
-                                        root.row = rowItem.index
-                                        root.col = cell.index
-                                        root.forceActiveFocus()
-                                    }
-                                    onDoubleTapped: root.activated(cell.modelData)
-                                }
+                        TapHandler {
+                            onTapped: {
+                                root.row = rowItem.index
+                                root.col = cell.index
+                                root.forceActiveFocus()
                             }
+                            onDoubleTapped: root.activated(cell.modelData)
                         }
                     }
                 }

@@ -6,6 +6,11 @@ leer cualquier archivo del proyecto, entender por qué está así y añadir cosa
 
 Léela en orden. Cada parte enlaza al código real: ábrelo al lado.
 
+Hay una versión larga en PDF, con un recorrido archivo por archivo de todo el código, los
+formatos de datos, las decisiones, las trampas y ejercicios: [guia/guia.pdf](guia/guia.pdf) (sus
+fuentes LaTeX, en [guia/capitulos/](guia/capitulos/); se compila con `latexmk -xelatex guia.tex`
+dentro de `docs/guia`).
+
 | Parte | Qué aprendes | Tiempo |
 |---|---|---|
 | [1. La idea general](#1-la-idea-general) | Qué piezas hay y quién habla con quién | 15 min |
@@ -545,7 +550,7 @@ abierto.
    2. si YouTube no la da sin sesión y hay sesión, **yt-dlp** con tus cookies (el cliente de
       YouTube Music), ~2 s;
    3. guarda la URL en caché hasta que caduca.
-6. **mpv** ([src/audio.rs](../src/audio.rs)): `load_stream(url)` manda por el socket la orden
+6. **mpv** ([src/audio.rs](../src/audio.rs)): `load(url)` manda por el socket la orden
    `loadfile`. mpv empieza a sonar y avisa con eventos (`Started`, `Position`…).
 7. **De vuelta en `Player::on_event`**: `Started` → `set_playing(true)`, avisa a los plugins
    (Discord muestra la canción) y precarga las tres siguientes. `Position` → `set_position`

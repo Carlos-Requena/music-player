@@ -11,7 +11,7 @@ FocusScope {
     readonly property var tracks: detail ? (detail.tracks || []) : []
     // Al llegar las canciones se resuelven las primeras: así la que elijas suena al momento,
     // también las que YouTube solo da con sesión (que tardan ~2 s en resolverse).
-    onTracksChanged: if (tracks.length) Player.prefetchTracks(JSON.stringify(tracks), 6)
+    onTracksChanged: if (tracks.length) Player.prefetchTracks(JSON.stringify(tracks.slice(0, 6)), 6)
     readonly property var zonas: detail ? (detail.zonas || []) : []
     readonly property bool artist: detail !== null && detail.kind === "artist"
     readonly property real totalSeconds: tracks.reduce((sum, track) => sum + (track.duration || 0), 0)

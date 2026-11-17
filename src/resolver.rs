@@ -124,10 +124,17 @@ pub fn forget(video_id: &str) {
     }
 }
 
-/// Devuelve la URL de audio de `video_id`, resolviéndola si hace falta. Bloquea: hay
-/// que llamarla desde un hilo de trabajo. Si otra llamada ya la está resolviendo,
-/// espera a esa en vez de lanzar un segundo yt-dlp.
+/// Devuelve la URL de audio de `video_id` para reproducirla ya (un clic, pasar de pista),
+/// resolviéndola si hace falta. Bloquea: hay que llamarla desde un hilo de trabajo. Si otra
+/// llamada ya la está resolviendo (una precarga), espera a esa en vez de lanzar otra.
 pub fn resolve(video_id: &str) -> Result<String, String> {
+    resolve_with(video_id, true)
+}
+
+/// `urgent`: la pide el usuario. No espera a que acaben las precargas (`MAX_WORKERS` solo
+/// limita a estas) y, si falla, lo reintenta una vez. Una precarga no reintenta: si YouTube está
+/// rechazando, insistir empeora el rechazo, y el clic ya reintentará.
+fn resolve_with(video_id: &str, urgent: bool) -> Result<String, String> {
     let (lock, signal) = &*STATE;
     let mut state = lock.lock().map_err(|_| "caché envenenada".to_owned())?;
     loop {
@@ -136,7 +143,7 @@ pub fn resolve(video_id: &str) -> Result<String, String> {
             Some(Entry::Pending) => {
                 state = signal.wait(state).map_err(|_| "caché envenenada".to_owned())?;
             }
-            _ if state.workers >= MAX_WORKERS => {
+            _ if !urgent && state.workers >= MAX_WORKERS => {
                 state = signal.wait(state).map_err(|_| "caché envenenada".to_owned())?;
             }
             _ => break,
@@ -150,7 +157,7 @@ pub fn resolve(video_id: &str) -> Result<String, String> {
     // salir sin formatos y, un momento después, con ellos. Un segundo intento suele bastar.
     // Si la pista necesita sesión, repetir no cambia nada.
     let result = run_ytdlp(video_id).or_else(|error| {
-        if error == NEEDS_SESSION {
+        if error == NEEDS_SESSION || !urgent {
             return Err(error);
         }
         thread::sleep(Duration::from_millis(400));
@@ -197,7 +204,7 @@ pub fn hint(video_id: &str) {
             },
             Err(_) => return,
         };
-        let _ = resolve(&next);
+        let _ = resolve_with(&next, false);
     });
 }
 
@@ -213,7 +220,7 @@ pub fn prefetch(video_id: &str) {
     }
     let video_id = video_id.to_owned();
     thread::spawn(move || {
-        let _ = resolve(&video_id);
+        let _ = resolve_with(&video_id, false);
     });
 }
 
@@ -307,16 +314,4 @@ fn run_ytdlp_process(video_id: &str) -> Result<String, String> {
         .filter(|url| url.starts_with("http"))
         .map(str::to_owned)
         .ok_or_else(|| "yt-dlp no devolvió ninguna URL".to_owned())
-}
-
-/// Espera breve usada por las pruebas para dejar terminar las precargas.
-#[allow(dead_code)]
-pub fn settle(timeout: Duration) {
-    let deadline = std::time::Instant::now() + timeout;
-    while std::time::Instant::now() < deadline {
-        if STATE.0.lock().map_or(true, |state| state.workers == 0) {
-            return;
-        }
-        thread::sleep(Duration::from_millis(50));
-    }
 }

@@ -1,5 +1,219 @@
 \chapter{Glosario y referencia}
+\label{cap:apendices}
 
-\begin{trampa}[Capítulo pendiente]
-Este capítulo aún no está escrito. Mientras tanto, la información equivalente está en \archivo{docs/INDEX.md} (las fichas de \archivo{docs/areas/}) y \archivo{docs/ARCHITECTURE.md}.
-\end{trampa}
+\section{Glosario}
+
+Los términos que más aparecen en el proyecto, de la A a la Z. Entre paréntesis, dónde
+verlos.
+
+\begin{description}[style=nextline, leftmargin=0pt, itemsep=0.5em]
+  \item[ADR] \emph{Architecture Decision Record}. Documento corto que anota una decisión, sus
+  alternativas descartadas y su motivo (\archivo{docs/decisions/}; capítulo~\ref{cap:decisiones}).
+  \item[Ambiente (modo)] El fondo de color que cambia con la carátula. Variantes: vivo, suave,
+  tenue, plano y fluido (\archivo{Ambient.qml}).
+  \item[\emph{Binding} (enlace)] Una propiedad QML definida por una expresión: se recalcula sola
+  cuando cambia algo de lo que lee (capítulo~\ref{cap:qml}).
+  \item[Bridge / puente] El módulo \cod{#[cxx_qt::bridge]} que hace visible un \cod{struct}
+  de Rust en QML (capítulo~\ref{cap:puente}).
+  \item[Caché de secciones] Copia en disco de lo último publicado de cada sección, para
+  mostrar algo al instante al arrancar (\cod{library::cache}).
+  \item[Catálogo] Todo lo que se explora en YouTube Music: secciones, búsqueda, detalle.
+  Área \emph{catalogo}.
+  \item[\cod{Catalog}] El singleton QML que convierte el JSON de Rust en objetos (y guarda la
+  lógica de categorías y de letra).
+  \item[\cod{cxx-qt}] Biblioteca de KDAB que une Rust y Qt (capítulo~\ref{cap:puente}).
+  \item[Deriva] El movimiento lento de los focos del modo ambiente (opción
+  \cod{ambienteMovimiento}).
+  \item[\emph{Daemon} (yt-dlp residente)] Un yt-dlp que se queda cargado y atiende peticiones
+  (\archivo{daemon.rs}).
+  \item[\cod{footprint}] Comando de macOS que da la memoria que muestra el Monitor de
+  Actividad.
+  \item[Gancho de yt-dlp (de mpv)] El plugin con el que mpv resuelve una página de YouTube por
+  su cuenta; es el último recurso.
+  \item[Hilo de Qt] El hilo principal: el único que toca propiedades e interfaz. Nunca debe
+  esperar (capítulo~\ref{cap:arquitectura}).
+  \item[InnerTube] El nombre de la API interna que usa la web de YouTube y YouTube Music
+  (\archivo{ytm.rs}).
+  \item[IPC] \emph{Inter-process communication}: aquí, el socket Unix por el que se habla con
+  mpv.
+  \item[Item (QML)] El tipo base de todo lo visual en QML. \emph{No confundir} con
+  \cod{ytm::Item}, la tarjeta de una canción, álbum o playlist.
+  \item[Lomos] Vista en estantería 3D de cajas (\archivo{LomosView.qml}).
+  \item[\cod{lavf://}] Prefijo que hace que mpv lea una URL con ffmpeg en vez de con su
+  cliente HTTP.
+  \item[\emph{Loader}] Objeto QML que crea o destruye un componente a demanda.
+  \item[Mascota] Imagen que cambia de pose según el estado (\archivo{Mascot.qml}).
+  \item[mpv] Reproductor externo que decodifica y reproduce el audio.
+  \item[Muro] Vista en cuadrícula de carátulas (\archivo{MuroView.qml}).
+  \item[Netscape (formato de cookies)] Una cookie por línea, siete campos separados por
+  tabuladores. Lo leen yt-dlp y mpv.
+  \item[Opción] Una pareja clave--valor de \cod{AppSettings.opcion}; vacío es el valor por
+  defecto (capítulo~\ref{cap:datos}).
+  \item[\cod{Pin<&mut Self>}] El tipo con el que cxx-qt entrega \cod{self} a un método:
+  el objeto no puede moverse en memoria (capítulo~\ref{cap:puente}).
+  \item[Precarga] Resolver la URL de una pista antes de que se pida (\cod{resolver::hint} y
+  \cod{prefetch}).
+  \item[\cod{qt.queue(...)}] Encola un cierre para ejecutarlo en el hilo de Qt con acceso al
+  objeto (\cod{CxxQtThread::queue}).
+  \item[\cod{qml_singleton}] Atributo que hace que un objeto de Rust sea un singleton en QML.
+  \item[\cod{Qt Quick}] El conjunto de tipos de QML para interfaces gráficas aceleradas por GPU.
+  \item[Radio] La cola de canciones parecidas que YouTube Music propone tras una canción
+  (\cod{ytm::queue}).
+  \item[\cod{renderEpoch}] Contador de \cod{Theme} que sube cuando una ventana reaparece, para
+  recrear lo que no se redibuja solo.
+  \item[\cod{revision}] Entero de \cod{AppSettings} que sube con cada cambio de opción; los
+  enlaces lo leen para reevaluarse.
+  \item[\emph{Scrobble}] Un registro de «escuchado» en Last.fm.
+  \item[Sesión] Las cookies de youtube.com (\cod{cookies.txt}) con las que se pide la
+  biblioteca y los formatos de cuenta.
+  \item[Sonda (\emph{probe})] Una consulta sin ventana con \cod{--probe}, para aislar fallos de
+  red.
+  \item[Singleton] Un objeto único accesible por su nombre desde cualquier archivo QML.
+  \item[Skin] Un JSON de colores, radio y ambiente; opcionalmente con una imagen de fondo.
+  \item[\cod{TapHandler}, \cod{HoverHandler}] \emph{Handlers} de Qt Quick para pulsar y para
+  pasar el puntero.
+  \item[\cod{Theme}] El singleton QML de colores, tamaños e iconos.
+  \item[Vía rápida] La resolución del audio por \cod{/player} con el cliente de visionOS
+  (\archivo{stream.rs}).
+  \item[Vidrio] Panel translúcido que desenfoca lo que hay detrás (\archivo{Glass.qml}).
+  \item[Visitor data] Identificador de visitante que YouTube exige para no pedir la
+  comprobación anti-bot.
+  \item[yt-dlp] Programa de Python que sabe sacar la URL real del audio de un vídeo.
+  \item[Zona] Una fila de tarjetas con un título (\cod{ytm::Zone}).
+\end{description}
+
+\section{Comandos de referencia}
+
+\subsection{Compilar y probar}
+
+\begin{terminal}
+cargo build                     # depuración
+cargo build --release           # para medir y para usar
+cargo test                      # pruebas de Rust
+python3 scripts/docs.py check   # comprueba la documentación
+python3 scripts/docs.py index   # regenera las tablas de docs/INDEX.md
+scripts/shaders.sh              # recompila shaders/*.frag (necesita qsb)
+scripts/crear-app-macos.sh      # crea Reproductor.app en macOS
+scripts/instalar-linux.sh       # instala en Linux (con --dependencias, antes)
+\end{terminal}
+
+\subsection{Ejecutar para depurar}
+
+\begin{terminal}
+export PRUEBA="$(mktemp -d)"
+HOME="$PRUEBA" MUSICPLAYER_SILENT=1 ./target/release/musicplayer \
+    --shot "$PRUEBA/c.png" --delay 8000 --section albumes --index 3
+HOME="$PRUEBA" ./target/release/musicplayer --probe search "texto"
+\end{terminal}
+
+\subsection{Argumentos de \texttt{Main.qml}}
+
+\begin{center}
+\small
+\begin{longtable}{@{}p{0.3\linewidth}p{0.64\linewidth}@{}}
+\toprule
+Argumento & Efecto \\
+\midrule
+\endhead
+\texttt{--shot ruta.png} & Captura la ventana y sale \\
+\texttt{--delay ms} & Espera antes de capturar \\
+\texttt{--section id} & \texttt{inicio}, \texttt{explorar}, \texttt{playlists}, \texttt{albumes}, \texttt{megusta}, \texttt{buscar} \\
+\texttt{--index n} & Lleva Lomos o Cubeta al elemento \texttt{n} \\
+\texttt{--step n} & Mueve la vista \texttt{n} elementos; \texttt{--step-delay ms} \\
+\texttt{--search texto} & Busca al arrancar \\
+\texttt{--play ID} & Reproduce esa canción; \texttt{--play-title} \\
+\texttt{--autoplay} & Reproduce el elemento enfocado; \texttt{--autoplay-delay}, \texttt{--then-next ms} \\
+\texttt{--settings}, \texttt{--settings-cat id}, \texttt{--settings-end}, \texttt{--settings-at y} & Abre las opciones \\
+\texttt{--now}, \texttt{--panel}, \texttt{--tab id} & «Sonando», el panel, y su pestaña (\texttt{letra}, \texttt{cola}, \texttt{temporal}) \\
+\texttt{--minimize ms}, \texttt{--hide}, \texttt{--mini}, \texttt{--restore ms} & Minimizar, ocultar, mini reproductor, volver \\
+\texttt{--open}, \texttt{--shuffle}, \texttt{--inspect} & Detalle, aleatorio, modo inspeccionar \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+\subsection{Sondas}
+
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{@{}lX@{}}
+\toprule
+Sonda & Qué hace \\
+\midrule
+\texttt{home}, \texttt{explore}, \texttt{albums}, \texttt{playlists} & Secciones \\
+\texttt{search "texto"} & Búsqueda \\
+\texttt{queue ID}, \texttt{album ID} & Radio de una canción; canciones de una lista \\
+\texttt{lyrics "título" "artista"} & Letra \\
+\texttt{play ID}, \texttt{resolve ids}, \texttt{fast ids}, \texttt{url ID} & Resolución y arranque \\
+\texttt{playable ID}, \texttt{account}, \texttt{cookies navegador} & Diagnóstico de cuenta y pistas \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\subsection{Git}
+
+\begin{terminal}
+git switch master && git switch -c feature/nombre   # empezar una tarea
+git status
+git log --oneline master..HEAD                      # lo hecho en la rama
+git switch master && git merge --no-ff feature/nombre   # solo con visto bueno
+\end{terminal}
+
+\section{Qué leer para cada tarea}
+
+\begin{center}
+\small
+\begin{longtable}{@{}p{0.4\linewidth}p{0.54\linewidth}@{}}
+\toprule
+Si vas a\dots & Abre \\
+\midrule
+\endhead
+Entender el proyecto desde cero & Esta guía, capítulos 1 a 6 y 11 \\
+Tocar la reproducción & \texttt{docs/areas/reproduccion.md}, \texttt{resolucion.md} \\
+Tocar la letra & \texttt{docs/areas/letra.md} \\
+Tocar las vistas (Muro, Lomos, Cubeta) & \texttt{docs/areas/vistas.md} \\
+Tocar skins, ambiente u opciones de aspecto & \texttt{docs/areas/personalizacion.md} \\
+Tocar «Sonando», el panel o la barra & \texttt{ventana.md}, \texttt{reproduccion.md} \\
+Tocar la sesión & \texttt{docs/areas/sesion.md} y \texttt{runbooks/probar-sesion.md} \\
+Añadir un plugin & \texttt{docs/areas/plugins.md}, \texttt{runbooks/probar-plugins.md} \\
+Medir rendimiento & \texttt{runbooks/medir-rendimiento.md} \\
+Saber de qué área es un archivo & \texttt{docs/INDEX.md}, tabla «archivo $\rightarrow$ área» \\
+Retomar una tarea larga & \texttt{docs/EN-CURSO.md}, \texttt{runbooks/retomar-trabajo.md} \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+\section{Para aprender más}
+
+\begin{description}[style=nextline, leftmargin=0pt]
+  \item[Rust] «The Rust Programming Language» (el \emph{libro}, gratuito en
+  \cod{doc.rust-lang.org/book}), capítulos 1 a 10 y el 16 (hilos). «Rust by Example» para ver
+  código corto de cada tema. \emph{Rustlings} si te gusta aprender practicando.
+  \item[QML] La documentación de Qt Quick (\cod{doc.qt.io}), sobre todo «QML Syntax Basics»,
+  «Property Binding» y «Qt Quick Controls». La sección de «Qt Quick Effects» y
+  «ShaderEffect» para el vidrio y los sombreadores.
+  \item[cxx-qt] El libro de KDAB (\cod{kdab.github.io/cxx-qt}).
+  \item[mpv] El manual del IPC JSON: \cod{mpv.io/manual/stable/#json-ipc}.
+  \item[YouTube Music] La API no es pública. El proyecto \emph{ytmusicapi} (Python) es la mejor
+  referencia de qué pide la web y cómo leer sus respuestas.
+  \item[yt-dlp] El \emph{README} del proyecto, sobre todo las opciones de extractores
+  (\cod{--extractor-args}).
+\end{description}
+
+\section{Cómo actualizar esta guía}
+
+La guía está en \archivo{docs/guia/}: un \archivo{guia.tex} que enlaza un archivo por
+capítulo (\archivo{capitulos/}). Para recompilar el PDF, en esa carpeta:
+
+\begin{terminal}
+latexmk -xelatex guia.tex
+\end{terminal}
+
+Reglas para mantenerla:
+
+\begin{itemize}
+  \item Cuando cambies algo importante del código, actualiza el capítulo que lo describe.
+  \item Las cifras (memoria, tiempos) llevan su fecha y su máquina; si las rehaces, cambia la
+  fecha.
+  \item Un recuadro de tipo «trampa» es un error que ya ocurrió: añade los nuevos al capítulo
+  de trampas \emph{y} a \archivo{docs/TRAMPAS.md}, que es la fuente viva.
+\end{itemize}

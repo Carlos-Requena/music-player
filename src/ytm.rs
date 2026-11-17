@@ -21,6 +21,14 @@ const SEARCH_PLAYLISTS: &str = "EgeKAQQoAEABagwQDhAKEAMQBBAJEAU%3D";
 
 pub type Result<T> = std::result::Result<T, String>;
 
+/// Cliente HTTP de toda la app (catálogo, vía rápida, letra, historial, Last.fm). Guarda unos
+/// segundos las conexiones abiertas y las reutiliza: `ureq::get` y `ureq::post` crean un cliente
+/// de un solo uso, y cada petición pagaba una conexión TLS nueva (~50–150 ms).
+pub fn http() -> &'static ureq::Agent {
+    static AGENT: std::sync::LazyLock<ureq::Agent> = std::sync::LazyLock::new(ureq::Agent::new_with_defaults);
+    &AGENT
+}
+
 /// Elemento navegable: canción, álbum o playlist.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
@@ -57,7 +65,7 @@ fn post(endpoint: &str, mut body: Value) -> Result<Value> {
     body["context"] = json!({
         "client": { "clientName": "WEB_REMIX", "clientVersion": CLIENT_VERSION, "hl": "es", "gl": "ES" }
     });
-    let mut request = ureq::post(format!("{ENDPOINT}/{endpoint}?prettyPrint=false"))
+    let mut request = http().post(format!("{ENDPOINT}/{endpoint}?prettyPrint=false"))
         .header("User-Agent", USER_AGENT)
         .header("Origin", "https://music.youtube.com");
     // Con sesión, las mismas peticiones devuelven el contenido de la cuenta.
@@ -342,7 +350,7 @@ pub fn set_playlist_cover(playlist_id: &str, image: &[u8]) -> Result<()> {
     };
 
     // 1. Abre la subida y recibe la URL a la que mandar los bytes.
-    let start = authed(ureq::post(format!("{UPLOAD}?authuser=0")))
+    let start = authed(http().post(format!("{UPLOAD}?authuser=0")))
         .header("Content-Type", "text/plain; charset=utf-8")
         .header("X-Goog-Upload-Command", "start")
         .header("X-Goog-Upload-Header-Content-Length", image.len().to_string())
@@ -359,7 +367,7 @@ pub fn set_playlist_cover(playlist_id: &str, image: &[u8]) -> Result<()> {
     // 2. Sube la imagen entera de una vez; la respuesta trae el identificador del archivo.
     // El tipo es el que usa la implementación de ytmusicapi (PR #866): con otros, el servidor
     // de subidas respondía 400.
-    let mut uploaded = authed(ureq::post(&upload_url))
+    let mut uploaded = authed(http().post(&upload_url))
         .header("Content-Type", "text/html; charset=UTF-8")
         .header("X-Goog-Upload-Command", "upload, finalize")
         .header("X-Goog-Upload-Offset", "0")
@@ -531,19 +539,30 @@ pub fn mood_playlists(categories: usize) -> Result<Vec<Zone>> {
     Ok(out)
 }
 
-/// Búsqueda de artistas, canciones, álbumes y playlists.
+/// Búsqueda de artistas, canciones, álbumes y playlists. Las cuatro peticiones van a la vez:
+/// la búsqueda tarda lo que la más lenta, no la suma.
 pub fn search(query: &str) -> Result<Vec<Zone>> {
-    let mut out = Vec::new();
-    for (titulo, params) in [
+    let kinds = [
         ("Artistas", SEARCH_ARTISTS),
         ("Canciones", SEARCH_SONGS),
         ("Álbumes", SEARCH_ALBUMS),
         ("Playlists", SEARCH_PLAYLISTS),
-    ] {
-        let page = post("search", json!({ "query": query, "params": params }))?;
-        let items: Vec<Item> = zones(&page).into_iter().flat_map(|zone| zone.items).collect();
+    ];
+    let pages: Vec<Result<Value>> = std::thread::scope(|scope| {
+        let running: Vec<_> = kinds
+            .iter()
+            .map(|(_, params)| scope.spawn(move || post("search", json!({ "query": query, "params": params }))))
+            .collect();
+        running
+            .into_iter()
+            .map(|handle| handle.join().unwrap_or_else(|_| Err("La búsqueda falló.".to_owned())))
+            .collect()
+    });
+    let mut out = Vec::new();
+    for ((titulo, _), page) in kinds.iter().zip(pages) {
+        let items: Vec<Item> = zones(&page?).into_iter().flat_map(|zone| zone.items).collect();
         if !items.is_empty() {
-            out.push(Zone { titulo: titulo.to_owned(), items });
+            out.push(Zone { titulo: (*titulo).to_owned(), items });
         }
     }
     Ok(out)

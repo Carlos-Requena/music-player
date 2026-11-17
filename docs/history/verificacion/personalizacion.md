@@ -5,6 +5,14 @@ son de cuando se escribieron. El estado actual está en su [ficha](../../areas/p
 
 Lo nuevo va arriba: añade una sección `## AAAA-MM-DD · qué se verificó` encima de las anteriores.
 
+## 2026-11-17 · Preferencias guardadas en un hilo y sondas que sueltan la carátula (rama `perf/letra`)
+
+- **Cambio:** `settings.json` se escribe en un hilo, siempre la última versión y de una vez
+  (archivo aparte y renombrado); `TintProbe` suelta la carátula anterior (`unloadImage`).
+- **Verificado:** prueba nueva de `write_atomic`; Opciones abierta, dos pasadas: 253–256 MB →
+  231–239 MB (con el vidrio a media resolución, de [interfaz-comun](interfaz-comun.md)).
+- **No verificado:** cerrar la app justo después de cambiar una opción.
+
 ## 2026-11-16 · Modo ambiente «Fluido» (carátula fluida) y letra sin recuadro
 
 - **Cambio:** valor `fluido` de `ambiente`: sombreador `shaders/fluido.frag` (desenfoque en anillo

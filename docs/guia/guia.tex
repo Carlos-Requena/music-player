@@ -118,7 +118,27 @@
 % Código en línea. Lee `#` y `%` tal cual (cambia su catcode antes de leer el argumento);
 % por eso no puede ir dentro del argumento de otra orden (títulos, \item[...], tabularx).
 \newcommand{\cod}{\begingroup\catcode`\#=12 \catcode`\%=12 \catcode`\~=12 \codaux}
-\newcommand{\codaux}[1]{\texttt{\detokenize{#1}}\endgroup}
+% El código en línea puede partirse tras «/», «.», «_», «-», «,» y «(» para no salirse del margen.
+\ExplSyntaxOn
+\tl_new:N \l__cod_tl
+\tl_const:Nx \c__cod_under_tl { \char_generate:nn { 95 } { 12 } }
+\tl_const:Nx \c__cod_dcolon_tl { \char_generate:nn { 58 } { 12 } \char_generate:nn { 58 } { 12 } }
+\NewDocumentCommand{\codbreak}{m}
+  {
+    \tl_set:Nx \l__cod_tl { \detokenize {#1} }
+    \tl_replace_all:Nnn \l__cod_tl { / } { /\allowbreak }
+    \tl_replace_all:Nnn \l__cod_tl { . } { .\allowbreak }
+    \tl_replace_all:Nnn \l__cod_tl { , } { ,\allowbreak }
+    \tl_replace_all:Nnn \l__cod_tl { ( } { (\allowbreak }
+    \tl_replace_all:Nnn \l__cod_tl { - } { -\allowbreak }
+    \tl_replace_all:Nnn \l__cod_tl { [ } { [\allowbreak }
+    \tl_replace_all:Nnn \l__cod_tl { = } { =\allowbreak }
+    \tl_replace_all:NVn \l__cod_tl \c__cod_dcolon_tl { \c__cod_dcolon_tl \allowbreak }
+    \tl_replace_all:NVn \l__cod_tl \c__cod_under_tl { \c__cod_under_tl \allowbreak }
+    \tl_use:N \l__cod_tl
+  }
+\ExplSyntaxOff
+\newcommand{\codaux}[1]{\texttt{\codbreak{#1}}\endgroup}
 \newcommand{\archivo}[1]{\textsf{\color{acento}#1}}
 \newcommand{\opcion}[1]{«\textit{#1}»}
 

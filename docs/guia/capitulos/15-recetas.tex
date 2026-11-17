@@ -1,5 +1,295 @@
 \chapter{Recetas paso a paso}
+\label{cap:recetas}
 
-\begin{trampa}[Capítulo pendiente]
-Este capítulo aún no está escrito. Mientras tanto, la información equivalente está en \archivo{docs/INDEX.md} (las fichas de \archivo{docs/areas/}) y \archivo{docs/ARCHITECTURE.md}.
+Cada receta es un cambio típico, con los archivos exactos y la forma de comprobarlo. Si una
+receta de aquí y un \emph{runbook} (\archivo{docs/runbooks/}) no coinciden, manda el runbook:
+es el procedimiento vigente; esta guía lo explica con ejemplos.
+
+\begin{idea}[Antes de cualquier receta]
+\begin{enumerate}
+  \item Crea una rama: \cod{git switch -c feature/nombre} (nunca se trabaja en \cod{master}).
+  \item Abre la ficha del área que vas a tocar (\archivo{docs/areas/}).
+  \item Si hay una trampa para esa zona, léela (capítulo~\ref{cap:trampas}).
+  \item Al terminar: \cod{cargo build --release}, \cod{cargo test} y
+  \cod{python3 scripts/docs.py check}.
+\end{enumerate}
+\end{idea}
+
+%% ------------------------------------------------------------------------------------------
+\section{Añadir una opción}
+
+\emph{Ejemplo:} «Mostrar segundos en la barra», con valores sí o no. Es la receta más común y
+\emph{no toca Rust}.
+
+\begin{enumerate}
+  \item \textbf{La fila.} En \archivo{qml/SettingsSheet.qml}, añade un objeto a
+  \cod{optionRows}. \cod{cat} es la categoría de la barra lateral (\cod{reproduccion},
+  \cod{apariencia} o \cod{vistas}); \cod{fallback} es el valor por defecto.
+\begin{qml}
+{ cat: "vistas", key: "segundos", label: "Mostrar segundos", fallback: "si",
+  options: [{ id: "si", label: "Sí" }, { id: "no", label: "No" }] },
+\end{qml}
+  Con eso la fila aparece y se guarda sola en \cod{settings.json}.
+  \item \textbf{Leerla.} Donde la uses, con \cod{void AppSettings.revision} delante: sin eso,
+  el enlace no se vuelve a evaluar al cambiar la opción.
+\begin{qml}
+readonly property bool segundos: { void AppSettings.revision; return AppSettings.opcion("segundos") !== "no" }
+\end{qml}
+  Si la leen varios archivos, ponla en \archivo{Theme.qml}.
+  \item \textbf{Documentarla.} Añade la clave al \cod{opciones:} de la ficha de su área y
+  explica su efecto. \cod{docs.py check} \emph{falla} si una clave del código no está en
+  ninguna ficha.
+  \item \textbf{Comprobar.} Una captura de la categoría
+  (\cod{--shot ruta.png --settings-cat vistas}) y otra con la opción puesta (un
+  \cod{settings.json} de prueba en el \cod{HOME} temporal).
+\end{enumerate}
+
+\begin{trampa}[Errores habituales]
+\begin{itemize}
+  \item Olvidar \cod{void AppSettings.revision}: el valor no cambia hasta reiniciar.
+  \item Llamar \cod{setOpcion(clave, "")}: borra la opción y deja el \cod{fallback}.
+  \item Un botón de opción sin 44 px de área o sin foco visible.
+\end{itemize}
 \end{trampa}
+
+%% ------------------------------------------------------------------------------------------
+\section{Añadir un color a las skins}
+
+\begin{enumerate}
+  \item En \archivo{qml/Theme.qml}:
+\begin{qml}
+readonly property color miColor: pick("miColor", "#FF8800")
+\end{qml}
+  El segundo valor es el de por defecto (el de la skin Vidrio).
+  \item Añade \cod{"miColor": "#..."} a la sección \cod{colores} de \emph{las cuatro} skins
+  de \archivo{skins/} (\cod{vidrio}, \cod{medianoche}, \cod{grafito}, \cod{neon}).
+  \item Úsalo como \cod{Theme.miColor}. Nunca un color escrito a mano en un componente.
+  \item Si las personas que usan la app pueden ponerlo en su skin, añádelo a la lista de
+  claves del README.
+  \item Captura con al menos dos skins (Vidrio y Neón).
+\end{enumerate}
+
+%% ------------------------------------------------------------------------------------------
+\section{Añadir un archivo QML}
+
+\begin{enumerate}
+  \item Crea \archivo{qml/MiCosa.qml}.
+  \item Regístralo en \archivo{build.rs}, en \cod{QML_FILES} (o en \cod{QML_SINGLETONS} si
+  es un singleton, con \cod{pragma Singleton}).
+  \item Añádelo al \cod{archivos:} de la ficha de su área y a su tabla «Archivos».
+  \item Úsalo como \cod{MiCosa { ... }} desde cualquier QML.
+\end{enumerate}
+
+Si olvidas el paso 2, QML dirá que el tipo no existe; \cod{docs.py check} también lo detecta.
+
+%% ------------------------------------------------------------------------------------------
+\section{Añadir una propiedad o una función a un singleton}
+
+\emph{Ejemplo:} saber cuántas canciones quedan en la cola, con la propiedad \cod{restantes}.
+
+\begin{enumerate}
+  \item \textbf{La propiedad}, en el bloque \cod{extern "RustQt"} de \archivo{src/player.rs},
+  junto a las demás:
+\begin{rust}
+#[qproperty(i32, restantes)]
+\end{rust}
+  \item \textbf{El campo}, en \cod{struct PlayerRust}, y su valor inicial en
+  \cod{impl Default for PlayerRust}:
+\begin{rust}
+restantes: i32,          // en el struct
+restantes: 0,            // en Default
+\end{rust}
+  \item \textbf{Actualizarla} donde cambie la cola o la pista; por ejemplo al final de
+  \cod{load}:
+\begin{rust}
+let restantes = (self.tracks.len() - index - 1) as i32;
+self.as_mut().set_restantes(restantes);
+\end{rust}
+  \item \textbf{Usarla en QML}, con el nombre en \cod{camelCase} (aquí ya coincide):
+\begin{qml}
+Text { text: Player.restantes + " canciones más" }
+\end{qml}
+\end{enumerate}
+
+Para una \emph{función}, declárala con \cod{#[qinvokable]} en el bloque del puente
+(\emph{solo la firma}) y escribe el cuerpo en \cod{impl qobject::Player}. Si es lenta, ejecútala
+en un hilo con \cod{qt_thread().queue(...)} y protégela con un contador (capítulo~\ref{cap:puente}).
+
+\begin{trampa}
+El cuerpo \emph{nunca} va dentro del bloque \cod{extern "RustQt"}: cxx-qt falla con
+«Unsupported verbatim input in ForeignItem».
+\end{trampa}
+
+\subsection{Un singleton de Rust nuevo}
+
+\begin{enumerate}
+  \item \archivo{src/mi\_cosa.rs} con su \cod{#[cxx_qt::bridge]}.
+  \item En \archivo{build.rs}, dentro de \cod{.files([...])}.
+  \item En \archivo{src/main.rs}, \cod{mod mi_cosa;}.
+  \item En el \cod{archivos:} de su ficha.
+  \item \cod{cargo build --release} sin avisos.
+\end{enumerate}
+
+%% ------------------------------------------------------------------------------------------
+\section{Añadir datos nuevos de YouTube Music}
+
+\emph{Ejemplo:} una sección con las «Subidas» del usuario.
+
+\begin{enumerate}
+  \item \textbf{Descubre qué pide la web.} Abre music.youtube.com con las herramientas de
+  desarrollador (pestaña Red), filtra por \cod{browse} y anota el \cod{browseId} de la petición.
+  \item \textbf{Pruébalo sin interfaz.} \archivo{ytm.rs} ya tiene \cod{browse(browse_id)},
+  que devuelve \cod{Vec<Zone>}. Añade un caso a \cod{probe} en \archivo{main.rs} y ejecuta
+  \cod{--probe subidas}.
+  \item \textbf{Publica en \cod{Library}.} Una propiedad (\cod{#[qproperty(QString, subidas)]})
+  con su campo, y una entrada en el array \cod{sections} de \cod{load()}, como la de
+  \cod{megusta}. El array tiene tamaño fijo: sube también el número de su tipo
+  (\cod{[...; 5]} a \cod{[...; 6]}); el compilador te lo recordará.
+  \item \textbf{Conviértelo en QML.} En \archivo{Catalog.qml}: una propiedad
+  \cod{subidas: parse(Library.subidas)}, el \cod{case "subidas"} en \cod{zonas()} y la entrada
+  en \cod{sections} (con \cod{cuenta: true} si exige sesión). La pestaña aparece sola en la
+  navegación y en «Vista de cada sección».
+  \item \textbf{La vista por defecto}, en \cod{DEFAULT_VIEWS} de \archivo{settings.rs}.
+\end{enumerate}
+
+%% ------------------------------------------------------------------------------------------
+\section{Añadir una entrada al menú de clic derecho}
+
+\emph{Ejemplo:} «Mover al final» en las canciones de la cola.
+
+\begin{enumerate}
+  \item En \archivo{ContextMenu.qml}, la propiedad \cod{entries} construye la lista según lo
+  pulsado. Las pistas de la cola llegan con \cod{queueIndex} (lo añade \archivo{QueueList}),
+  así que dentro de \cod{if (inQueue)}:
+\begin{qml}
+out.push({ id: "final", label: "Mover al final", icon: Theme.iconAddQueue })
+\end{qml}
+  \item En \cod{run(action)}, qué hace:
+\begin{qml}
+} else if (action === "final") {
+    Player.moveInQueue(target.queueIndex, Catalog.queue.length - 1)
+    notify("«" + target.title + "» al final de la cola")
+\end{qml}
+  \item Si la lista va a ser larga (como las playlists donde guardar), no la metas en el menú
+  principal: haz una \emph{subpágina}. Una entrada con \cod{id: "page:loquesea"} y
+  \cod{more: true} abre la página \cod{loquesea}, y \cod{entries} devuelve su contenido cuando
+  \cod{page === "loquesea"}.
+  \item Pruébalo con un clic simulado:
+\begin{terminal}
+MUSICPLAYER_DEBUG_CLICK="1224,300,right,6000" ... --shot /tmp/menu.png --autoplay --tab cola
+\end{terminal}
+\end{enumerate}
+
+%% ------------------------------------------------------------------------------------------
+\section{Añadir un atajo de teclado}
+
+En \archivo{Main.qml}, junto a los demás:
+
+\begin{qml}
+Shortcut { sequence: "L"; enabled: !win.settingsOpen && !searchField.editing
+           onActivated: win.lyricsOn = !win.lyricsOn }
+\end{qml}
+
+La condición \cod{!searchField.editing} evita que la tecla se «coma» cuando estás escribiendo
+una búsqueda; \cod{!win.settingsOpen} hace lo mismo con Opciones.
+
+%% ------------------------------------------------------------------------------------------
+\section{Añadir un argumento de depuración}
+
+Un argumento nuevo (para una captura) se añade a \archivo{Main.qml} con \cod{arg("--nombre")}
+y a la tabla de argumentos de \archivo{docs/runbooks/verificar-interfaz.md}, \emph{en la misma
+tarea}. Si es una sonda sin ventana, un caso nuevo en \cod{probe} de \archivo{main.rs} y su
+fila en la tabla de \archivo{verificar-reproduccion.md}.
+
+%% ------------------------------------------------------------------------------------------
+\section{Crear una mascota}
+
+No hace falta código: una carpeta en \cod{<config>/musicplayer/mascotas/<id>/} con un
+\cod{mascota.json} y los PNG de las poses (formato en el capítulo~\ref{cap:datos}). Solo
+\cod{reposo} es obligatoria. La lógica que elige la pose vive en \archivo{Mascot.qml}; si
+quieres un estado nuevo, se añade ahí y en su tabla de sustitución.
+
+\section{Crear una skin}
+
+Tampoco necesita código: un \cod{<id>.json} (o una carpeta con \cod{skin.json} y una imagen de
+fondo) en \cod{<config>/musicplayer/skins/}, con \cod{nombre} y \cod{colores}. Pulsa
+«recargar» en Opciones. Para una skin que se incluya en el programa, copia el JSON a
+\archivo{skins/} y añádelo a \cod{BUILTIN_SKINS} de \archivo{settings.rs}; ojo: un color nuevo
+va en las cuatro.
+
+%% ------------------------------------------------------------------------------------------
+\section{Escribir una prueba}
+
+Las pruebas están al final del archivo Rust, en un módulo \cod{#[cfg(test)]}:
+
+\begin{rust}
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn quita_el_numero_de_reproducciones() {
+        assert_eq!(artist_from_subtitle("Quevedo • 75 M reproducciones"), "Quevedo");
+    }
+}
+\end{rust}
+
+\begin{terminal}
+cargo test --release
+\end{terminal}
+
+Es lo que da más seguridad por menos esfuerzo en lo que es \emph{parseo de datos ajenos}:
+formatos de letra, firmas, convertir una respuesta de YouTube. Lo que habla con la red no tiene
+pruebas (está en la deuda conocida); se prueba con las sondas.
+
+\section{Añadir un plugin}
+
+Un plugin nuevo (por ejemplo, otro servicio de «escuchando ahora») sigue el patrón de
+\archivo{plugins/discord.rs}:
+
+\begin{enumerate}
+  \item Un archivo \archivo{src/plugins/mi\_plugin.rs} con un tipo que sabe conectarse y recibir
+  la pista, la posición y la parada. Declara \cod{mod mi_plugin;} en \archivo{plugins.rs}.
+  \item Su configuración, como campos nuevos de \cod{Config} (con \cod{#[serde(default)]}) para
+  que \cod{plugins.json} de versiones anteriores siga siendo válido.
+  \item En \cod{worker}, una variable \cod{Option<MiPlugin>} que se crea y se destruye según la
+  configuración, y una rama por evento que le avisa.
+  \item Las funciones invocables de \cod{Plugins} (\cod{set_mi_plugin}) y su propiedad de estado.
+  \item La pestaña «Plugins» de \archivo{SettingsSheet.qml} y su ficha
+  (\archivo{docs/areas/plugins.md}).
+\end{enumerate}
+
+Nunca llames a un plugin desde \cod{Player}: el hilo \cod{worker} existe para que la red de un
+plugin no frene la interfaz (ADR-15).
+
+\section{Añadir un área, una decisión o una trampa}
+
+\begin{itemize}
+  \item \textbf{Un área nueva:} \archivo{docs/runbooks/nueva-area.md} (copia
+  \archivo{docs/templates/area.md}, rellena el frontmatter y ejecuta
+  \cod{python3 scripts/docs.py index}).
+  \item \textbf{Una decisión} que cruza áreas, o que fija el propietario:
+  \archivo{docs/runbooks/registrar-decision.md}.
+  \item \textbf{Una trampa} que costó encontrar: una línea en \archivo{docs/TRAMPAS.md}, con
+  síntoma, causa y arreglo.
+\end{itemize}
+
+\section{Terminar una tarea}
+
+Es el \emph{checklist final} de \archivo{docs/AGENTES.md} (§12), resumido:
+
+\begin{enumerate}
+  \item Nada lento en el hilo de Qt; las respuestas obsoletas se descartan.
+  \item Colores por \cod{Theme}; opciones por \cod{AppSettings.opcion}, con su fila y en su ficha.
+  \item QML y puentes nuevos registrados.
+  \item \cod{cargo build --release} sin avisos, \cod{cargo test} en verde,
+  \cod{python3 scripts/docs.py check} sin problemas.
+  \item Captura de cada pantalla tocada; \cod{--autoplay} si tocaste reproducción; medida en
+  release si cambia memoria o tiempos.
+  \item Ficha del área al día, con su entrada en el historial; ADR o trampa si las hubo.
+  \item Datos del propietario como estaban; sin procesos de prueba vivos.
+  \item Dicho qué \emph{no} se verificó (Linux, Wayland, el sonido real, con sesión\dots).
+\end{enumerate}
+
+Y, solo con el visto bueno de quien manda en el proyecto, el commit y la unión a \cod{master}
+(\cod{git merge --no-ff}, y borrar la rama).

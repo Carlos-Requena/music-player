@@ -20,7 +20,7 @@ import app.musicplayer
 // Tres modos (Opciones › Apariencia › Calidad de la letra), porque cada fotograma redibuja la
 // ventana entera con su vidrio desenfocado y eso es lo que cuesta CPU:
 //
-//   calidad      barrido a la frecuencia de la pantalla (60 Hz), cascada, brillo y palabras que
+//   calidad      barrido a 60 Hz (aunque la pantalla vaya a 120), cascada, brillo y palabras que
 //                se elevan con suavidad. (Se probó además dibujar el texto con curvas,
 //                `Text.CurveRendering`: ~95 MB más para una nitidez que apenas se nota.)
 //   equilibrado  barrido a 30 Hz, cascada y brillo; el resto, al instante. (Por defecto.)
@@ -130,10 +130,10 @@ Item {
 
     // mpv da la posición diez veces por segundo; para que el barrido de las palabras sea suave,
     // un reloj propio avanza entre una y otra (a 60 Hz en «calidad», a 30 Hz en «equilibrado»).
-    // Solo mientras se está cantando la línea activa y se ve: en las pausas o con la línea ya
-    // entera se queda en los diez pasos por segundo de mpv.
+    // Solo mientras se está cantando la línea activa (o dura su brillo) y se ve: en las pausas o
+    // con la línea ya entera y apagada se queda en los diez pasos por segundo de mpv.
     property real smooth: 0
-    readonly property bool ticking: !low && visible && Player.playing && position < fillEnd
+    readonly property bool ticking: !low && visible && Player.playing && position < Math.max(fillEnd, glowEnd)
     readonly property real clock: ticking ? smooth : position
     onPositionChanged: {
         if (!ticking || Math.abs(position - smooth) > 0.35)
@@ -148,10 +148,24 @@ Item {
         const words = timing(current)
         return words.length ? words.reduce((last, w) => Math.max(last, w.end), 0) + 0.3 : -1
     }
-    // «Calidad»: con cada fotograma de la pantalla.
+    // El brillo de la línea activa también sigue a este reloj (ver `glow`): mientras dura, el
+    // reloj propio sigue en marcha aunque la línea ya esté entera.
+    readonly property real glowSeconds: 1.6
+    readonly property real glowEnd: !low && Theme.blur && current >= 0 && lines[current].text !== ""
+        ? lines[current].t + glowSeconds : -1
+    // «Calidad»: con los fotogramas de la pantalla, pero 60 veces por segundo como mucho. En una
+    // pantalla de 120 Hz (ProMotion) los fotogramas de en medio no cambian nada y Qt no redibuja.
     FrameAnimation {
+        property real pending: 0
         running: root.ticking && root.quality
-        onTriggered: root.advance(frameTime)
+        onRunningChanged: pending = 0
+        onTriggered: {
+            pending += frameTime
+            if (pending >= 1 / 60 - 0.002) {
+                root.advance(pending)
+                pending = 0
+            }
+        }
     }
     // «Equilibrado»: a 30 Hz.
     Timer {
@@ -357,11 +371,30 @@ Item {
                     // ---- Brillo de la línea activa ----
                     // Una copia desenfocada detrás del texto: fuerte al empezar la línea y apagada en
                     // 1,6 s, como en Better Lyrics. Detrás y no como efecto del propio texto: así el
-                    // texto se dibuja directo y nítido. Apagado, el efecto se quita (se rehace con cada
-                    // palabra que se rellena).
+                    // texto se dibuja directo y nítido. Apagado, el efecto se quita.
+                    //
+                    // Desenfoca una instantánea de la línea (`live: false`), no la línea viva: con
+                    // ella viva, cada paso del barrido volvía a copiar y desenfocar la línea entera.
+                    // La instantánea se rehace al encenderse la línea y cada vez que empieza a
+                    // iluminarse una palabra (`litWords`); detrás del texto y desenfocada, la
+                    // diferencia con el barrido exacto no se ve.
+                    readonly property bool glowOn: !root.low && line.active && Theme.blur && body.glow > 0.01
+                    readonly property int litWords: glowOn ? words.reduce((n, w) => n + (root.clock >= w.start ? 1 : 0), 0) : 0
+                    onLitWordsChanged: if (glowOn) glowSource.scheduleUpdate()
+                    onGlowOnChanged: if (glowOn) glowSource.scheduleUpdate()
+
+                    ShaderEffectSource {
+                        id: glowSource
+                        visible: false
+                        width: body.width
+                        height: body.height
+                        sourceItem: line.glowOn ? body : null
+                        live: false
+                    }
+
                     MultiEffect {
-                        visible: !root.low && line.active && Theme.blur && body.glow > 0.01
-                        source: visible ? body : null
+                        visible: line.glowOn
+                        source: visible ? glowSource : null
                         x: body.x
                         y: body.y
                         width: body.width
@@ -388,21 +421,15 @@ Item {
                             Behavior on xScale { NumberAnimation { duration: 166; easing.type: Easing.InOutQuad } }
                         }
 
-                        property real glow: 0
-                        NumberAnimation on glow {
-                            id: glowAnim
-                            running: false
-                            from: 0.9
-                            to: 0
-                            duration: 1600
-                            easing.type: Easing.OutQuad
-                        }
-                        Connections {
-                            target: line
-                            function onActiveChanged() {
-                                if (line.active)
-                                    glowAnim.restart()
-                            }
+                        // Intensidad del brillo: de 0,9 a 0 en `glowSeconds` desde que empieza la
+                        // línea, con la curva de antes (OutQuad). Sale del reloj de la letra y no de
+                        // una animación propia: así no añade fotogramas a la frecuencia de la
+                        // pantalla (en «Equilibrado», 30 por segundo como el barrido).
+                        readonly property real glow: {
+                            if (!line.active || root.low)
+                                return 0
+                            const t = (root.clock - line.start) / root.glowSeconds
+                            return t < 0 || t >= 1 ? 0 : 0.9 * (1 - t) * (1 - t)
                         }
 
                         Repeater {
@@ -527,13 +554,13 @@ Item {
                             }
                         }
 
-                        // Respira mientras dura la pausa.
-                        SequentialAnimation on scale {
-                            running: line.active && line.gapShown && root.visible
-                            loops: Animation.Infinite
-                            NumberAnimation { to: 1.15; duration: 1250; easing.type: Easing.InOutSine }
-                            NumberAnimation { to: 1; duration: 1250; easing.type: Easing.InOutSine }
-                        }
+                        // Respira mientras dura la pausa (2,5 s por respiración). Sale de la posición
+                        // de la canción, diez pasos por segundo: tan lento, no se ve a saltos y no
+                        // redibuja la ventana a la frecuencia de la pantalla durante toda la pausa.
+                        // En «bajo», quietos.
+                        scale: line.active && line.gapShown && !root.low
+                            ? 1 + 0.075 * (1 - Math.cos(2 * Math.PI * Math.max(0, root.clock - line.start) / 2.5))
+                            : 1
                     }
                 }
             }

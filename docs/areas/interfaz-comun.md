@@ -1,8 +1,8 @@
 ---
 area: interfaz-comun
 titulo: Piezas comunes de la interfaz
-resumen: Vidrio, carátula, icono, botones, deslizador y campo de texto que usan todas las pantallas.
-archivos: [qml/Glass.qml, qml/Cover.qml, qml/Icon.qml, qml/IconButton.qml, qml/PillButton.qml, qml/Slider.qml, qml/TextField.qml]
+resumen: Vidrio, carátula, icono, botones, deslizador, pestañas y campo de texto que usan todas las pantallas.
+archivos: [qml/Glass.qml, qml/Cover.qml, qml/Icon.qml, qml/IconButton.qml, qml/PillButton.qml, qml/Slider.qml, qml/TextField.qml, qml/TabStrip.qml]
 opciones: []
 adr: []
 ---
@@ -23,6 +23,7 @@ esta ficha), no se copia con otro nombre.
 | `PillButton` | Botón de texto en píldora; `primary` lo rellena |
 | `Slider` | Deslizador de 0 a 1; `stepSize` es lo que mueve cada flecha |
 | `TextField` | Campo de una línea con etiqueta accesible; `committed` al pulsar Intro o salir |
+| `TabStrip` | Pestañas en una cápsula (`tabs: [{ id, label }]`, `current`, `picked(id)`): las del panel lateral y las de «Sonando» |
 
 ## Reglas y decisiones
 
@@ -31,7 +32,15 @@ esta ficha), no se copia con otro nombre.
 - **`Icon` se recrea** con un `Loader` cada vez que sube `Theme.renderEpoch`: una `Shape` con
   CurveRenderer no se redibuja tras liberar los gráficos de la ventana.
 - **`Glass` con `backdrop` cuesta un desenfoque por fotograma**: úsalo solo donde se vea. Sin
-  `backdrop` no reserva ni la máscara del desenfoque.
+  `backdrop` no reserva ni la máscara del desenfoque. El desenfoque se rehace cada vez que cambia
+  algo dentro de `backdrop`: dale la capa más pequeña que sirva (en «Sonando», solo su fondo). Si
+  el `backdrop` se mueve (sube con una pantalla), su `x` e `y` están en las dependencias del recorte.
+- **`Glass` copia el fondo a media resolución** (`textureSize`): se desenfoca tanto que no se nota y
+  la copia pesa la cuarta parte (la de Opciones ocupa casi toda la ventana).
+- **`Cover.picture`** da la imagen de la carátula para leer su textura en un sombreador (el reflejo
+  de Lomos) sin cargarla dos veces.
+- **`Slider` dibuja en píxeles enteros** (`drawn`): un `value` que cambia sin mover el tirador un
+  píxel no redibuja la ventana.
 - **`Cover` con `radius`** rellena una forma con la imagen (`ShapePath.fillItem`), sin capa ni
   máscara aparte; la forma se recrea con `Theme.renderEpoch`, como `Icon`. La forma pone la
   textura en su esquina con su tamaño en píxeles físicos, así que `fillTransform` la escala para
@@ -50,6 +59,7 @@ esta ficha), no se copia con otro nombre.
 | `qml/PillButton.qml` | Botón de texto |
 | `qml/Slider.qml` | Deslizador |
 | `qml/TextField.qml` | Campo de texto |
+| `qml/TabStrip.qml` | Pestañas |
 
 ## Dependencias
 
@@ -58,8 +68,7 @@ esta ficha), no se copia con otro nombre.
 
 ## Estado actual
 
-- **Última verificación:** 2026-11-16, carátula redonda del panel y de «Sonando» sin el borde
-  repetido, capturas en Retina ([historial](../history/verificacion/interfaz-comun.md)).
+- **Última verificación:** 2026-11-17, `TabStrip`, vidrio a media resolución y Cover.picture ([historial](../history/verificacion/interfaz-comun.md)).
 - **Pruebas:** ninguna automática.
 - **Sin verificar:** `Cover` con `radius` tras ocultar y volver a mostrar la ventana; en una
   pantalla sin Retina (densidad 1, CachyOS): la captura sin ventana no pinta el relleno de la forma.

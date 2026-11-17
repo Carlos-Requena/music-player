@@ -43,6 +43,23 @@ wait $APP
 - **Comprueba en la línea `estado:`** que sonaba la canción esperada.
 - Repite al menos dos veces: el ruido es de ±1 s.
 
+### Siempre la misma canción, aunque YouTube no deje reproducir
+
+Para comparar la letra (o cualquier cosa que se mueva mientras suena) hace falta la misma canción
+en cada pasada, y YouTube a veces pide sesión. `--play ID` elige la canción (su cola, su letra y
+su título llegan como con un clic) y `MUSICPLAYER_DEBUG_AUDIO` hace que mpv suene un archivo local
+en vez del audio de YouTube; la posición avanza igual:
+
+```bash
+ffmpeg -loglevel error -f lavfi -i "sine=frequency=220:duration=240" -c:a libopus -b:a 32k "$PRUEBA/prueba.opus"
+HOME="$PRUEBA" MUSICPLAYER_SILENT=1 MUSICPLAYER_DEBUG_AUDIO="$PRUEBA/prueba.opus" ./target/release/musicplayer \
+  --play TqyfmFaZlqw --play-title "紅蓮華 - Gurenge" --panel --tab letra --shot "$PRUEBA/c.png" --delay 42000 &
+```
+
+(`TqyfmFaZlqw` es «紅蓮華» de LiSA: NetEase y Kugou traen el tiempo de cada sílaba.) La calidad de
+la letra se elige con un `settings.json` en el `HOME` de pruebas
+(`{"opciones": {"letraCalidad": "calidad"}}`); «Sonando», con `--now` en vez de `--panel`.
+
 ## Tiempos
 
 - Arranque de pista: stderr escribe `arranque de pista: N ms`; `--probe play ID` mide el arranque

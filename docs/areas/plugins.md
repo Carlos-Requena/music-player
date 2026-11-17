@@ -57,7 +57,8 @@ Opciones › Plugins. Los controles del sistema (souvlaki) se activan aquí pero
 
 ## Dependencias
 
-- No usa otras áreas: recibe los eventos de [reproduccion](reproduccion.md).
+- Recibe los eventos de [reproduccion](reproduccion.md).
+- **[catalogo](catalogo.md)** (`ytm::http`): el cliente HTTP común para hablar con Last.fm.
 - **La usan:** [reproduccion](reproduccion.md) (`plugins::emit`), [ventana](ventana.md) y
   [personalizacion](personalizacion.md) (la pestaña Plugins).
 

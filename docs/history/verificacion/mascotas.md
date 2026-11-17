@@ -5,6 +5,13 @@ son de cuando se escribieron. El estado actual está en su [ficha](../../areas/m
 
 Lo nuevo va arriba: añade una sección `## AAAA-MM-DD · qué se verificó` encima de las anteriores.
 
+## 2026-11-17 · Poses cargadas en segundo plano (rama `perf/letra`)
+
+- **Cambio:** cada pose se carga con `asynchronous` y la anterior se ve hasta que llega
+  (`retainWhileLoading`).
+- **Verificado:** compila y carga sin errores de QML.
+- **No verificado:** con una mascota de verdad (el `HOME` de pruebas no tiene ninguna).
+
 ## 2026-11-16 · La mascota y el «Me gusta» quitado desde la barra
 
 - **Cambio:** si se quita el «Me gusta» desde la barra, pincharla otra vez con la misma canción lo

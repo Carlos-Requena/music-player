@@ -5,6 +5,17 @@ son de cuando se escribieron. El estado actual está en su [ficha](../../areas/c
 
 Lo nuevo va arriba: añade una sección `## AAAA-MM-DD · qué se verificó` encima de las anteriores.
 
+## 2026-11-17 · Cliente HTTP común y búsqueda en paralelo (rama `perf/letra`)
+
+- **Cambio:** `ytm::http`, un cliente HTTP para toda la app que reutiliza las conexiones; la
+  búsqueda pide sus cuatro listas a la vez; `to_json` recorta las zonas sin copiarlas;
+  `Catalog.categorias` sale de `categoriasJson`; `Catalog.allItems` para Lomos y Cubeta; fuera
+  `Catalog.lineProgress`, que no usaba nadie.
+- **Verificado:** `--probe search "Vetusta Morla"`, tres veces con cada versión: 1,6–1,8 s → 0,50–0,57 s.
+  `cargo test` en verde; capturas de Inicio, Lomos y Opciones sin errores de QML.
+- **No verificado:** con sesión (la búsqueda y las secciones de la cuenta); cambiar de categoría de
+  playlists tocando otra opción.
+
 ## 2026-11-16 · `ytm::remove_like`
 
 - **Cambio:** `Library.like` lleva `gusta` y llama a `ytm::like` o `ytm::remove_like`

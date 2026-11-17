@@ -13,7 +13,13 @@ Canvas {
     width: 8
     height: 8
 
+    // Imagen que tiene cargada este lienzo. Al pasar a otra se suelta: si no, cada carátula
+    // enfocada se quedaba en memoria mientras viviera la sonda (una por caja en Lomos).
+    property string loaded: ""
     onUrlChanged: {
+        if (loaded !== "" && loaded !== url)
+            unloadImage(loaded)
+        loaded = url
         if (url === "")
             return
         // Cada lienzo carga la imagen por su cuenta aunque ya esté en la caché de otro.

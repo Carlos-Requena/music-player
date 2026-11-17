@@ -21,6 +21,8 @@ Item {
     readonly property string url: load ? thumb.replace("w544-h544", "w" + pixels + "-h" + pixels) : ""
     // Cargada y ya a la vista del todo (terminado el fundido de entrada).
     readonly property bool ready: image.status === Image.Ready && image.opacity >= 1
+    // La imagen, para usar su textura en un sombreador (el reflejo de Lomos) sin cargarla dos veces.
+    readonly property Image picture: image
 
     Rectangle {
         anchors.fill: parent

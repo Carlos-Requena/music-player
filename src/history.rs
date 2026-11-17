@@ -110,7 +110,7 @@ fn ping(base: &str, extra: &[(&str, String)]) -> Result<(), String> {
     let Some((cookie, authorization)) = crate::account::with_session(|session| session.headers()) else {
         return Err("sin sesión".to_owned());
     };
-    ureq::get(with_params(base, extra))
+    crate::ytm::http().get(with_params(base, extra))
         .header("User-Agent", crate::ytm::USER_AGENT)
         .header("Origin", "https://music.youtube.com")
         .header("Referer", "https://music.youtube.com/")

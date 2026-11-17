@@ -16,12 +16,7 @@ FocusScope {
     property string titulo: ""
     property int index: 0
 
-    readonly property var items: {
-        let out = []
-        for (const zona of zonas)
-            out = out.concat(zona.items)
-        return out
-    }
+    readonly property var items: Catalog.allItems(zonas)
     readonly property var currentItem: items.length ? items[Math.min(index, items.length - 1)] : null
 
     // Posición continua de la estantería; sigue a `index` con una animación.
@@ -131,6 +126,8 @@ FocusScope {
     }
 
     signal activated(var item)
+    // El puntero entra (`on`) o sale de un elemento: la ventana lo precarga si se queda en él.
+    signal hinted(var item, bool on)
 
     // Otra sección: vuelve al principio sin animar. La misma sección refrescada (la caché y
     // luego la red): conserva el sitio.
@@ -189,23 +186,6 @@ FocusScope {
         }
     }
 
-    // Degradado que funde los reflejos (se comparte entre todas las cajas).
-    Item {
-        id: fade
-        width: 64
-        height: 64
-        visible: false
-        layer.enabled: true
-
-        Rectangle {
-            anchors.fill: parent
-            gradient: Gradient {
-                GradientStop { position: 0; color: "black" }
-                GradientStop { position: 1; color: "transparent" }
-            }
-        }
-    }
-
     // Color de la elegida, para el halo del suelo.
     TintProbe {
         id: currentTint
@@ -228,22 +208,32 @@ FocusScope {
         Behavior on color { ColorAnimation { duration: Theme.animMove } }
     }
 
+    // Cajas que existen: las que caben a cada lado y unas pocas más, no una por elemento (una
+    // sección con cientos de álbumes creaba cientos de cajas, con su sonda de color cada una).
+    // Cada caja `k` del anillo muestra el elemento `at` más cercano a la posición con `at ≡ k`
+    // (módulo `ring`): al avanzar uno, solo la caja que sale por un lado pasa al otro, y lo hace
+    // lejos del centro, donde ya no se ve.
+    readonly property int ring: 2 * (perSide + 3) + 1
+    readonly property var emptyItem: ({ title: "", subtitle: "", thumb: "" })
+
     Item {
         id: shelf
         anchors.fill: parent
 
         Repeater {
-            model: root.items
+            model: root.ring
 
             Item {
                 id: box
-                required property var modelData
                 required property int index
+                readonly property int at: index + root.ring * Math.round((root.pos - index) / root.ring)
+                readonly property bool exists: at >= 0 && at < root.items.length
+                readonly property var modelData: exists ? root.items[at] : root.emptyItem
 
-                readonly property real d: index - root.pos
+                readonly property real d: at - root.pos
                 readonly property real u: Math.abs(d)
                 readonly property bool shown: u < root.perSide + 1
-                readonly property bool near: u <= root.perSide + 2
+                readonly property bool near: exists && u <= root.perSide + 2
                 readonly property real a: root.signedAngle(d)
                 readonly property real s: root.scaleAt(u)
                 readonly property real bx: root.centerX + (d < 0 ? -1 : 1) * root.slotAt(u)
@@ -254,7 +244,7 @@ FocusScope {
                 readonly property real fadeOut: Math.max(0, Math.min(1, root.perSide + 1 - u))
                 readonly property color tint: probe.tint
 
-                visible: shown && fadeOut > 0
+                visible: exists && shown && fadeOut > 0
                 opacity: fadeOut
                 z: 1000 - Math.round(u * 10)
 
@@ -262,48 +252,37 @@ FocusScope {
                 Accessible.name: modelData.title + ", " + modelData.subtitle
 
                 function select() {
-                    if (index === root.index)
+                    if (at === root.index)
                         root.activated(modelData)
                     else
-                        root.index = index
+                        root.index = at
                     root.forceActiveFocus()
                 }
 
                 // ---- Reflejos (debajo de las caras) ----
 
-                // Frontal reflejado: la carátula volteada que nace del borde inferior.
-                Item {
+                // Frontal reflejado: la carátula volteada que nace del borde inferior y se funde
+                // hacia abajo. Un sombreador (`shaders/reflejo.frag`) que lee la textura de la
+                // carátula pequeña de la caja: antes era una capa con máscara por caja, con su propia
+                // copia de la imagen.
+                ShaderEffect {
+                    readonly property Image picture: cover.picture
                     width: box.w
                     height: box.w * root.reflection
-                    clip: true
                     transform: Matrix4x4 {
                         matrix: root.faceMatrix([-box.w / 2, box.w / 2, -box.t / 2], [1, 0, 0], [0, 1, 0],
                                                 box.a, box.s, box.bx, box.by)
                     }
                     opacity: 0.3
-                    layer.enabled: box.visible
-                    layer.effect: MultiEffect {
-                        maskEnabled: true
-                        maskSource: fade
-                        maskThresholdMin: 0.5
-                        maskSpreadAtMin: 1
-                    }
-
-                    Rectangle {
-                        width: box.w
-                        height: box.w
-                        color: Qt.darker(box.tint, 1.4)
-                    }
-
-                    Image {
-                        width: box.w
-                        height: box.w
-                        source: box.near ? cover.url : ""
-                        sourceSize: Qt.size(cover.pixels, cover.pixels)
-                        fillMode: Image.PreserveAspectCrop
-                        mirrorVertically: true
-                        asynchronous: true
-                    }
+                    property var source: picture
+                    property real ratio: root.reflection
+                    property real loaded: picture.status === Image.Ready ? 1 : 0
+                    // Recorte al centro si la carátula no es cuadrada (miniaturas de vídeo).
+                    readonly property real aspect: picture.implicitHeight > 0 ? picture.implicitWidth / picture.implicitHeight : 1
+                    property real cropX: Math.min(1, 1 / aspect)
+                    property real cropY: Math.min(1, aspect)
+                    property color base: Qt.darker(box.tint, 1.4)
+                    fragmentShader: "qrc:/qt/qml/app/musicplayer/shaders/reflejo.frag.qsb"
                 }
 
                 // Lomos reflejados: su color fundiéndose hacia abajo.
@@ -406,12 +385,24 @@ FocusScope {
                         thumb: box.near ? box.modelData.thumb : ""
                     }
 
+                    // La carátula a 226 px en todas las cajas cercanas y, encima, a 544 px solo en la
+                    // elegida y sus vecinas: las de los lados se ven como una franja estrecha y
+                    // pedirlas a 544 px costaba ~1,2 MB cada una. Mientras llega la grande, se ve la
+                    // pequeña.
                     Cover {
                         id: cover
                         anchors.fill: parent
                         thumb: box.modelData.thumb
-                        pixels: 544
+                        pixels: 226
                         load: box.near
+                    }
+                    Cover {
+                        anchors.fill: parent
+                        thumb: box.modelData.thumb
+                        pixels: 544
+                        load: box.near && box.u < 2.5
+                        visible: load
+                        placeholder: false
                     }
 
                     // Brillo del plástico: reflejo diagonal arriba a la izquierda.
@@ -452,7 +443,7 @@ FocusScope {
 
                     HoverHandler {
                         cursorShape: Qt.PointingHandCursor
-                        onHoveredChanged: if (hovered) Player.prefetchItem(JSON.stringify(box.modelData))
+                        onHoveredChanged: root.hinted(box.modelData, hovered)
                     }
 
                     TapHandler { onTapped: box.select() }

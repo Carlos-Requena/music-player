@@ -54,6 +54,8 @@ que toque **antes** de cambiar algo ahí. Una trampa nueva se añade en su secci
   mayor, el último píxel se repite por la derecha y por abajo (la carátula del panel salía
   «corrida»). Escálala con `fillTransform`, como `Cover.qml`. La captura sin ventana
   (`offscreen`) no pinta el relleno: compruébalo con ventana.
+- **Una `ListView` vertical pone cada delegado en x = 0** aunque el delegado diga otra `x`: el
+  margen va en `leftMargin` de la lista (el Muro salía pegado al borde).
 - **Letra en japonés o chino:** partir la línea por espacios deja una sola «palabra» enorme que se
   encoge en vez de pasar al renglón siguiente, y unir las sílabas con espacios separa los
   caracteres. Cada sílaba lleva `join` y los renglones se parten entre caracteres CJK (`rows` de

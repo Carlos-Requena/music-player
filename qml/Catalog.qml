@@ -5,6 +5,8 @@ import app.musicplayer
 // Datos que consume la interfaz: las secciones (JSON publicado por `Library`) y la
 // letra de la pista actual (JSON publicado por `Player`), ya convertidos a objetos.
 QtObject {
+    id: catalog
+
     readonly property var sections: [
         { id: "inicio", label: "Inicio" },
         { id: "explorar", label: "Explorar" },
@@ -58,18 +60,31 @@ QtObject {
     readonly property var lyricsSources: parse(Player.lyrics)
     // Fuente que se muestra: la elegida para esta canción (`origen:<videoId>`, pulsando el pie
     // de la letra), si no la preferida en Opciones (`letraOrigen`) y, si no, la mejor.
-    readonly property var lyricsChosen: {
-        void AppSettings.revision
+    //
+    // Se guarda y solo se sustituye si cambia la fuente: cada fuente que llega vuelve a publicar
+    // todas, y cada opción que cambia (el retraso de la letra, por ejemplo) sube
+    // `AppSettings.revision`; con un enlace, cada vez salía un objeto nuevo y la letra se
+    // reconstruía entera aunque fuera la misma.
+    property var lyricsChosen: null
+    function chooseLyrics() {
         const sources = lyricsSources
-        if (sources.length === 0)
-            return null
+        let best = sources.length ? sources[0] : null
         const wanted = [currentVideoId !== "" ? AppSettings.opcion("origen:" + currentVideoId) : "",
                         AppSettings.opcion("letraOrigen")]
-        for (const id of wanted)
+        search: for (const id of wanted)
             for (const source of sources)
-                if (id !== "" && source.id === id)
-                    return source
-        return sources[0]
+                if (id !== "" && source.id === id) {
+                    best = source
+                    break search
+                }
+        if (best === null || lyricsChosen === null || best.id !== lyricsChosen.id)
+            lyricsChosen = best
+    }
+    onLyricsSourcesChanged: chooseLyrics()
+    onCurrentVideoIdChanged: chooseLyrics()
+    readonly property Connections settingsWatch: Connections {
+        target: AppSettings
+        function onRevisionChanged() { catalog.chooseLyrics() }
     }
     // Líneas `{ t, text, w }` de la letra que se muestra; vacío si no hay letra sincronizada.
     readonly property var lyrics: lyricsChosen ? lyricsChosen.lines : []
@@ -96,9 +111,13 @@ QtObject {
     // Categorías de playlists (OST, Gym…): `[{ nombre, ids: [playlistId…] }]`. YouTube Music
     // no tiene carpetas, así que viven en las opciones locales (`categorias`). `categoria` es
     // la pestaña elegida; vacía = «Todas».
+    //
+    // Se analiza desde el texto guardado (`categoriasJson`) y no desde `AppSettings.revision`:
+    // una propiedad de texto solo avisa si cambia, y cualquier otra opción (el retraso de la letra,
+    // por ejemplo) ya no reconstruye la sección de Playlists.
+    readonly property string categoriasJson: { void AppSettings.revision; return AppSettings.opcion("categorias") }
     readonly property var categorias: {
-        void AppSettings.revision
-        const list = parse(AppSettings.opcion("categorias"))
+        const list = parse(categoriasJson)
         return Array.isArray(list) ? list : []
     }
     readonly property string categoria: {
@@ -209,6 +228,11 @@ QtObject {
         }))
     }
 
+    // Los elementos de todas las zonas, seguidos (las vistas de uno en uno: Lomos y Cubeta).
+    function allItems(zonas) {
+        return [].concat(...zonas.map(zona => zona.items))
+    }
+
     function zonas(section) {
         switch (section) {
         case "explorar": return explorar
@@ -254,14 +278,5 @@ QtObject {
         for (let i = 0; i < lyrics.length && lyrics[i].t <= position; ++i)
             current = i
         return lyrics.length ? Math.max(0, current) : -1
-    }
-
-    // Fracción cantada (0–1) de la línea `line` en `position`.
-    function lineProgress(line, position) {
-        if (line < 0 || line >= lyrics.length)
-            return 0
-        const start = lyrics[line].t
-        const end = line + 1 < lyrics.length ? lyrics[line + 1].t : start + 6
-        return Math.max(0, Math.min(1, (position - start) / (end - start)))
     }
 }

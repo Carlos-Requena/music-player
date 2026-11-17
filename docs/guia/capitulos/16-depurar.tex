@@ -1,5 +1,205 @@
 \chapter{Depurar}
+\label{cap:depurar}
 
-\begin{trampa}[Capítulo pendiente]
-Este capítulo aún no está escrito. Mientras tanto, la información equivalente está en \archivo{docs/INDEX.md} (las fichas de \archivo{docs/areas/}) y \archivo{docs/ARCHITECTURE.md}.
+Cuando algo no funciona, la pregunta útil es \emph{en qué capa está el fallo}: ¿YouTube, el
+núcleo de Rust, el puente, la interfaz o un proceso auxiliar? Este capítulo da un método para
+acotarlo y las herramientas del proyecto para hacerlo sin tocar tus datos ni molestar a YouTube.
+
+\section{Antes de nada: aislar las pruebas}
+
+Todo lo que ejecutes para depurar debe llevar estas dos cosas. Están en las normas del
+proyecto porque ya hubo sustos:
+
+\begin{terminal}
+export PRUEBA="$(mktemp -d)"          # un HOME de pruebas, vacío
+HOME="$PRUEBA" MUSICPLAYER_SILENT=1 ./target/release/musicplayer ...
+\end{terminal}
+
+\begin{itemize}
+  \item \cod{HOME=$PRUEBA} aísla las preferencias, la caché y \emph{la sesión de YouTube} de
+  la persona que usa la app. Sin él, una prueba puede cerrar su sesión o machacar sus ajustes.
+  \item \cod{MUSICPLAYER_SILENT=1} hace que mpv reproduzca sin sonido (\cod{--ao=null}).
+  \item Para probar con una opción puesta, escribe un \cod{settings.json} dentro del \cod{HOME}
+  de pruebas (\cod{$PRUEBA/Library/Application Support/musicplayer/} en macOS,
+  \cod{$PRUEBA/.config/musicplayer/} en Linux).
+  \item \textbf{No importes las cookies del navegador} en una prueba: el camino con sesión se
+  prueba con un \cod{cookies.txt} falso.
+\end{itemize}
+
+\section{Un método en cuatro preguntas}
+
+\begin{enumerate}
+  \item \textbf{¿Compila?} Si no, el error de \cod{cargo build} casi siempre trae la solución
+  (capítulo~\ref{cap:rust}, «Leer los errores del compilador»).
+  \item \textbf{¿Qué dice la terminal?} QML escribe sus errores en stderr con el formato
+  \cod{qrc:/qt/qml/app/musicplayer/qml/Archivo.qml:123: mensaje}. Rust, lo que hayas pedido con
+  \cod{eprintln!}. Una ventana vacía o a medias casi siempre es un error de QML ahí.
+  \item \textbf{¿Es la red o es la interfaz?} Una sonda \cod{--probe} (sin ventana) lo aísla:
+  si la sonda devuelve bien los datos, el fallo está \emph{después} (puente o QML); si no,
+  \emph{antes} (YouTube o el parseo).
+  \item \textbf{¿Es nuestro o es de fuera?} Compara con \cod{yt-dlp} o con la web. Si ellos
+  también fallan, no es el código.
+\end{enumerate}
+
+\section{Síntomas frecuentes}
+
+\begin{center}
+\small
+\begin{longtable}{@{}p{0.34\linewidth}p{0.6\linewidth}@{}}
+\toprule
+Síntoma & Qué mirar \\
+\midrule
+\endhead
+No compila (Rust) & El error completo de \texttt{cargo build}; suele traer la solución. Si dice «Unsupported verbatim input», un cuerpo está dentro de \cod{extern "RustQt"} \\
+No compila (QML no encuentra un tipo) & Falta registrarlo en \texttt{build.rs} (\texttt{QML\_FILES}) \\
+La ventana sale vacía o falta algo & La terminal: QML escribe ahí sus errores \\
+Un componente entero no carga & Un \texttt{font.pixelSize} decimal, o una propiedad llamada \texttt{palette} \\
+Una opción no cambia hasta reiniciar & Falta \texttt{void AppSettings.revision} delante de la lectura \\
+Algo de la red no llega & Una sonda \texttt{--probe}: aísla si es YouTube o la interfaz \\
+Una canción no suena & \texttt{--probe fast ID}, \texttt{--probe playable ID} y las líneas del resolvedor en stderr \\
+«Inicia sesión» en una canción pública & \texttt{--probe fast ID}: la vía rápida la rechazó y no hay sesión \\
+Un clic «atraviesa» a lo de debajo & \texttt{gesturePolicy: TapHandler.ReleaseWithinBounds} \\
+Arrastrar dentro de una lista la desplaza & Un \texttt{MouseArea} con \texttt{preventStealing: true} \\
+Un icono desaparece al volver de minimizar & Falta recrearlo con \texttt{Theme.renderEpoch} \\
+La CPU sube con la letra & Un gestor por elemento (\texttt{HoverHandler}); mide con CPU acumulada \\
+Lo escuchado no aparece en el historial & Las líneas \texttt{historial:} de la terminal \\
+«Guardar en una playlist» falla & La línea \texttt{guardar en \dots} de la terminal; solo funciona con playlists propias y con sesión \\
+La app no encuentra mpv o yt-dlp (macOS) & Las apps gráficas no heredan el \texttt{PATH}: \texttt{audio::search\_path} \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+\section{Herramientas}
+
+\subsection{Imprimir}
+
+\begin{description}[style=nextline, leftmargin=0pt]
+  \item[En QML] \cod{console.log("valor", algo)} escribe en la terminal. Para un objeto,
+  \cod{JSON.stringify(algo)}.
+  \item[En Rust] \cod{eprintln!("valor: {algo:?}")}; \cod{{:?}} imprime casi cualquier tipo.
+  Si es un error de red, deja un \emph{prefijo reconocible} (\cod{historial:}, \cod{guardar
+  en ...}), como pide la norma, para poder filtrarlo.
+\end{description}
+
+\subsection{Las sondas sin ventana}
+
+\begin{terminal}
+./target/release/musicplayer --probe fast ID1,ID2     # ¿la vía rápida da audio?
+./target/release/musicplayer --probe resolve ID1,ID2  # tiempos de resolución
+./target/release/musicplayer --probe play ID          # arranque aislado (con SILENT)
+./target/release/musicplayer --probe lyrics "Idol" "YOASOBI"
+./target/release/musicplayer --probe account          # ¿YouTube reconoce la sesión?
+\end{terminal}
+
+La lista completa está en el capítulo~\ref{cap:herramientas}. Son la primera herramienta
+para cualquier problema de red.
+
+\subsection{Capturas y clics}
+
+\begin{terminal}
+HOME="$PRUEBA" MUSICPLAYER_SILENT=1 ./target/release/musicplayer \
+  --shot "$PRUEBA/c.png" --delay 20000 --section albumes --index 5 \
+  --autoplay --autoplay-delay 6000
+\end{terminal}
+
+La última línea de stdout es \cod{estado: ...}: dice si suena y si hay error. Si la captura
+sale vacía, \emph{sube el \cod{--delay}} antes de concluir nada: la red tarda. Para menús y
+gestos, \cod{MUSICPLAYER_DEBUG_CLICK} (capítulo~\ref{cap:nativo}).
+
+\begin{trampa}[Cosas que no son fallos de la app]
+\begin{itemize}
+  \item Inicio cambia de una ejecución a otra: compara capturas de Álbumes o de una búsqueda
+  fija.
+  \item YouTube rechaza la IP tras muchas pruebas seguidas.
+  \item El modo \cod{offscreen} y el renderizador por software no pintan igual el desenfoque
+  ni el relleno de \cod{ShapePath.fillItem}: lo visual se comprueba con ventana.
+\end{itemize}
 \end{trampa}
+
+\subsection{Variables de entorno}
+
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{@{}lX@{}}
+\toprule
+Variable & Efecto \\
+\midrule
+\texttt{MUSICPLAYER\_SILENT=1} & mpv sin sonido \\
+\texttt{MUSICPLAYER\_DEBUG\_AUDIO=archivo} & mpv reproduce ese archivo local en vez de cada pista \\
+\texttt{MUSICPLAYER\_DEBUG\_CLICK="x,y,boton,ms;\dots"} & Clics, arrastres y rueda simulados \\
+\texttt{MUSICPLAYER\_YTDLP\_CLIENTS=web\_music,\dots} & Fuerza los clientes de yt-dlp \\
+\texttt{MUSICPLAYER\_LOGIN\_URL=url} & Cambia la página inicial de la ventana de sesión (macOS) \\
+\texttt{MUSICPLAYER\_DISCORD\_ID} & Al \emph{compilar}: el Application ID de Discord que se incluye \\
+\texttt{HTTPS\_PROXY}, \texttt{HTTP\_PROXY} & Proxy para Rust y para Qt \\
+\texttt{QT\_QPA\_PLATFORM=offscreen} & Sin ventana (el vidrio cambia) \\
+\texttt{QT\_LOGGING\_RULES="qt.qml.*=true"} & Más mensajes de Qt, para casos raros \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\subsection{Espiar a mpv}
+
+mpv escribe sus errores y los de su gancho de yt-dlp en stderr con el prefijo \cod{mpv[...]}.
+Si necesitas ver la conversación completa por el socket, la ruta está en
+\cod{/tmp} o en el directorio temporal, con el nombre \cod{musicplayer-mpv-<pid>.sock};
+con una herramienta como \cod{socat} puedes hacer una consulta a mano, por ejemplo:
+
+\begin{terminal}
+echo '{"command": ["get_property", "time-pos"]}' | socat - /tmp/musicplayer-mpv-1234.sock
+\end{terminal}
+
+\section{Cuando YouTube dice que no}
+
+Es el fallo más desconcertante porque el código no ha cambiado y de pronto «no funciona».
+Síntomas: 403, «Requested format is not available», «Sign in to confirm you're not a bot»,
+\cod{LOGIN_REQUIRED}.
+
+\begin{enumerate}
+  \item \textbf{Para.} Cada ejecución de prueba hace peticiones reales; seguir insistiendo
+  empeora el rechazo.
+  \item \textbf{Espera unos minutos} y comprueba con \cod{yt-dlp} directamente:
+\begin{terminal}
+yt-dlp -F "https://music.youtube.com/watch?v=ID"
+\end{terminal}
+  \item Si \cod{yt-dlp} también falla, no es el código: actualiza yt-dlp o espera.
+  \item Si \cod{yt-dlp} funciona y la app no, \cod{--probe fast ID} dice por qué falla la
+  vía rápida y \cod{--probe playable ID} qué dice YouTube Music de esa pista.
+  \item Algunas pistas (muchos «Art Tracks» de sellos japoneses) YouTube solo las da con
+  sesión: ni la web de YouTube Music las reproduce sin ella. No es un fallo.
+\end{enumerate}
+
+\section{Procesos que se quedan vivos}
+
+Al terminar una sesión de pruebas, comprueba que no queda nada de lo que lanzaste:
+
+\begin{terminal}
+pgrep -fl "mpv --idle"
+pgrep -fl ytdlp_daemon
+\end{terminal}
+
+Cierra solo los tuyos: si la persona que usa la app la tiene abierta, sus procesos de mpv y
+yt-dlp son suyos. Si ves un mpv huérfano tras cerrar la app con \cod{kill}, algo ha ido mal con
+el cierre ordenado (\archivo{signals.cpp}).
+
+\section{Depurar el puente}
+
+Los fallos de cxx-qt son de dos clases:
+
+\begin{description}[style=nextline, leftmargin=0pt]
+  \item[Al compilar] Lo habitual es lo que ya está en las trampas: cuerpo dentro del bloque,
+  tipo sin importar, falta de \cod{impl cxx_qt::Threading}. Mira primero el \emph{primer}
+  error, no el último.
+  \item[En ejecución] Una propiedad que no cambia en QML: ¿llamaste a \cod{set_xxx} (que avisa
+  del cambio) o asignaste el campo directamente (que no avisa)? Una función que no existe en
+  QML: ¿el nombre en \cod{camelCase}? Un valor que llega vacío: ¿\cod{JSON.parse} falló y
+  \cod{Catalog.parse} lo devolvió como \cod{[]}? Imprime el texto crudo
+  (\cod{console.log(Library.inicio)}) y mira si es JSON válido.
+\end{description}
+
+\begin{ejercicio}
+Rompe algo a propósito y encuentra el síntoma: en \archivo{Catalog.qml} cambia
+\cod{parse(Library.inicio)} por \cod{parse(Library.explorar)} y arranca con \cod{--shot}.
+¿Qué ves? Después quita \cod{void AppSettings.revision} de alguna lectura de \archivo{Theme.qml}
+y comprueba que cambiar la opción ya no tiene efecto hasta reiniciar. Deshaz los cambios con
+\cod{git checkout}.
+\end{ejercicio}

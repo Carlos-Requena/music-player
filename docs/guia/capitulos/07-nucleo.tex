@@ -1,5 +1,707 @@
 \chapter{El núcleo en Rust, archivo por archivo}
+\label{cap:nucleo}
 
-\begin{trampa}[Capítulo pendiente]
-Este capítulo aún no está escrito. Mientras tanto, la información equivalente está en \archivo{docs/INDEX.md} (las fichas de \archivo{docs/areas/}) y \archivo{docs/ARCHITECTURE.md}.
+Este capítulo recorre \archivo{src/} pieza por pieza, en el orden en que conviene leerla: de lo
+que no depende de nada (el cliente de YouTube Music) a lo que lo junta todo (\cod{Player}). En
+cada archivo verás qué problema resuelve, sus tipos y funciones principales, el fragmento que
+mejor lo explica y qué hay que tener en cuenta antes de tocarlo.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[x=1cm,y=1cm, every node/.style={font=\sffamily\small}]
+  \node[caja, fill=acento!8] (player) at (5.6,4.6) {player.rs};
+  \node[caja] (library) at (0.2,2.4) {library.rs};
+  \node[caja] (resolver) at (2.6,2.4) {resolver.rs};
+  \node[caja] (audio) at (5.0,2.4) {audio.rs};
+  \node[caja] (lyrics) at (7.2,2.4) {lyrics.rs};
+  \node[caja] (history) at (9.4,2.4) {history.rs};
+  \node[caja] (plugins) at (11.6,2.4) {plugins.rs};
+  \node[caja] (ytm) at (0.2,0) {ytm.rs};
+  \node[caja] (stream) at (2.6,0) {stream.rs};
+  \node[caja] (daemon) at (5.0,0) {daemon.rs};
+  \node[caja] (account) at (7.8,0) {account.rs};
+  \foreach \a in {library,resolver,audio,lyrics,history,plugins}
+    \draw[flecha] (player.south) -- (\a.north);
+  \draw[flecha] (library) -- (ytm);
+  \draw[flecha] (resolver) -- (stream);
+  \draw[flecha] (resolver) -- (daemon);
+  \draw[flecha] (history) -- (account);
+  \draw[flecha] (ytm) -- (account);
+\end{tikzpicture}
+\caption{Quién usa a quién en el núcleo (una flecha significa «llama a»). \cod{Player} está
+arriba del todo: casi todo lo demás son piezas que él orquesta.}
+\end{figure}
+
+\begin{idea}[El mismo molde en cinco archivos]
+\archivo{player.rs}, \archivo{library.rs}, \archivo{account.rs}, \archivo{settings.rs} y
+\archivo{plugins.rs} son los cinco puentes (capítulo~\ref{cap:puente}): un bloque
+\cod{#[cxx_qt::bridge]} con propiedades y funciones, un \cod{struct} con los datos y un
+\cod{impl qobject::Nombre} con los cuerpos. El resto de archivos son Rust corriente, sin QML
+a la vista, y por eso se pueden probar con \cod{cargo test} y con las sondas.
+\end{idea}
+
+%% ------------------------------------------------------------------------------------------
+\section{\texttt{main.rs}: el arranque}
+
+\archivo{src/main.rs} es corto (unas 220 líneas) y hace cuatro cosas, en este orden:
+
+\begin{enumerate}
+  \item \textbf{Declara los módulos} (\cod{mod account; mod audio; ...}). Si añades un archivo
+  \archivo{.rs}, hay que añadir su \cod{mod} aquí (\archivo{docs.py} lo comprueba).
+  \item \textbf{\cod{--login <archivo>}}: si el primer argumento lo pide, el proceso no arranca
+  Qt: llama a \cod{musicplayer_login} (Objective-C++, capítulo~\ref{cap:nativo}), abre la
+  ventana de inicio de sesión y sale. Es el mismo ejecutable, usado como programa auxiliar.
+  \item \textbf{\cod{--probe}}: la función \cod{probe} consulta la red e imprime el resultado sin
+  abrir ventana (capítulo~\ref{cap:herramientas}). Aquí se añade una sonda nueva.
+  \item \textbf{Arranque normal}: registra el módulo QML (\cod{init_qml_module!}), crea la
+  \cod{QGuiApplication}, instala el cierre ordenado por señales y la configuración de red, carga
+  \archivo{Main.qml} desde los recursos del binario y entra en el bucle de eventos.
+\end{enumerate}
+
+\begin{rust}
+cxx_qt::init_crate!(musicplayer);
+cxx_qt::init_qml_module!("app.musicplayer");
+
+let mut app = QGuiApplication::new();
+unsafe { musicplayer_handle_signals() };     // SIGTERM/SIGINT: cierre ordenado (signals.cpp)
+unsafe { musicplayer_configure_network() };  // proxy y red de Qt (window.cpp)
+let mut engine = QQmlApplicationEngine::new();
+engine.load(&QUrl::from("qrc:/qt/qml/app/musicplayer/qml/Main.qml"));
+unsafe { musicplayer_tune_windows() };       // memoria gráfica de ventanas ocultas
+app.exec();
+\end{rust}
+
+Los cinco singletons \emph{no se crean aquí}: QML los instancia la primera vez que alguien
+nombra \cod{Player}, \cod{Library}, etc. Lo que hace \cod{Default::default()} de cada uno
+(leer ajustes, cargar la sesión) ocurre en ese momento.
+
+%% ------------------------------------------------------------------------------------------
+\section{\texttt{ytm.rs}: el cliente de YouTube Music}
+
+\archivo{src/ytm.rs} (700 líneas) habla con la API interna de YouTube Music, llamada
+\emph{InnerTube}. No es una API pública: es la que usa la propia web, así que no tiene
+documentación y cambia sin avisar. Todo el archivo está escrito con esa fragilidad en mente.
+
+\subsection{Los tipos}
+
+\begin{rust}
+pub struct Item { title, subtitle, thumb, kind, video_id, browse_id, playlist_id }
+pub struct Zone { titulo: String, items: Vec<Item> }
+pub struct Track { title, artist, thumb, video_id, duration: f64 }
+\end{rust}
+
+\begin{itemize}
+  \item \cod{Item} es una «tarjeta» de las que ves en las estanterías. \cod{kind} es
+  \cod{"song"}, \cod{"album"}, \cod{"playlist"} o \cod{"artist"}. Una canción lleva
+  \cod{video_id}; un álbum, \cod{browse_id} y \cod{playlist_id}.
+  \item \cod{Zone} es una fila con título («Selecciones rápidas», «Novedades»\dots).
+  \item \cod{Track} es una pista de la cola: lo mínimo para reproducirla.
+\end{itemize}
+
+Los tres llevan \cod{#[serde(rename_all = "camelCase")]}: en JSON (y por tanto en QML) los
+campos se llaman \cod{videoId}, \cod{browseId}\dots
+
+\subsection{Una sola puerta: \texttt{post}}
+
+Toda petición pasa por \cod{post(endpoint, body)}: añade el contexto del cliente
+(\cod{WEB_REMIX}, la versión, el idioma) y, si hay sesión, las cabeceras \cod{Cookie} y
+\cod{Authorization} que firma \cod{account::with_session}. Por eso \emph{el mismo código}
+sirve para el usuario anónimo y para el que ha iniciado sesión: con sesión, YouTube devuelve
+su biblioteca en las mismas páginas.
+
+\subsection{Leer árboles enormes: \texttt{find} y \texttt{find\_all}}
+
+Las respuestas son JSON con docenas de niveles. En vez de fijar rutas como
+\cod{contents.singleColumnBrowseResultsRenderer.tabs[0]...} (que se rompen en cuanto
+YouTube mueve algo), el código \emph{busca por nombre} el nodo que le interesa:
+
+\begin{rust}
+fn find<'a>(value: &'a Value, key: &str) -> Option<&'a Value> { /* recorre en profundidad */ }
+fn find_all<'a>(value: &'a Value, key: &str, out: &mut Vec<&'a Value>) { /* todos los nodos */ }
+\end{rust}
+
+Con eso, \cod{item(entry)} convierte un \cod{musicTwoRowItemRenderer} o un
+\cod{musicResponsiveListItemRenderer} en un \cod{Item}, y \cod{zones(root)} reúne las filas de
+una página. Si un día YouTube cambia el nombre de un renderer, solo hay que tocar ahí.
+
+\subsection{Cuatro peticiones a la vez}
+
+\cod{search} no hace cuatro peticiones una detrás de otra: lanza \emph{cuatro hilos} dentro de
+un \cod{std::thread::scope}, que garantiza que todos terminan antes de salir del bloque (y por
+eso los hilos pueden tomar prestado \cod{query} sin copiarlo). La búsqueda tarda lo que la más
+lenta, no la suma: de 1,7 s a 0,5 s.
+
+\subsection{Las funciones públicas}
+
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{@{}lX@{}}
+\toprule
+Función & Qué devuelve \\
+\midrule
+\texttt{browse(id)} & Las zonas de una página: \texttt{FEmusic\_home}, \texttt{FEmusic\_explore}\dots \\
+\texttt{mood\_playlists(n)} & Playlists por estado de ánimo (sonda \texttt{playlists}) \\
+\texttt{search(texto)} & Cuatro listas a la vez: canciones, álbumes, artistas y playlists \\
+\texttt{library\_playlists()}, \texttt{library\_albums()}, \texttt{liked\_songs()} & Biblioteca del usuario (necesitan sesión) \\
+\texttt{detail(item)} & Cabecera y canciones de un álbum, playlist o artista \\
+\texttt{playlist\_tracks(id)} & Todas las canciones de una lista, con continuaciones \\
+\texttt{queue(video\_id, playlist\_id)} & La «radio» de una canción (cola \texttt{next}) \\
+\texttt{like}, \texttt{remove\_like}, \texttt{add\_to\_playlist} & Escritura en la cuenta \\
+\texttt{set\_playlist\_cover(id, bytes)} & Sube una portada propia a una playlist \\
+\texttt{playability(id)}, \texttt{tracking\_urls(id)} & Diagnóstico y avisos de escucha \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\begin{porque}[¿Por qué las canciones de un álbum salen de \texttt{VL<id>}?]
+La cola \cod{next} parecía lo natural, pero mezcla cada canción con su versión en vídeo, se
+corta en unas 50 y a veces añade canciones ajenas. La página de la lista (\cod{VL} + id) trae
+solo la lista, en su orden. Es la ADR-06 (capítulo~\ref{cap:decisiones}).
+\end{porque}
+
+\begin{trampa}
+\cod{ytm::http()} devuelve un único \cod{ureq::Agent} compartido (\cod{LazyLock}), que reutiliza
+conexiones. No crees agentes nuevos por petición: cada conexión TLS cuesta tiempo y memoria.
 \end{trampa}
+
+%% ------------------------------------------------------------------------------------------
+\section{\texttt{stream.rs}: la vía rápida del audio}
+
+Para reproducir una canción hace falta la \emph{URL directa del audio} (un enlace de
+\cod{googlevideo.com} que caduca). \archivo{src/stream.rs} la pide a la API \cod{/player} de
+YouTube haciéndose pasar por el cliente de visionOS, que devuelve URLs ya listas, sin el
+descifrado de JavaScript que exigen otros clientes. Tarda unos 0,3 s.
+
+Piezas:
+
+\begin{itemize}
+  \item \cod{visitor_data()}: YouTube pide un identificador de visitante para no exigir la
+  comprobación anti-bot. Se obtiene una vez (\cod{/visitor_id}) y se guarda en una variable
+  global (\cod{static VISITOR_DATA: LazyLock<Mutex<String>>}). Sin él, la respuesta es
+  \cod{LOGIN_REQUIRED}.
+  \item \cod{best_audio(player)}: entre los formatos de la respuesta, elige por
+  \cod{AUDIO_ITAGS} (251, 140, 250, 249, 139: Opus y AAC, por orden de preferencia).
+  \item \cod{refused(error)}: reconoce que YouTube ha rechazado la pista (necesita sesión).
+  \item \cod{resolve(video_id)}: la función pública. Devuelve la URL o un texto de error.
+\end{itemize}
+
+Tiene su prueba (\cod{elige_el_mejor_audio_disponible}) porque es la pieza que más
+probabilidades tiene de romperse cuando YouTube cambie algo.
+
+%% ------------------------------------------------------------------------------------------
+\section{\texttt{resolver.rs}: elegir el camino, guardar y precargar}
+
+\archivo{src/resolver.rs} responde a una pregunta: \emph{«dame la URL de esta canción lo antes
+posible»}. Decide el camino, guarda el resultado y adelanta trabajo.
+
+\subsection{Los caminos}
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[node distance=6mm and 10mm, every node/.style={font=\sffamily\small}]
+  \node[caja] (req) {\cod{resolve(id)}};
+  \node[caja, right=of req] (cache) {¿en caché y vigente?};
+  \node[caja, right=of cache, minimum width=2.6cm] (fast) {vía rápida\\\footnotesize stream.rs, 0,3 s};
+  \node[caja, below=of fast, minimum width=2.6cm] (dae) {yt-dlp residente\\\footnotesize 2,2--2,5 s};
+  \node[caja, below=of dae, minimum width=2.6cm] (proc) {yt-dlp en proceso\\\footnotesize 3,5--4,2 s};
+  \node[externo, left=of proc] (hook) {gancho de yt-dlp de mpv\\\footnotesize último recurso};
+  \draw[flecha] (req) -- (cache);
+  \draw[flecha] (cache) -- node[etiqueta,above]{no} (fast);
+  \draw[flecha] (fast) -- node[etiqueta,right]{falla} (dae);
+  \draw[flecha] (dae) -- node[etiqueta,right]{no hay} (proc);
+  \draw[flecha] (proc) -- node[etiqueta,above]{falla} (hook);
+  \draw[flecha, draw=acento] (cache.north) to[bend left=40] node[etiqueta,above]{sí: al instante} +(0,1.0) -| (req.north);
+\end{tikzpicture}
+\caption{Cascada de \cod{resolver::fast_or_ytdlp}. El gancho de mpv no está en el resolvedor:
+lo usa \cod{Player} si \cod{resolve} devuelve error.}
+\end{figure}
+
+La función \cod{fast_or_ytdlp} implementa la cascada y tiene dos desvíos que conviene
+conocer:
+
+\begin{itemize}
+  \item \textbf{Modo Premium} (\cod{set_premium}): los 256 kbps solo llegan por yt-dlp con
+  la sesión, así que se salta la vía rápida.
+  \item \textbf{Pistas que exigen cuenta}: si la vía rápida rechaza una pista y hay sesión, se
+  apunta en \cod{NEEDS_ACCOUNT} y la próxima vez va directa a yt-dlp. Sin sesión, la función
+  devuelve el error especial \cod{NEEDS_SESSION}, y \cod{Player} lo traduce a «Inicia sesión
+  en Opciones».
+\end{itemize}
+
+\subsection{La caché y su sincronización}
+
+El estado es un \cod{Mutex} más una \cod{Condvar} en una variable global:
+
+\begin{rust}
+enum Entry { Pending, Ready { url: String, until: u64 } }
+struct State { entries: HashMap<String, Entry>, workers: usize }
+static STATE: LazyLock<(Mutex<State>, Condvar)> = ...;
+\end{rust}
+
+\cod{resolve_with} hace lo siguiente. Si hay una URL \cod{Ready} vigente, la devuelve. Si hay
+una \cod{Pending} (otro hilo la está resolviendo, por ejemplo una precarga), \emph{espera en la
+\cod{Condvar}} a que termine en vez de empezar otra. Si no, marca \cod{Pending}, resuelve,
+guarda \cod{Ready} y despierta a todos con \cod{notify_all}. Esto evita pedir dos veces la
+misma pista cuando haces clic justo mientras se precargaba.
+
+La vigencia sale de la propia URL: \cod{valid_until} lee su parámetro \cod{expire=} y resta
+diez minutos de margen (\cod{EXPIRY_MARGIN}).
+
+\subsection{Precarga: \texttt{hint} y \texttt{prefetch}}
+
+\begin{description}[style=nextline, leftmargin=0pt]
+  \item[\cod{prefetch(id)}] Resuelve ya, en un hilo, si no está hecho. Para listas cortas y
+  seguras: las tres pistas siguientes de la cola, las primeras de un álbum abierto.
+  \item[\cod{hint(id)}] Para cosas que cambian muy deprisa (el foco recorriendo carátulas, el
+  ratón). Guarda \emph{solo el último} identificador pedido y un único hilo lo atiende: si
+  recorres veinte carátulas, se resuelve donde te detienes, no las veinte.
+\end{description}
+
+Los resolvedores de precarga son \emph{educados}: \cod{MAX_WORKERS = 2} limita cuántos
+trabajan a la vez, y no reintentan si fallan (si YouTube está rechazando, insistir empeora el
+rechazo). El clic, que es \cod{urgent}, no espera a las precargas y sí reintenta una vez.
+
+\subsection{El prefijo \texttt{lavf://}}
+
+\cod{run_ytdlp} añade \cod{lavf://} a las URL que vienen de yt-dlp. mpv usaría su cliente
+HTTP para ellas y recibiría un 403; con \cod{lavf://} las lee ffmpeg. Al revés, las de la vía
+rápida se atascan con ffmpeg y van tal cual. Es una de las trampas del capítulo~\ref{cap:trampas}.
+
+%% ------------------------------------------------------------------------------------------
+\section{\texttt{daemon.rs} y \texttt{ytdlp\_daemon.py}: yt-dlp residente}
+
+Lanzar yt-dlp para cada canción cuesta ~0,7 s solo en arrancar Python. \archivo{src/daemon.rs}
+mantiene \emph{un} proceso de Python con yt-dlp ya cargado y le manda peticiones.
+
+\begin{itemize}
+  \item \cod{spawn}: busca el intérprete leyendo la línea \cod{#!} del script de \cod{yt-dlp}
+  y arranca \archivo{ytdlp\_daemon.py}, que va \emph{incluido en el binario}
+  (\cod{include_str!}) y se pasa por argumento.
+  \item El protocolo es una línea de JSON por mensaje: \cod{{"id": "..."}} hacia el script,
+  \cod{{"id": "...", "url": "..."}} o \cod{{"id": "...", "error": "..."}} de vuelta.
+  \item \cod{WAITERS} asocia cada identificador con los hilos que esperan su respuesta (un
+  \cod{mpsc::Sender} por cada uno).
+  \item \cod{resolve(id)} devuelve \cod{None} si no se puede usar el residente (yt-dlp es un
+  binario autónomo, está desactivado en Opciones o no arranca): entonces el resolvedor cae a un
+  proceso por petición.
+\end{itemize}
+
+El script de Python usa un \cod{ThreadPoolExecutor} de dos hilos (una instancia de
+\cod{YoutubeDL} por hilo, porque no es seguro compartirla) y un \emph{vigilante} que se
+cierra con \cod{os._exit(0)} tras 60 s sin peticiones. Mientras vive ocupa unos 120 MB, y por
+eso se apaga solo.
+
+%% ------------------------------------------------------------------------------------------
+\section{\texttt{audio.rs}: hablar con mpv}
+
+\archivo{src/audio.rs} (unas 290 líneas) encapsula el proceso de mpv. El resto del programa
+solo conoce dos cosas: el \cod{struct Mpv} (con funciones \cod{load}, \cod{set_pause},
+\cod{seek}, \cod{set_loop_file} y \cod{set_volume}) y el \cod{enum Event}.
+
+\subsection{Arrancar mpv}
+
+\cod{Mpv::spawn(on_event)} lanza \cod{mpv --idle=yes --no-video} con un buen número de
+opciones para que gaste poco: sin scripts de interfaz, \cod{--no-config} y una caché de
+demuxer de 16~MiB. Escucha por un \emph{socket Unix} (\cod{--input-ipc-server=ruta}), cuyo
+nombre incluye el PID del programa. Con \cod{MUSICPLAYER_SILENT} añade \cod{--ao=null}: reproduce
+sin sonido, para las pruebas.
+
+Después se conecta al socket (reintentando hasta 5 s mientras mpv arranca), lanza un hilo
+lector (\cod{read_events}) y le pide a mpv que \emph{observe} cinco propiedades
+(\cod{observe_property}): \cod{time-pos}, \cod{duration}, \cod{pause}, \cod{audio-codec-name}
+y \cod{audio-bitrate}.
+
+\subsection{El protocolo}
+
+El IPC de mpv es JSON, una línea por mensaje:
+
+\begin{codigo}
+-> {"command": ["loadfile", "https://...", "replace"]}
+<- {"event": "property-change", "name": "time-pos", "data": 12.4}
+<- {"event": "playback-restart"}
+<- {"event": "end-file", "reason": "eof"}
+\end{codigo}
+
+\cod{read_events} traduce esos mensajes al \cod{enum Event} \cod{{Position, Duration, Paused,
+Codec, Bitrate, Started, Ended, Failed}} y llama a la función \cod{on_event} que dio quien
+creó el \cod{Mpv}. Tres detalles de este hilo:
+
+\begin{itemize}
+  \item mpv informa de \cod{time-pos} muchas veces por segundo; solo se reenvía si cambió
+  $\ge 0{,}1$ s. Sin este filtro la interfaz recalcularía cientos de enlaces por segundo.
+  \item \cod{audio-bitrate} varía en cada instante (VBR): solo se reenvía si cambia $\ge 8$~kbps.
+  \item \cod{end-file} se distingue por su motivo: \cod{eof} es \emph{terminó la canción},
+  \cod{error} es \emph{falló}, y \cod{stop} o \cod{redirect} se ignoran (ocurren al cambiar de
+  pista).
+\end{itemize}
+
+\subsection{Cerrar mpv}
+
+\cod{impl Drop for Mpv} mata el proceso hijo y borra el socket. Como Rust llama a \cod{drop}
+cuando el valor sale de su ámbito, basta con que \cod{Player} destruya su \cod{Option<Mpv>}
+para que mpv desaparezca. Que \emph{siempre} llegue a ocurrir (incluso con \cod{kill} o
+Ctrl+C) es el trabajo de \archivo{signals.cpp} (capítulo~\ref{cap:nativo}).
+
+%% ------------------------------------------------------------------------------------------
+\section{\texttt{player.rs}: el director de orquesta}
+
+Es el archivo más grande (1\,225 líneas) y el centro del programa. Su ficha es
+\archivo{docs/areas/reproduccion.md}. Para no perderse, léelo por bloques.
+
+\subsection{Qué publica}
+
+Las propiedades que ve QML (todas de solo lectura desde QML; se cambian con funciones):
+
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{@{}llX@{}}
+\toprule
+Propiedad & Tipo & Contenido \\
+\midrule
+\texttt{playing}, \texttt{loading} & bool & ¿suena?, ¿está arrancando una pista? \\
+\texttt{position}, \texttt{duration} & f64 & segundos \\
+\texttt{title}, \texttt{artist}, \texttt{thumb} & QString & lo que suena \\
+\texttt{index} & i32 & posición en la cola \\
+\texttt{queue} & QString & la cola, en JSON \\
+\texttt{lyrics} & QString & las letras encontradas, en JSON (capítulo~\ref{cap:datos}) \\
+\texttt{error} & QString & mensaje corto en español, vacío si no hay \\
+\texttt{volume}, \texttt{calidad} & f64, QString & volumen; «opus 160 kbps» y similares \\
+\texttt{repetir}, \texttt{repetir\_una} & bool & modos de repetición \\
+\texttt{temporal} & QString & la lista temporal, en JSON \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+Y las funciones invocables: \cod{play_item}, \cod{play_tracks}, \cod{play_index},
+\cod{toggle}, \cod{next}, \cod{previous}, \cod{seek}, \cod{enqueue}, \cod{move_in_queue},
+\cod{remove_from_queue}, \cod{shuffle_queue}, \cod{cycle_repeat}, las de la lista temporal
+y \cod{prefetch_item} / \cod{prefetch_tracks} (la precarga que dispara la interfaz).
+
+\subsection{Los contadores que descartan lo obsoleto}
+
+\cod{PlayerRust} lleva tres contadores \cod{u64}, cada uno para un tipo de trabajo:
+
+\begin{description}[style=nextline, leftmargin=0pt]
+  \item[\cod{request}] Cambia con cada \cod{play_item}. Protege la cola que llega de la red:
+  si pulsas otra canción antes de que llegue, la respuesta vieja no la pisa.
+  \item[\cod{load_token}] Cambia con cada \cod{load}. Protege la URL resuelta: si saltas de
+  pista mientras se resuelve la anterior, su URL se ignora.
+  \item[\cod{lyrics_token}] Cambia con cada petición de letra (y al limpiarla).
+\end{description}
+
+\subsection{El camino de una pista: \texttt{play\_item}, \texttt{load}, \texttt{on\_event}}
+
+\textbf{\cod{play_item(json)}.} Convierte el JSON de la tarjeta en \cod{Item}. Si es una
+\emph{canción}, crea una cola de una sola pista y llama a \cod{load(0)} \emph{ya}: la música
+empieza antes de saber qué viene después. En otro hilo pide la radio (\cod{ytm::queue}) y, al
+llegar, \cod{adopt_queue} la instala sin interrumpir lo que suena. Si es un \emph{álbum o
+playlist}, pide su cola (\cod{album_queue}) y arranca por la primera pista.
+
+\textbf{\cod{load(index)}.} Publica el título, el artista y la carátula (la interfaz cambia
+al instante), sube \cod{load_token}, y busca la URL: primero en la caché del resolvedor
+(inmediato) y, si no está, en un hilo (\cod{resolver::resolve}). Cuando llega, comprueba que el
+\cod{load_token} siga siendo el mismo y llama a \cod{start_stream}, que manda la URL a mpv.
+Si la resolución falla, \cod{start_stream(None, ...)} carga la página de YouTube y deja que
+el gancho de yt-dlp de mpv haga el trabajo.
+
+\textbf{\cod{on_event(evento)}.} Es donde mpv avisa de lo que pasa. Las ramas importantes:
+
+\begin{itemize}
+  \item \cod{Started}: la pista ya suena. Se quita \cod{loading}, se anuncia a los plugins
+  (\cod{announce}), se empieza a registrar la escucha (\cod{begin_listen}) y se precarga la
+  siguiente (\cod{prefetch_next}). Aquí se imprime «arranque de pista: N ms», la medida que
+  usamos para saber si «clic y que suene» se cumple.
+  \item \cod{Position}: se publica la posición, se avisa a los plugins y se cuenta lo escuchado.
+  \item \cod{Paused}: mpv solo avisa de la pausa \emph{cuando cambia}; por eso se guarda
+  (\cod{mpv_paused}) y se reaplica en \cod{Started}.
+  \item \cod{Ended}: pasa a la siguiente (\cod{advance}), o repite, o se detiene.
+  \item \cod{Failed}: cascada de reintentos. Se olvida la URL guardada; si la carga era por URL
+  directa, se prueba con el gancho de mpv; si no, se reintenta \emph{una} vez (\cod{retried});
+  y si vuelve a fallar, «No se pudo reproducir esta pista».
+\end{itemize}
+
+El motor se crea \emph{perezosamente}: \cod{ensure_engine} arranca mpv la primera vez que
+hace falta, y \cod{warm_up} lo adelanta al arrancar la app para que el primer clic no pague
+el arranque de mpv.
+
+\subsection{Lo que cuelga del reproductor}
+
+\begin{description}[style=nextline, leftmargin=0pt]
+  \item[Letra (\cod{fetch_lyrics})] Lanza \emph{un hilo por fuente} (LRCLIB, NetEase, Kugou).
+  Cada uno, al terminar, encola su resultado; \cod{Player} lo añade a \cod{lyrics_found},
+  reordena con \cod{lyrics::rank} y publica \emph{todas} las letras en la propiedad
+  \cod{lyrics}. La primera que llega aparece sin esperar a las otras.
+  \item[Escuchas (\cod{begin_listen}, \cod{track_listen}, \cod{flush_listen},
+  \cod{end_listen})] Registran en YouTube Music lo que realmente se oyó. Se envía un tramo
+  cada 30 s, al pausar, al saltar a otro punto y al cambiar de pista. Todo en hilos: un fallo
+  solo escribe en stderr.
+  \item[Plugins (\cod{announce}, \cod{plugins::emit})] Avisos de pista nueva, posición,
+  pausa y parada. El \emph{trabajo} lo hace otro hilo (sección~\ref{sec:plugins}).
+  \item[Controles del sistema (\cod{apply_media_controls}, \cod{publish_media})] La
+  biblioteca \cod{souvlaki} conecta con el Centro de control de macOS y MPRIS en Linux:
+  teclas multimedia y «Ahora suena». Viven en este archivo porque en macOS \emph{deben} ir en
+  el hilo principal.
+  \item[Lista temporal] Una segunda lista (\cod{temporal_tracks}) para «tocar esto después»;
+  no se mezcla con la cola.
+  \item[Colas de álbumes] \cod{QUEUES} guarda las últimas 24 listas descargadas, con la misma
+  técnica que la caché de URLs (\cod{Mutex} + \cod{Condvar}). \cod{hint_list} precarga la
+  primera pista de un álbum cuando el ratón se detiene sobre él.
+\end{description}
+
+\begin{trampa}
+Un método con \cod{Pin<&mut Self>} que \emph{consume} el \cod{self} (como \cod{load}) debe
+ser la última llamada de su bloque o recibir \cod{self.as_mut()}. Es el error de compilador
+más frecuente al editar este archivo (capítulo~\ref{cap:puente}).
+\end{trampa}
+
+%% ------------------------------------------------------------------------------------------
+\section{\texttt{history.rs}: contar las escuchas en la cuenta}
+
+Si pides el audio de una pista, YouTube \emph{no} la cuenta como escuchada. Cuenta lo que
+envía el reproductor de la web mientras suena: un aviso al empezar y avisos con los tramos
+oídos. \archivo{src/history.rs} los imita.
+
+\begin{itemize}
+  \item \cod{start(video_id)} pide \cod{/player} con la sesión, saca las direcciones
+  \cod{videostatsPlaybackUrl} y \cod{videostatsWatchtimeUrl} y envía el primer aviso. Devuelve
+  un \cod{Report} con lo necesario para los siguientes.
+  \item \cod{watched(report, desde, hasta)} envía el tramo oído.
+  \item Todos los avisos llevan \cod{c=WEB_REMIX}: sin eso la escucha se apunta en el
+  historial de YouTube, no en el de YouTube Music.
+  \item \cod{is_youtube(url)} impide firmar con las cookies cualquier dirección que no sea de
+  YouTube (un servidor ajeno nunca recibe la sesión).
+\end{itemize}
+
+Se puede desactivar en Opciones (\cod{set_enabled}). Es la ADR-12.
+
+%% ------------------------------------------------------------------------------------------
+\section{\texttt{library.rs}: el catálogo}
+
+\cod{Library} publica, como JSON, cada sección (\cod{inicio}, \cod{explorar}, \cod{playlists},
+\cod{albumes}, \cod{megusta}), la búsqueda (\cod{busqueda}) y el detalle abierto
+(\cod{detalle}), más \cod{loading}, \cod{searching} y \cod{error}.
+
+\subsection{\texttt{load}: pintar lo guardado y luego lo nuevo}
+
+\cod{load()} declara un array de cinco secciones, cada una con \emph{qué pedir} (una clausura)
+y \emph{dónde publicarlo} (otra). Después:
+
+\begin{enumerate}
+  \item Lee de disco la copia de cada sección (\cod{cache::read}) y la publica \emph{ya}. Por
+  eso la ventana tiene contenido a los 300 ms (ADR-09).
+  \item En un hilo, pide cada sección a YouTube. Al llegar, la escribe en disco
+  (\cod{cache::write}) y la encola al hilo de Qt, que la publica si el contador
+  \cod{load_generation} sigue siendo el mismo.
+  \item Si una sección falla, se queda la copia guardada y se publica el error.
+\end{enumerate}
+
+\begin{rust}
+let sections: [(&str, fn() -> ytm::Result<Vec<Zone>>, Setter); 5] = [
+    ("inicio",   || ytm::browse("FEmusic_home"),    |library, json| library.set_inicio(json)),
+    ("explorar", || ytm::browse("FEmusic_explore"), |library, json| library.set_explorar(json)),
+    // ... albumes, playlists, megusta
+];
+\end{rust}
+
+\subsection{El resto}
+
+\begin{itemize}
+  \item \cod{to_json} recorta cada zona a 60 elementos (\cod{ZONE_LIMIT}).
+  \item \cod{open_detail(item)} / \cod{close_detail()}: abre un álbum, playlist o artista;
+  protegido por \cod{detail_request}.
+  \item \cod{search(texto)}: una petición con contador \cod{search_request}.
+  \item \cod{like}, \cod{add_to_playlist}, \cod{set_playlist_cover}: escriben en la
+  cuenta y devuelven su resultado por una \emph{señal} (\cod{gustado}, \cod{guardado},
+  \cod{portada_lista}) con un mensaje corto y si fue error. La interfaz lo muestra como aviso.
+  \item El módulo \cod{cache} guarda en \cod{<caché>/musicplayer/} un archivo por sección y
+  por ámbito (\cod{anonimo-} o \cod{cuenta-}). Al cerrar sesión se borran los de la cuenta.
+\end{itemize}
+
+%% ------------------------------------------------------------------------------------------
+\section{\texttt{lyrics.rs}: letras de varias fuentes}
+
+Tres fuentes, todas sin cuenta:
+
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{@{}llX@{}}
+\toprule
+Fuente & Formato & Particularidades \\
+\midrule
+LRCLIB & LRC (línea a línea; a veces palabra a palabra) & Abierta; poco anime \\
+NetEase Cloud Music & YRC (tiempo por sílaba) & Mucho anime, J-pop y C-pop \\
+Kugou & KRC (por sílaba, cifrado) & \cod{decrypt_krc} quita el prefijo \cod{krc1}, aplica un XOR con una clave fija de 16 bytes y descomprime con zlib \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\subsection{Del texto a \texttt{Line} y \texttt{Word}}
+
+\begin{rust}
+pub struct Line { pub t: f64, pub text: String, pub w: Vec<Word> }
+pub struct Word { pub t: f64, pub d: f64, pub text: String, pub join: bool }
+\end{rust}
+
+Cada fuente se parsea (\cod{parse} para LRC, \cod{parse_timed} para YRC y KRC) a esta forma
+común. \cod{Line.t} es el instante de inicio; \cod{w}, si existe, el de cada palabra o sílaba;
+\cod{join} marca que va pegada a la siguiente (sílabas de una palabra, o japonés y chino, que
+no separan palabras).
+
+\subsection{Encontrar la letra correcta}
+
+Buscar «título y artista» en un servicio devuelve varios candidatos. \cod{best} elige el que
+mejor encaja comparando nombres normalizados (\cod{norm}, \cod{similar}) y, sobre todo, la
+\emph{duración}: se descarta lo que difiera más de 3 s (\cod{MAX_DELTA}). \cod{clean_title} y
+\cod{clean_artist} quitan lo que YouTube añade («(Official Video)», «feat.», «Topic»\dots).
+
+\cod{finish} da los últimos retoques: las líneas vacías son pausas instrumentales, una intro
+larga (\cod{INTRO_GAP}) se marca con una pausa, y \cod{without_credits} quita las primeras
+líneas que solo son créditos («Letra: \dots», «Música: \dots»).
+
+\cod{rank} ordena las letras encontradas de mejor a peor: duración que encaja, tiempos por
+palabra y, a igualdad, la fuente. Tiene pruebas para cada formato, porque es todo parseo de datos
+ajenos.
+
+%% ------------------------------------------------------------------------------------------
+\section{\texttt{account.rs}: la sesión}
+
+\cod{Account} publica \cod{signed_in}, \cod{busy}, \cod{name}, \cod{message}, \cod{browser},
+\cod{web_login} y \cod{needs_disk_access}, con las funciones \cod{sign_in_web},
+\cod{sign_in} (importar del navegador), \cod{verify} y \cod{sign_out}.
+
+\subsection{Qué es «tener sesión»}
+
+Un archivo de cookies en formato Netscape (\cod{cookies.txt}) con permisos 600. De él se
+extrae \cod{Session}:
+
+\begin{rust}
+pub struct Session { cookie: String, sapisid: String }
+impl Session {
+    pub fn headers(&self) -> (String, String) { /* Cookie y Authorization: SAPISIDHASH */ }
+}
+static SESSION: LazyLock<RwLock<Option<Session>>> = ...;
+\end{rust}
+
+La cabecera \cod{Authorization: SAPISIDHASH {t}_{sha1(t sapisid origen)}} es la «firma» que
+la web de Google exige a cada petición con sesión. \cod{with_session(|s| ...)} presta la
+sesión a quien la necesite (\cod{ytm::post} la usa). Es un \cod{RwLock}: muchos lectores a la
+vez, un escritor cuando se inicia o cierra sesión.
+
+\subsection{Dos caminos para conseguir las cookies}
+
+\begin{description}[style=nextline, leftmargin=0pt]
+  \item[Ventana propia (\cod{sign_in_web})] Lanza un proceso aparte (en macOS, el mismo
+  ejecutable con \cod{--login}; en Linux, \cod{musicplayer-login}) con un archivo temporal
+  como argumento. La ventana escribe ahí las cookies de youtube.com. Cuando el proceso termina,
+  \cod{login_web} las lee, se queda con las de YouTube (\cod{youtube_lines}) y las guarda
+  (\cod{store}). Código de salida 1 = el usuario cerró la ventana (\cod{CANCELLED}).
+  \item[Importar del navegador (\cod{sign_in})] Ejecuta \cod{yt-dlp --cookies-from-browser}
+  y recoge el resultado. En macOS exige «Acceso total al disco»
+  (\cod{needs_disk_access}).
+\end{description}
+
+\begin{trampa}
+yt-dlp \emph{reescribe} el archivo que se le da con \cod{--cookies}. Nunca le pases el original:
+\cod{cookies_copy(etiqueta)} hace una copia propia para cada uso, y \cod{clean_copies} las
+borra.
+\end{trampa}
+
+El cierre de sesión (\cod{forget}) olvida la sesión en memoria, borra el archivo de cookies,
+las copias que se dieron a yt-dlp y mpv y las secciones guardadas de la cuenta.
+
+%% ------------------------------------------------------------------------------------------
+\section{\texttt{settings.rs}: preferencias, skins y mascotas}
+
+\cod{AppSettings} expone: \cod{vista(seccion)} y \cod{set_vista}; \cod{opcion(clave)} y
+\cod{set_opcion}; la skin activa (\cod{skin_data}, JSON) y la lista de skins; la mascota
+(\cod{mascota_data}) y su lista; y las carpetas de skins y mascotas. Además \cod{revision}, un
+entero que sube con cada cambio.
+
+\subsection{Opciones genéricas y \texttt{revision}}
+
+Las opciones de disposición son un \emph{mapa de texto a texto}
+(\cod{BTreeMap<String, String>}). Una opción nueva \emph{no} necesita tocar Rust: basta una
+fila en \archivo{SettingsSheet.qml}. Vacío significa «valor por defecto». Es la ADR-11.
+
+La contrapartida: como cualquier opción puede cambiar, QML necesita un modo de enterarse. Cada
+\cod{set_opcion} sube \cod{revision}, y los enlaces escriben \cod{void AppSettings.revision}
+antes de leer la opción:
+
+\begin{qml}
+readonly property bool blur: { void AppSettings.revision; return AppSettings.opcion("desenfoque") !== "no" }
+\end{qml}
+
+\subsection{Guardar sin bloquear ni corromper}
+
+\cod{write_settings} no escribe en el hilo de Qt. Deja el texto en una variable global
+(\cod{PENDING}, un \cod{Mutex}) y, si no hay un hilo escritor activo, lanza uno que escribe
+\emph{lo último} que haya. Si cambias un deslizador cien veces, se escribe una o dos. La
+escritura es atómica (\cod{write_atomic}: se escribe un temporal y se renombra), así que un
+corte de luz no deja el archivo a medias.
+
+\subsection{Skins y mascotas}
+
+Las skins incluidas se compilan dentro del binario (\cod{include_str!} sobre
+\archivo{skins/*.json}); las del usuario se leen de \cod{<config>/musicplayer/skins/}, como
+archivo \cod{<id>.json} o como carpeta con \cod{skin.json} e imágenes. Una skin del usuario con
+el mismo id que una incluida la sustituye. Solo se acepta un JSON con \cod{nombre} y
+\cod{colores}; si no, se ignora y se avisa por stderr. A las de carpeta se les añade la clave
+\cod{carpeta} (una URL \cod{file://}) para que QML resuelva las imágenes con ruta relativa. Las
+mascotas funcionan igual, y exigen la pose \cod{reposo}.
+
+%% ------------------------------------------------------------------------------------------
+\section{\texttt{plugins.rs}, \texttt{discord.rs} y \texttt{lastfm.rs}}
+\label{sec:plugins}
+
+Tres integraciones opcionales: controles multimedia del sistema, Discord y Last.fm.
+
+\subsection{Un hilo que reparte eventos}
+
+\cod{Player} no llama a Discord ni a Last.fm: llama a \cod{plugins::emit(Event)}, que mete el
+evento en un canal (\cod{mpsc::Sender}) y vuelve al instante. Un hilo propio, \cod{worker},
+recibe los eventos en bucle (\cod{for event in events}) y los reparte:
+
+\begin{rust}
+pub enum Event { Track(Track), Playing(bool, f64), Position(f64), Stopped, Reload }
+\end{rust}
+
+Como Discord y Last.fm hacen red, si se llamaran desde \cod{Player} una Discord lenta frenaría
+la interfaz. El \cod{worker} comunica su estado («Conectado a Discord», «Scrobble enviado»)
+volviendo al hilo de Qt con \cod{qt.queue}. Es la ADR-15.
+
+\subsection{Discord}
+
+\archivo{discord.rs} implementa a mano el protocolo IPC local de Discord, sin dependencias: un
+socket Unix y mensajes con cabecera de 8 bytes (\cod{opcode} y longitud, ambos \cod{u32} little
+endian) más JSON. \cod{frame} y \cod{read_frame} codifican y decodifican; \cod{connect} hace
+el \emph{handshake}; \cod{set_activity} manda lo que se ve en el perfil. Su prueba arranca un
+Discord \emph{simulado} en un socket temporal.
+
+\subsection{Last.fm}
+
+\archivo{lastfm.rs} firma cada llamada: \cod{sign} ordena los parámetros, los concatena con el
+secreto y calcula el MD5, como pide la API 2.0. \cod{begin_auth} y \cod{finish_auth} hacen la
+autorización en dos pasos (el usuario aprueba en su navegador). \cod{Scrobbler} lleva la
+cuenta: «escuchando ahora» al empezar y, con \cod{should_scrobble}, el \emph{scrobble} cuando
+la pista dura más de 30 s y se oyó la mitad o 4 minutos.
+
+La configuración, incluidos el secreto y la sesión de Last.fm, va en \cod{plugins.json} con
+permisos 600.
+
+%% ------------------------------------------------------------------------------------------
+\section{El crate \texttt{login/}}
+
+\archivo{login/} es un segundo paquete de Cargo con su propio binario,
+\cod{musicplayer-login}, para Linux. Su \archivo{src/main.rs} es mínimo: lee un argumento (la
+ruta del archivo de cookies o \cod{--check}) y llama a una función de C++
+(\cod{musicplayer_login_linux}) que abre una ventana con Qt WebEngine
+(capítulo~\ref{cap:nativo}). Si el sistema no tiene \cod{qt6-webengine}, \cod{--check} sale con
+código 3 y la app ofrece solo la importación desde el navegador. Está aparte para que el
+reproductor \emph{nunca} cargue un motor web (ADR-07).
+
+\begin{ejercicio}[Para comprobar que lo has entendido]
+Abre \archivo{src/resolver.rs} y responde sin ejecutar nada: ¿qué pasa si haces clic en una
+pista mientras la precarga de esa misma pista sigue en marcha? Pista: busca \cod{Entry::Pending}
+y la \cod{Condvar}. Después compruébalo con
+\cod{--probe resolve id1,id2} (capítulo~\ref{cap:herramientas}).
+\end{ejercicio}

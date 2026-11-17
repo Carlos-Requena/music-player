@@ -33,7 +33,7 @@ fn call(method: &str, mut params: BTreeMap<String, String>, key: &str, secret: &
     params.insert("api_sig".into(), signature);
     params.insert("format".into(), "json".into());
     let form: Vec<(&str, &str)> = params.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
-    let mut response = ureq::post(API)
+    let mut response = crate::ytm::http().post(API)
         .header("User-Agent", "musicplayer/0.1")
         .config()
         .http_status_as_error(false)

@@ -1,5 +1,233 @@
 \chapter{Ejercicios}
+\label{cap:ejercicios}
 
-\begin{trampa}[Capítulo pendiente]
-Este capítulo aún no está escrito. Mientras tanto, la información equivalente está en \archivo{docs/INDEX.md} (las fichas de \archivo{docs/areas/}) y \archivo{docs/ARCHITECTURE.md}.
-\end{trampa}
+Una guía se aprende haciendo. Estos ejercicios están ordenados de menos a más y tocan, cada
+uno, una parte distinta del proyecto. Para todos:
+
+\begin{itemize}
+  \item Crea una rama (\cod{git switch -c practica/ejercicio-N}) y trabaja en ella; los
+  ejercicios son para tirar.
+  \item Usa siempre un \cod{HOME} temporal y \cod{MUSICPLAYER_SILENT=1}
+  (capítulo~\ref{cap:depurar}).
+  \item Si te atascas, busca en el proyecto algo que ya haga algo parecido: casi todo tiene un
+  vecino que puedes imitar. Al final del capítulo hay pistas para cada uno, y después soluciones
+  resumidas.
+\end{itemize}
+
+\section{Nivel 1: solo QML}
+
+\begin{ejercicio}[1.1 Tiempo que falta]
+En la barra de reproducción (\archivo{PlayerBar.qml}) muestra el tiempo que \emph{falta}
+(\cod{-1:23}) en vez de la duración total. Haz la prueba con una captura.
+\end{ejercicio}
+
+\begin{ejercicio}[1.2 Hacerlo una opción]
+Convierte lo anterior en una opción de Opciones («Tiempo restante», sí o no). Sigue la receta
+de la capítulo~\ref{cap:recetas}. Comprueba que \cod{docs.py check} te exige documentarla en la
+ficha del área.
+\end{ejercicio}
+
+\begin{ejercicio}[1.3 Un color nuevo]
+Añade a las skins un color \cod{tiempo} para ese texto. Pon un valor distinto en la skin Neón.
+Haz capturas con dos skins.
+\end{ejercicio}
+
+\section{Nivel 2: Rust sin puente}
+
+\begin{ejercicio}[2.1 Una sonda]
+Añade la sonda \cod{--probe artist NOMBRE}, que busque y muestre solo el primer artista
+(título y \cod{browseId}). Úsala sin abrir ninguna ventana.
+\end{ejercicio}
+
+\begin{ejercicio}[2.2 Una prueba]
+Escribe una prueba para \cod{seconds("3:27")} en \archivo{ytm.rs}: debe dar 207. Añade
+también \cod{"1:02:03"} (3\,723) y la cadena vacía (0). Ejecuta
+\cod{cargo test --release}.
+\end{ejercicio}
+
+\begin{ejercicio}[2.3 Un parseador]
+En \archivo{lyrics.rs}, la función \cod{parse} lee el formato LRC. Escribe una prueba para una
+línea con \emph{dos} marcas de tiempo (\cod{[00:10.00][01:30.00]Estribillo}): debe producir dos
+líneas, una en el segundo 10 y otra en el 90.
+\end{ejercicio}
+
+\section{Nivel 3: el puente}
+
+\begin{ejercicio}[3.1 Una propiedad]
+Añade a \cod{Player} la propiedad \cod{restantes} (cuántas canciones quedan en la cola) y
+muéstrala en la pestaña Cola. Sigue la receta de la capítulo~\ref{cap:recetas}.
+\end{ejercicio}
+
+\begin{ejercicio}[3.2 Una función invocable]
+Añade a \cod{Player} una función \cod{limpiar_cola()} que deje solo la pista actual. Llámala
+desde una entrada nueva del menú contextual. ¿Qué pasa con \cod{index}? ¿Y con la precarga?
+\end{ejercicio}
+
+\begin{ejercicio}[3.3 Un singleton nuevo]
+Crea un puente \cod{Notas} con una propiedad de texto y una función \cod{guardar}, que escriba
+el texto en un archivo dentro de \cod{<config>/musicplayer/}. Regístralo en \archivo{build.rs}
+y \archivo{main.rs}. Cuida lo siguiente: escribir en disco no debe bloquear el hilo de Qt.
+\end{ejercicio}
+
+\section{Nivel 4: hilos y red}
+
+\begin{ejercicio}[4.1 Letra a demanda]
+Añade a \cod{Library} una función que pida la letra de una canción cualquiera
+(\cod{lyrics::fetch}) en otro hilo y la publique en una propiedad. Sigue el patrón de
+\cod{search} de \archivo{library.rs}, \emph{con su contador} para descartar respuestas viejas.
+¿Qué ocurre sin el contador si llamas dos veces seguidas?
+\end{ejercicio}
+
+\begin{ejercicio}[4.2 Medir una petición]
+Mide, con tiempos reales, cuánto tarda \cod{ytm::browse("FEmusic_home")} (con
+\cod{std::time::Instant} en una sonda nueva). Repítelo cinco veces: ¿qué dispersión hay?
+\end{ejercicio}
+
+\section{Nivel 5: la interfaz a fondo}
+
+\begin{ejercicio}[5.1 Mover al final]
+Añade «Mover al final» a las canciones de la cola en el menú de clic derecho (receta de
+la capítulo~\ref{cap:recetas}). Pruébalo con \cod{MUSICPLAYER_DEBUG_CLICK} haciendo clic
+derecho en una fila.
+\end{ejercicio}
+
+\begin{ejercicio}[5.2 Teclado en la cola]
+En \archivo{QueueList.qml}, haz que las filas se puedan enfocar con Tab y que \texttt{Alt+$\uparrow$} y
+\texttt{Alt+$\downarrow$} las muevan con \cod{Player.moveInQueue}. Respeta la norma: foco visible.
+\end{ejercicio}
+
+\begin{ejercicio}[5.3 Una skin completa]
+Crea una skin en carpeta (\cod{skin.json} más una imagen de fondo con \cod{fondoOpacidad} y
+\cod{fondoVelo}) en tu carpeta de skins, y elígela en Opciones. Haz una captura de Inicio, otra de
+«Sonando» y otra de Opciones. ¿Se lee el texto sobre la imagen?
+\end{ejercicio}
+
+\begin{ejercicio}[5.4 Una mascota]
+Crea una mascota con tres poses (\cod{reposo}, \cod{sonando}, \cod{clic}) y comprueba que
+\cod{megusta} usa \cod{clic} al no existir. ¿Cuál es la cadena de sustitución completa para
+\cod{playlist}?
+\end{ejercicio}
+
+\section{Nivel 6: rendimiento y diseño}
+
+\begin{ejercicio}[6.1 Medir tu cambio]
+Elige uno de los ejercicios anteriores que añada algo visible y mide su coste en CPU y memoria
+con el método del capítulo~\ref{cap:rendimiento}: dos pasadas antes y dos después, en release,
+con \cod{MUSICPLAYER_DEBUG_AUDIO}. Escribe la entrada de «Medidas» como si fuera a una ficha.
+\end{ejercicio}
+
+\begin{ejercicio}[6.2 Una animación que se detenga]
+Añade un indicador que pulse (un círculo que cambia de opacidad) junto al título cuando suena
+una canción. Debe \emph{pararse} en pausa, con la ventana oculta y con la opción
+«Desenfoque» desactivada. Mide su coste. ¿Compensa un \cod{Timer} a 10 Hz frente a una
+\cod{NumberAnimation}?
+\end{ejercicio}
+
+\begin{ejercicio}[6.3 Proponer alternativas]
+La norma dice que el diseño visual se propone con \emph{dos a cuatro alternativas} con su
+contrapartida. Propón tres formas de mostrar el tiempo restante (ejercicio 1.1): una
+simple, una que cambie al pulsar y una que se anime. Escribe, para cada una, qué cuesta en
+memoria, CPU y complejidad.
+\end{ejercicio}
+
+\begin{ejercicio}[6.4 Una ADR]
+Escribe una ADR (\archivo{docs/runbooks/registrar-decision.md}) para una decisión ficticia:
+«El tiempo restante se calcula en Rust y no en QML». Rellena \emph{alternativas descartadas} y
+\emph{consecuencias} con argumentos reales. Ejecuta \cod{python3 scripts/docs.py check}.
+\end{ejercicio}
+
+\section{Pistas}
+
+\begin{description}[style=nextline, leftmargin=0pt]
+  \item[1.1] \cod{Theme.mmss(Player.duration - Player.position)}, en la línea que muestra la
+  duración. Cuidado con que la duración puede ser 0 al arrancar.
+  \item[2.1] Copia el caso \cod{"search"} de \cod{probe} en \archivo{main.rs}. Las zonas
+  tienen título; busca la que se llame «Artistas» y toma su primer \cod{Item}.
+  \item[2.2] \cod{seconds} es privada: la prueba va dentro de su propio archivo, en
+  \cod{mod tests} con \cod{use super::*}.
+  \item[3.1] Actualízala en \cod{set_tracks} y en \cod{load}; ¿y al quitar o mover pistas?
+  \item[3.3] Escribe en un hilo (\cod{thread::spawn}) y publica el resultado con
+  \cod{qt_thread().queue}. Usa \cod{write_atomic} de \archivo{settings.rs} como modelo.
+  \item[4.1] Busca \cod{search_request} en \archivo{library.rs}.
+  \item[5.2] \cod{activeFocusOnTab: true} y \cod{Keys.onPressed} mirando
+  \cod{event.modifiers & Qt.AltModifier}.
+  \item[6.2] Mira cómo \cod{Ambient.drifting} combina \cod{visible}, \cod{windowShown} y
+  \cod{Player.playing}.
+\end{description}
+
+\section{Soluciones resumidas}
+
+\subsection*{1.1}
+
+\begin{qml}
+Text {
+    text: "-" + Theme.mmss(Math.max(0, Player.duration - Player.position))
+}
+\end{qml}
+
+Solo cambia el texto; la duración es la misma propiedad que ya se leía.
+
+\subsection*{2.1}
+
+\begin{rust}
+"artist" => {
+    let zones = ytm::search(argument);
+    if let Ok(zones) = &zones {
+        let first = zones.iter().find(|z| z.titulo == "Artistas").and_then(|z| z.items.first());
+        match first {
+            Some(item) => println!("{} ({})", item.title, item.browse_id),
+            None => println!("sin artistas"),
+        }
+    }
+    return true;
+}
+\end{rust}
+
+\subsection*{2.2}
+
+\begin{rust}
+#[test]
+fn segundos_de_un_reloj() {
+    assert_eq!(seconds("3:27"), 207.0);
+    assert_eq!(seconds("1:02:03"), 3723.0);
+    assert_eq!(seconds(""), 0.0);
+}
+\end{rust}
+
+\subsection*{3.1}
+
+La propiedad se declara en el puente y se inicializa en \cod{Default}. Se actualiza en cada
+sitio donde cambian la cola o el índice: \cod{set_tracks}, \cod{load}, \cod{remove_from_queue}
+y \cod{move_in_queue} (aunque mover no cambia el total, sí el \emph{índice actual}). Si la
+calculas siempre en un único método auxiliar, no se te olvida ningún sitio.
+
+\subsection*{4.1}
+
+Un esbozo (los nombres de \cod{letra_request} y \cod{letra} son inventados; añádelos al puente):
+
+\begin{rust}
+fn letra_de(mut self: Pin<&mut Self>, titulo: &QString, artista: &QString) {
+    let request = self.letra_request + 1;
+    self.as_mut().rust_mut().letra_request = request;
+    let query = lyrics::Query::new(&titulo.to_string(), &artista.to_string(), 0.0);
+    let qt = self.qt_thread();
+    thread::spawn(move || {
+        let found = lyrics::fetch(lyrics::Source::Lrclib, &query);
+        let _ = qt.queue(move |mut library| {
+            if library.letra_request != request { return; }   // llegó tarde
+            let json = serde_json::to_string(&found.map(|f| f.lines)).unwrap_or_default();
+            library.as_mut().set_letra(QString::from(&json));
+        });
+    });
+}
+\end{rust}
+
+Sin el contador, la primera respuesta (más lenta) puede llegar después de la segunda y
+\emph{sobrescribirla} con una letra que ya no interesa.
+
+\subsection*{6.2}
+
+Con \cod{running: root.visible && Player.playing && Theme.blur && windowShown} en un
+\cod{Timer} (o en la animación). Con un \cod{Timer} a 10 Hz, el coste es casi nulo; con una
+\cod{NumberAnimation} a 60 Hz, cada fotograma redibuja la ventana y el vidrio desenfocado
+detrás de ella: es exactamente el caso de la deriva del ambiente.

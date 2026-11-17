@@ -5,6 +5,27 @@ son de cuando se escribieron. El estado actual está en su [ficha](../../areas/v
 
 Lo nuevo va arriba: añade una sección `## AAAA-MM-DD · qué se verificó` encima de las anteriores.
 
+## 2026-11-17 · Precarga al detenerse el puntero y fondo de skin en escalones (rama `perf/letra`)
+
+- **Cambio:** `hint` y `unhint`: el foco o el puntero precargan a los 250 ms, nada si el puntero
+  sale antes. El fondo de imagen de una skin se decodifica en escalones de 256 px. Las pestañas de
+  «Sonando» y del panel son `TabStrip`.
+- **Verificado:** capturas del panel (pestaña Cola) y de «Sonando» sin errores de QML.
+- **No verificado:** la precarga al pasar el ratón (sin audio real); una skin con fondo.
+
+## 2026-11-16 · Lo que tapa «Sonando» no se pinta (rama `perf/letra`)
+
+- **Cambio:** con «Sonando» arriba del todo (`NowPlayingView.covering`) se ocultan el escenario,
+  el panel lateral y el detalle; al bajar, la sección recupera el foco. El vidrio de la barra
+  desenfoca solo el ambiente de «Sonando» (`NowPlayingView.backdrop`, fuera de `sheet`). La letra
+  de «Sonando» y la del panel van en un `Loader`. Arnés: `--play ID [--play-title texto]` y
+  `MUSICPLAYER_DEBUG_AUDIO`.
+- **Verificado:** «Sonando» con el panel, Equilibrado: 6,0 s → 3,1–3,5 s de CPU en 25 s
+  ([letra](letra.md)); capturas de «Sonando» con la letra y de Opciones encima (el escenario
+  oculto se sigue viendo desenfocado detrás, como antes).
+- **No verificado:** que el teclado vuelva a la sección al cerrar «Sonando» (no hay forma de
+  simular teclas en las capturas); la subida y la bajada a la vista; Linux.
+
 ## 2026-11-16 · El menú contextual no deja pasar clics ni rueda; rueda simulada
 
 - **Cambio:** fuera del menú, un `TapHandler` con agarre exclusivo que lo cierra y un `MouseArea`

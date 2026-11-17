@@ -5,6 +5,27 @@ son de cuando se escribieron. El estado actual está en su [ficha](../../areas/r
 
 Lo nuevo va arriba: añade una sección `## AAAA-MM-DD · qué se verificó` encima de las anteriores.
 
+## 2026-11-17 · Colas con límite, mensajes de mpv sin árbol JSON (rama `perf/letra`)
+
+- **Cambio:** `album_queue` guarda las últimas 24 colas y no descarga dos veces la misma a la vez;
+  los mensajes de mpv se leen con `Message` (nombres prestados de la línea) y una línea que se
+  reutiliza; las ediciones de la cola no la copian (`mem::take`); `new_request` reúne el comienzo
+  de cada petición; fuera el alias `Mpv::load_stream`.
+- **Verificado:** prueba nueva de `Message` (posición, aviso con escapes, fin de pista, respuesta
+  sin evento); `--play` y un álbum de Lomos con audio local: `sonando true`.
+- **No verificado:** con el audio real de YouTube; reordenar, quitar y barajar la cola a la vista.
+
+## 2026-11-16 · Progreso en píxeles enteros y la letra una vez (rama `perf/letra`)
+
+- **Cambio:** `Slider` (y con él la barra de posición), la línea de la barra Compacta y la del
+  mini reproductor se dibujan en píxeles enteros. `Player` pide la letra de una canción pulsada al
+  llegar su cola (`defer_lyrics`), no dos veces. Depuración: `MUSICPLAYER_DEBUG_AUDIO`.
+- **Verificado:** con el panel en la pestaña Cola, 2,9 s → 0,3 s de CPU en 25 s; `--play` de una
+  canción (letra de 46 líneas, sin la búsqueda fallida a LRCLIB de antes) y `--autoplay` de un
+  álbum en Lomos con audio local: `sonando true`, sin `error`. Con YouTube real, el álbum pide
+  sesión (como antes de los cambios).
+- **No verificado:** el arranque con audio de YouTube; la barra Compacta y el mini a la vista.
+
 ## 2026-11-16 · La zona central de la barra Clásica ya no se mueve con el título
 
 - **Cambio:** la columna de botones y posición se centra con un margen fijo a los dos lados

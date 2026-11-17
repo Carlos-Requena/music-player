@@ -47,6 +47,14 @@ búsqueda y el detalle de un álbum, playlist o artista. Cómo se pinta cada sec
 - **Guardar sin duplicar:** `browse/edit_playlist` con `ACTION_ADD_VIDEO` y
   `DEDUPE_OPTION_CHECK` (si ya estaba, YouTube responde con un diálogo y no la duplica), o
   `ACTION_ADD_PLAYLIST` para una lista entera; después se olvida la cola guardada de esa lista.
+- **Un solo cliente HTTP para toda la app** (`ytm::http`): guarda unos segundos las conexiones y
+  las reutiliza (catálogo, vía rápida, letra, historial, Last.fm). `ureq::get` y `ureq::post`
+  crean uno de un solo uso y cada petición pagaba una conexión TLS nueva: no se usan.
+- **La búsqueda pide sus cuatro listas a la vez** (artistas, canciones, álbumes y playlists): tarda
+  lo que la más lenta.
+- **Lo que no cambia no se reconstruye en QML:** `Catalog.categorias` sale del texto guardado
+  (`categoriasJson`), no de `AppSettings.revision`, para que tocar otra opción no rehaga
+  Playlists. Lomos y Cubeta juntan las zonas con `Catalog.allItems`.
 
 ## Cómo funciona
 
@@ -60,6 +68,7 @@ búsqueda y el detalle de un álbum, playlist o artista. Cómo se pinta cada sec
 
 | Situación | Medida | Fecha y máquina |
 |---|---|---|
+| Búsqueda («Vetusta Morla», `--probe search`, cuatro listas a la vez) | 0,50–0,57 s | 2026-11-17, M4 Pro, release |
 | Canciones de una playlist de 500 pistas (`playlist_tracks`) | ~3 s | 2026-11-14, M4 Pro, release |
 | Sección visible al abrir, desde la caché | ~300 ms con carátulas | 2026-11-14, M4 Pro, release |
 
@@ -103,8 +112,7 @@ búsqueda y el detalle de un álbum, playlist o artista. Cómo se pinta cada sec
 
 ## Estado actual
 
-- **Última verificación:** sin registrar (la estructura de fichas es de 2026-11-15; lo anterior
-  está en el changelog).
+- **Última verificación:** 2026-11-17, cliente HTTP común y búsqueda en paralelo ([historial](../history/verificacion/catalogo.md)).
 - **Pruebas:** ninguna en `ytm.rs` ni `library.rs` (dependen de la red); se prueban con
   `--probe home|explore|albums|playlists|search|album|queue`.
 - **Sin verificar:** biblioteca con sesión en Linux; `like/like` y `like/removelike` con una

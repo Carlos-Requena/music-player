@@ -35,7 +35,12 @@ La pieza que hace que una pista suene al hacer clic. Lo que pasa después (mpv, 
 - **Prefijo según el origen:** las URLs de yt-dlp se cargan como `lavf://URL` y las de la vía
   rápida tal cual ([TRAMPAS](../TRAMPAS.md#youtube-yt-dlp-y-mpv)).
 - **Precarga solo de la última petición** (`hint`): recorrer veinte carátulas no lanza veinte
-  resoluciones ([ADR-05](../decisions/ADR-05-precarga-de-urls.md)).
+  resoluciones ([ADR-05](../decisions/ADR-05-precarga-de-urls.md)). Lo mismo con las listas de
+  álbumes y playlists (`hint_list`, en `player.rs`), que además se guardan como mucho 24 y no se
+  descargan dos veces a la vez.
+- **El clic no espera a las precargas:** `resolve` (lo que pide el usuario) no cuenta en el límite
+  de dos a la vez (`MAX_WORKERS`) y reintenta una vez si falla; una precarga no reintenta (si
+  YouTube está rechazando, insistir lo empeora).
 - **yt-dlp residente** ([ADR-08](../decisions/ADR-08-yt-dlp-residente.md)), desactivable (`ytdlp`).
 
 ## Cómo funciona
@@ -46,8 +51,7 @@ hasta 10 min antes de su `expire=`.
 
 | Disparador | Qué se resuelve | Dónde |
 |---|---|---|
-| El foco se detiene 250 ms en un elemento | Esa canción, o la primera pista del álbum o playlist (y su cola) | `Player.prefetchItem` → `hint` |
-| El ratón pasa por una carátula (Muro, Lomos) | Igual | Igual |
+| El foco o el puntero se detienen 250 ms en un elemento (Muro, Lomos; si el puntero sale antes, nada) | Esa canción, o la primera pista del álbum o playlist (y su cola) | `Main.hint` → `Player.prefetchItem` → `hint` o `hint_list` |
 | Empieza a sonar una pista | Las tres siguientes de la cola (con repetición, dando la vuelta) | `Player::prefetch_next` → `prefetch` |
 | Se abre un álbum o playlist | Sus seis primeras canciones | `DetailView` → `Player.prefetchTracks` |
 | Se carga una sección | Las cuatro primeras canciones sueltas de su primera fila | `SectionView` → `Player.prefetchTracks` |
@@ -98,12 +102,13 @@ La vía rápida sirve unas 9 de cada 10 pistas.
 - **[sesion](sesion.md)** (`account::cookies_copy`, `account::with_session`): cookies para yt-dlp
   y la vía con cuenta.
 - **[reproduccion](reproduccion.md)** (`audio::which`): encontrar `yt-dlp` en el `PATH` ampliado.
+- **[catalogo](catalogo.md)** (`ytm::http`): el cliente HTTP común para la vía rápida.
 - **La usan:** [reproduccion](reproduccion.md) (todas las cargas y precargas),
   [personalizacion](personalizacion.md) (las opciones `calidad` y `ytdlp`).
 
 ## Estado actual
 
-- **Última verificación:** sin registrar.
+- **Última verificación:** 2026-11-17, el clic no espera a las precargas ([historial](../history/verificacion/resolucion.md)).
 - **Pruebas:** `mod tests` de `src/stream.rs` (elección del mejor audio). El resto, con
   `--probe fast`, `--probe resolve` y `--probe playable` ([verificar-reproduccion](../runbooks/verificar-reproduccion.md)).
 - **Sin verificar:** Premium 256 kbps con una cuenta Premium real en Linux.

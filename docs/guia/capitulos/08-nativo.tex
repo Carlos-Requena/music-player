@@ -1,5 +1,287 @@
 \chapter{Código nativo: C++ y Objective-C++}
+\label{cap:nativo}
 
-\begin{trampa}[Capítulo pendiente]
-Este capítulo aún no está escrito. Mientras tanto, la información equivalente está en \archivo{docs/INDEX.md} (las fichas de \archivo{docs/areas/}) y \archivo{docs/ARCHITECTURE.md}.
+Casi todo el programa es Rust y QML. Pero hay cuatro cosas que ninguno de los dos puede hacer
+solo: tocar APIs de Qt que QML no expone, instalar un manejador de señales de Unix, abrir una
+ventana con WebKit de macOS y abrir otra con Qt WebEngine en Linux. Para eso hay unos
+cientos de líneas de C++ y de Objective-C++ (el C++ con la sintaxis de Objective-C que usa
+Apple). No hace falta dominarlos: este capítulo explica qué hace cada archivo, cómo se une a
+Rust y qué no hay que tocar.
+
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{@{}llX@{}}
+\toprule
+Archivo & Lenguaje & Para qué \\
+\midrule
+\archivo{src/window.cpp} & C++ (Qt) & Liberar la memoria gráfica de ventanas ocultas, red de Qt, clics simulados \\
+\archivo{src/signals.cpp} & C++ (Qt + POSIX) & Cerrar mpv ordenadamente con \texttt{kill}, Ctrl+C o al cerrar la terminal \\
+\archivo{src/login\_mac.mm} & Objective-C++ (Cocoa, WebKit) & Ventana de inicio de sesión en macOS \\
+\archivo{login/src/login\_linux.cpp} & C++ (Qt WebEngine) & Ventana de inicio de sesión en Linux (opcional) \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+%% ------------------------------------------------------------------------------------------
+\section{Cómo se une el C++ a Rust}
+
+Hay dos mecanismos, y los dos están en el capítulo~\ref{cap:puente}; aquí los vemos desde
+el lado nativo.
+
+\subsection{Funciones C con nombre fijo}
+
+Las funciones nativas de este proyecto no usan cxx-qt: son funciones C con un nombre
+planchado, sin sobrecarga ni clases. En C++ se declaran así:
+
+\begin{codigo}
+extern "C" void musicplayer_configure_network()
+{
+    QNetworkProxyFactory::setUseSystemConfiguration(false);
+    // ...
+}
+\end{codigo}
+
+y en Rust (\archivo{src/main.rs}) se declaran del otro lado y se llaman dentro de
+\cod{unsafe}:
+
+\begin{rust}
+extern "C" {
+    fn musicplayer_tune_windows();
+    fn musicplayer_configure_network();
+    fn musicplayer_handle_signals();
+}
+// ...
+unsafe { musicplayer_configure_network() };
+\end{rust}
+
+\cod{unsafe} aquí significa: «el compilador no puede comprobar lo que hace el C++, lo
+garantizo yo». Cada llamada lleva encima un comentario \cod{// SAFETY:} que explica por qué
+es seguro (por ejemplo, «se llama en el hilo de Qt, con la aplicación ya creada»).
+
+\subsection{Cómo se compilan}
+
+\archivo{build.rs} compila \archivo{window.cpp} y \archivo{signals.cpp} con cxx-qt-build
+(\cod{.cpp_file(...)}), que ya sabe dónde están las cabeceras de Qt. \archivo{login\_mac.mm}
+solo se compila en macOS, con la biblioteca \cod{cc}, y se enlaza con los \emph{frameworks}
+\cod{Cocoa} y \cod{WebKit}:
+
+\begin{rust}
+if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("macos") {
+    cc::Build::new().cpp(true).file("src/login_mac.mm")
+        .flag("-fobjc-arc").flag("-std=c++17").compile("musicplayer_login");
+    println!("cargo::rustc-link-lib=framework=Cocoa");
+    println!("cargo::rustc-link-lib=framework=WebKit");
+}
+\end{rust}
+
+\cod{-fobjc-arc} activa el conteo automático de referencias de Objective-C: no hay que
+escribir \cod{retain} ni \cod{release}.
+
+%% ------------------------------------------------------------------------------------------
+\section{\texttt{window.cpp}: lo que QML no deja hacer}
+
+Ofrece a Rust dos funciones (\cod{musicplayer_configure_network} y
+\cod{musicplayer_tune_windows}) y se apoya en unas auxiliares internas.
+
+\subsection{Liberar la memoria de una ventana oculta}
+
+El problema: el controlador gráfico de macOS reserva unos 100 MB para una ventana de Qt Quick
+que se redibuja, y \emph{no los suelta} aunque la minimices. \cod{tune(window)} hace dos cosas:
+
+\begin{codigo}
+window->setPersistentGraphics(false);
+window->setPersistentSceneGraph(false);
+QObject::connect(window, &QWindow::visibilityChanged, window, [window](QWindow::Visibility v) {
+    if (v == QWindow::Minimized || v == QWindow::Hidden)
+        window->releaseResources();
+});
+\end{codigo}
+
+La primera pareja le dice a Qt que no conserve el grafo de escena ni los recursos gráficos
+cuando la ventana deja de mostrarse. La conexión llama a \cod{releaseResources()} al
+minimizar u ocultar. Al volver a mostrar la ventana, Qt lo recrea todo en unos milisegundos.
+
+Esto es lo que hace útil al mini reproductor: al abrirlo, la ventana grande se \emph{oculta} y
+la memoria pasa de 213 a 148 MB (ADR-10). Es también la causa de la trampa de los iconos
+(\cod{Theme.renderEpoch}, capítulo~\ref{cap:trampas}): lo que se libera hay que repintarlo.
+
+\cod{musicplayer_tune_windows()} recorre las ventanas abiertas y aplica \cod{tune} a las de
+Qt Quick que aún no lo tengan (lo marca con una propiedad dinámica, \cod{musicplayerTuned}).
+Se llama una vez desde \archivo{main.rs}, justo después de cargar la interfaz: para
+entonces ya existen la ventana principal y el mini reproductor (oculto), y ambas quedan
+ajustadas.
+
+\subsection{La red de Qt}
+
+\cod{musicplayer_configure_network()} desactiva el proxy del sistema
+(\cod{setUseSystemConfiguration(false)}) y solo usa uno si el entorno define
+\cod{HTTPS_PROXY} o \cod{HTTP_PROXY}. El motivo es un fallo real: con una red que tenía un
+WPAD (detección automática de proxy) roto, macOS fallaba cada descarga de carátula con
+«NSURLErrorDomain -1003» y la retrasaba. La parte Rust del programa ya respetaba esas
+variables; esto hace que Qt (que descarga las imágenes) se comporte igual.
+
+\subsection{Clics de ratón simulados}
+
+\cod{scheduleDebugClicks} lee la variable \cod{MUSICPLAYER_DEBUG_CLICK} y, con
+\cod{QTimer::singleShot}, programa eventos de ratón reales sobre la ventana principal
+(\cod{QMouseEvent}, \cod{QWheelEvent} enviados con \cod{QGuiApplication::sendEvent}).
+Sirve para hacer capturas con un menú abierto o a mitad de un arrastre sin tocar el ratón
+(capítulo~\ref{cap:depurar}). La sintaxis es una lista separada por \cod{;}:
+
+\begin{codigo}
+x,y,left,ms            clic izquierdo       x,y,right,ms         clic derecho
+x,y,drag,ms,x2,y2      arrastra y suelta    x,y,draghold,ms,x2,y2  arrastra sin soltar
+x,y,wheel,ms,pasos     rueda (+ = hacia abajo)
+\end{codigo}
+
+\begin{porque}[¿Por qué C++ y no QML?]
+QML no expone \cod{setPersistentGraphics} ni envía eventos de ratón sintéticos, y la red de Qt
+se configura sobre la aplicación, no sobre la interfaz. Son llamadas a la API C++ de Qt, así
+que lo más directo es escribirlas en C++ y llamarlas desde Rust.
+\end{porque}
+
+%% ------------------------------------------------------------------------------------------
+\section{\texttt{signals.cpp}: cerrar bien con \texttt{kill}}
+
+mpv es un proceso hijo. Cuando cierras la ventana, Qt sale de su bucle, Rust destruye el
+\cod{Player}, su \cod{Mpv} hace \cod{drop} y mata al hijo. Pero si la app recibe
+\cod{SIGTERM} (\cod{kill}), \cod{SIGINT} (Ctrl+C) o \cod{SIGHUP} (cerrar la terminal), el
+sistema la mata \emph{sin destruir nada}: mpv queda huérfano, vivo y gastando memoria.
+
+\subsection{El truco del \emph{self-pipe}}
+
+Un manejador de señales de Unix solo puede llamar a unas pocas funciones («seguras en señal»);
+no puede tocar Qt. La solución clásica:
+
+\begin{enumerate}
+  \item Se crea una pareja de sockets conectados (\cod{socketpair}).
+  \item El manejador solo hace \cod{write(socket[0], &byte, 1)}: una función segura.
+  \item Un \cod{QSocketNotifier} vigila el otro extremo \emph{en el hilo de Qt}; al recibir el
+  byte, llama a \cod{QCoreApplication::quit()}.
+\end{enumerate}
+
+\begin{codigo}
+action.sa_handler = onSignal;
+action.sa_flags = SA_RESTART | SA_RESETHAND;
+for (int signal : {SIGTERM, SIGINT, SIGHUP})
+    sigaction(signal, &action, nullptr);
+\end{codigo}
+
+\cod{quit()} hace exactamente lo mismo que cerrar la ventana, así que el cierre ordenado
+vuelve a funcionar. \cod{SA_RESETHAND} restaura el comportamiento por defecto después de la
+primera señal: si el cierre ordenado se atasca y llega una segunda, la app muere como antes.
+Los dos sockets llevan \cod{FD_CLOEXEC} para que mpv y yt-dlp no los hereden.
+
+%% ------------------------------------------------------------------------------------------
+\section{\texttt{login\_mac.mm}: iniciar sesión en macOS}
+
+La sesión de YouTube Music hace falta una sola vez, pero conseguirla exige un navegador: hay
+que pasar por la página de Google (con verificación en dos pasos, claves de acceso\dots).
+Meter un motor web dentro del reproductor costaría cientos de MB, así que el programa se
+\emph{relanza a sí mismo} (\cod{musicplayer --login <archivo>}), y el proceso hijo, sin
+arrancar Qt, abre una ventana con \cod{WKWebView}, el WebKit del sistema.
+
+\subsection{La estructura de Objective-C}
+
+Si vienes de Java o C++, esto es lo único raro:
+
+\begin{codigo}
+@interface MPLogin : NSObject <NSWindowDelegate, WKNavigationDelegate, WKUIDelegate>
+@property(nonatomic, copy) NSString *outPath;   // dónde escribir las cookies
+@property(nonatomic, strong) WKWebView *web;
+@end
+
+@implementation MPLogin
+- (void)open { ... }        // se llama así:  [login open];
+- (void)check { ... }
+@end
+\end{codigo}
+
+\cod{@interface} declara la clase y \cod{@implementation} la define; \cod{[objeto mensaje]} es
+una llamada a método. \cod{<NSWindowDelegate, ...>} son protocolos (el equivalente de las
+interfaces): la clase promete responder a los avisos de la ventana y del navegador.
+
+\subsection{Qué hace}
+
+\begin{enumerate}
+  \item \cod{open}: crea el \cod{WKWebView} con un almacén de datos \emph{no persistente}
+  (nada queda en disco) y abre la página de inicio de sesión de Google con retorno a YouTube
+  Music. El agente de usuario sale de la versión real de Safari (\cod{safariVersion}): no se
+  disfraza nada.
+  \item \cod{check}: se llama cuando termina de cargar cada página (nunca a mitad de la cadena
+  de redirecciones de Google, que va poniendo las cookies poco a poco). Si la página es
+  \cod{music.youtube.com}, ejecuta JavaScript para preguntar a la propia página
+  (\cod{ytcfg.get('LOGGED_IN')}) si hay sesión; si la hay, guarda y cierra.
+  \item \cod{copyGoogleSession}: si YouTube no recibió las cookies (acabó en \cod{/oops}, o
+  la página de las teles), pero Google sí las tiene, copia a \cod{youtube.com} las cookies de
+  la cuenta (\cod{SID}, \cod{SAPISID}, \cod{__Secure-1PSID}\dots) y recarga YouTube Music.
+  Solo una vez.
+  \item Al terminar, escribe las cookies de youtube.com en el archivo del argumento
+  (\cod{netscapeLine} da el formato que leen yt-dlp y el resto del programa), con permisos
+  600, y sale con código 0. Si el usuario cierra la ventana, sale con 1.
+\end{enumerate}
+
+\begin{trampa}[La prevención de rastreo de WebKit]
+WebKit tiene una protección contra rastreo que descarta cookies en cadenas de redirecciones
+entre dominios, justo lo que hace Google al pasar la sesión a youtube.com: sin saberlo,
+YouTube acababa en \cod{/oops}. El código desactiva esa protección con un ajuste privado de
+WebKit (\cod{_setResourceLoadStatisticsEnabled:}, llamado por \cod{NSSelectorFromString} y
+\cod{objc_msgSend}). Si Apple lo elimina, la copia de cookies del paso anterior es la red de
+seguridad.
 \end{trampa}
+
+\subsection{El menú mínimo}
+
+\cod{installMenu} crea la barra de menús de la aplicación con «Edición» (deshacer, copiar,
+pegar\dots). Parece un detalle, pero sin menú «Edición» \emph{no funciona} \texttt{Cmd+V} en los campos de la web, y mucha gente pega la contraseña desde un gestor.
+
+La función que llama Rust, \cod{musicplayer_login}, solo prepara \cod{NSApplication}, el menú
+y el objeto \cod{MPLogin}, y entra en \cod{[NSApp run]}. Cuando acaba, devuelve \cod{result}.
+
+%% ------------------------------------------------------------------------------------------
+\section{\texttt{login\_linux.cpp}: lo mismo con Qt WebEngine}
+
+En Linux el reproductor puede importar la sesión del navegador sin permisos especiales, pero
+la ventana propia es más cómoda. \archivo{login/src/login\_linux.cpp} hace lo mismo que la de
+macOS, con otros ingredientes:
+
+\begin{itemize}
+  \item Un \cod{QWebEngineProfile} sin nombre: perfil privado, solo en memoria.
+  \item Las cookies llegan por las señales \cod{cookieAdded} y \cod{cookieRemoved} del
+  \cod{QWebEngineCookieStore}, y se acumulan en un \cod{QMap}.
+  \item Mismo criterio de «ya hay sesión» (\cod{ytcfg LOGGED_IN}), misma copia de las cookies
+  de Google si YouTube no las recibió y mismo código de salida.
+\end{itemize}
+
+\begin{porque}[El agente de usuario no se toca]
+Un comentario del propio archivo lo explica: hacerse pasar por Chrome quitando
+«QtWebEngine/x.y» del agente \emph{es lo que delata la ventana}. El motor sigue enviando sus
+cabeceras de cliente (\cod{Sec-CH-UA: "Chromium"}, sin «Google Chrome») y Google, al ver la
+contradicción, responde «Este navegador o esta aplicación pueden no ser seguros». Con la
+identidad real del motor todo coincide.
+\end{porque}
+
+\subsection{Una dependencia opcional}
+
+Qt WebEngine es grande y no está en todos los sistemas, así que \archivo{login/build.rs} lo
+trata como \emph{opcional}. Pregunta a \cod{qmake6} (o a la variable \cod{QMAKE}) dónde están
+las cabeceras y las bibliotecas de Qt; si no existe la carpeta \cod{QtWebEngineWidgets}, imprime
+un aviso (\cod{cargo::warning=}) y \emph{no falla}. Si todo está, compila el C++ y activa
+\cod{cargo::rustc-cfg=webengine}. En \archivo{main.rs} del crate, el código que llama al C++
+va dentro de \cod{#[cfg(webengine)]}:
+
+\begin{rust}
+#[cfg(webengine)]
+extern "C" { fn musicplayer_login_linux(out_path: *const std::os::raw::c_char) -> i32; }
+\end{rust}
+
+\cod{musicplayer-login --check} responde 0 si se compiló con WebEngine y 3 si no; así el
+reproductor (\cod{account::linux_helper}) sabe si ofrecer o no el botón de inicio de sesión
+con ventana propia. Una dependencia que falta nunca rompe la compilación.
+
+\begin{ejercicio}[Seguir un cierre de sesión por los dos mundos]
+Sin ejecutar nada, traza la ruta completa de un inicio de sesión en macOS: qué botón de QML
+llama a \cod{Account.signInWeb()}, qué hace \cod{Account::sign_in_web} en Rust, con qué
+argumentos relanza el programa, qué escribe \cod{login_mac.mm} y cómo lo lee \cod{login_web}.
+Cuando termines, compara con el flujo del capítulo~\ref{cap:flujos}.
+\end{ejercicio}

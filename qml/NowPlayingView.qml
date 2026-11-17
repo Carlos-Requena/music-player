@@ -85,11 +85,39 @@ FocusScope {
         return Player.thumb.replace("w544-h544", "w" + bigPixels + "-h" + bigPixels)
     }
 
+    // Arriba del todo, tapa la ventana entera: lo de debajo no hace falta pintarlo.
+    readonly property bool covering: shown >= 1
+    // Lo que desenfoca el vidrio de la barra de reproducción: solo el fondo, no la letra ni la
+    // carátula. Si fuera toda la pantalla, cada paso del barrido de la letra obligaba a copiar y
+    // desenfocar otra vez el fondo de la barra.
+    readonly property Item backdrop: background
+
     visible: shown > 0.001
     clip: true
 
     Keys.onEscapePressed: root.closeRequested()
     Keys.onDownPressed: root.closeRequested()
+
+    // El mismo fondo ambiente que el resto de secciones, teñido por la carátula. Fuera de `sheet`
+    // (pero subiendo con ella) para que el vidrio de la barra lo capture solo a él.
+    Item {
+        id: background
+        width: root.width
+        height: root.height
+        y: sheet.y
+
+        Ambient {
+            anchors.fill: parent
+            intensity: Theme.ambient
+            stageTint: tint.tint
+            playingTint: Qt.lighter(tint.tint, 1.25)
+            stageCenter: parent.width / 2
+            playingCenter: parent.width * 0.85
+            moving: Theme.ambientMotion !== "no"
+            thumb: Player.thumb
+            fluidDarken: 0.35
+        }
+    }
 
     Item {
         id: sheet
@@ -115,19 +143,6 @@ FocusScope {
             anchors.fill: parent
             acceptedButtons: Qt.NoButton
             onWheel: wheel => wheel.accepted = true
-        }
-
-        // El mismo fondo ambiente que el resto de secciones, teñido por la carátula.
-        Ambient {
-            anchors.fill: parent
-            intensity: Theme.ambient
-            stageTint: tint.tint
-            playingTint: Qt.lighter(tint.tint, 1.25)
-            stageCenter: parent.width / 2
-            playingCenter: parent.width * 0.85
-            moving: Theme.ambientMotion !== "no"
-            thumb: Player.thumb
-            fluidDarken: 0.35
         }
 
         IconButton {
@@ -265,7 +280,7 @@ FocusScope {
 
         // ---- Derecha: pestañas Letra (solo si la hay) y Cola ----
 
-        Rectangle {
+        TabStrip {
             id: tabs
             opacity: root.sideShown
             visible: opacity > 0.01
@@ -273,62 +288,13 @@ FocusScope {
             y: root.sideTop
             width: root.sideWidth
             height: root.tabsHeight
-            radius: 16
-            color: Qt.rgba(0, 0, 0, 0.25)
-
-            Row {
-                anchors.fill: parent
-                anchors.margins: 4
-                spacing: 4
-
-                Repeater {
-                    model: root.hasLyrics
-                        ? [{ id: "letra", label: "Letra" }, { id: "cola", label: "Cola · " + Catalog.queue.length }]
-                        : [{ id: "cola", label: "Cola · " + Catalog.queue.length }]
-
-                    Item {
-                        id: tabButton
-                        required property var modelData
-                        required property int index
-                        readonly property bool chosen: modelData.id === root.shownTab
-
-                        width: (tabs.width - 8 - 4 * (root.hasLyrics ? 1 : 0)) / (root.hasLyrics ? 2 : 1)
-                        height: Theme.hit
-                        activeFocusOnTab: true
-
-                        Accessible.role: Accessible.PageTab
-                        Accessible.name: modelData.label
-                        Accessible.onPressAction: root.tab = modelData.id
-                        Keys.onReturnPressed: root.tab = modelData.id
-
-                        Rectangle {
-                            anchors.fill: parent
-                            radius: 12
-                            color: tabButton.chosen ? Theme.controlActive : (tabHover.hovered ? Theme.control : "transparent")
-                            border.width: tabButton.activeFocus ? 2 : 0
-                            border.color: Theme.text
-                        }
-
-                        Text {
-                            anchors.centerIn: parent
-                            text: tabButton.modelData.label
-                            color: tabButton.chosen ? Theme.text : Theme.textMuted
-                            font.pixelSize: 15
-                            font.weight: tabButton.chosen ? Font.DemiBold : Font.Normal
-                        }
-
-                        HoverHandler {
-                            id: tabHover
-                            cursorShape: Qt.PointingHandCursor
-                        }
-
-                        TapHandler {
-                            gesturePolicy: TapHandler.ReleaseWithinBounds
-                            onTapped: root.tab = tabButton.modelData.id
-                        }
-                    }
-                }
-            }
+            fontSize: 15
+            innerRadius: 12
+            current: root.shownTab
+            tabs: root.hasLyrics
+                ? [{ id: "letra", label: "Letra" }, { id: "cola", label: "Cola · " + Catalog.queue.length }]
+                : [{ id: "cola", label: "Cola · " + Catalog.queue.length }]
+            onPicked: id => root.tab = id
         }
 
         Rectangle {
@@ -346,14 +312,20 @@ FocusScope {
             border.width: Theme.ambientFluid ? 0 : 1
             border.color: Theme.glassBorder
 
-            // El ajuste de retraso es el pie discreto de la propia letra (`LyricsTiming`).
-            LyricsView {
+            // El ajuste de retraso es el pie discreto de la propia letra (`LyricsTiming`). Solo
+            // existe mientras la pantalla está abierta o subiendo y con la letra a la derecha (ver
+            // el panel lateral); se crea al pulsar, mientras sube.
+            Loader {
+                active: (root.open || root.visible) && root.sideShown > 0 && root.shownTab === "letra"
+                asynchronous: true
                 x: 24
                 y: 12
                 width: parent.width - 48
                 height: parent.height - 12 - 6
-                // Más pequeña si el recuadro es estrecho, para que quepan las palabras largas.
-                baseSize: Math.max(24, Math.min(34, width / 12))
+                sourceComponent: LyricsView {
+                    // Más pequeña si el recuadro es estrecho, para que quepan las palabras largas.
+                    baseSize: Math.max(24, Math.min(34, width / 12))
+                }
             }
         }
 
