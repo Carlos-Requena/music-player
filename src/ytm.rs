@@ -232,6 +232,12 @@ fn thumb(value: &Value) -> String {
     }
 }
 
+/// Carátula de la cabecera de un álbum o playlist. No vale `thumb(header)`: las claves se
+/// recorren en orden alfabético y `straplineThumbnail` (la foto del artista) va antes.
+fn header_thumb(header: &Value) -> String {
+    thumb(header.get("thumbnail").unwrap_or(header))
+}
+
 fn kind_of(page_type: &str) -> &'static str {
     match page_type {
         "MUSIC_PAGE_TYPE_ALBUM" => "album",
@@ -496,6 +502,103 @@ pub fn detail(target: &Item) -> Result<Detail> {
     Ok(out)
 }
 
+/// Álbum y artista de una canción, para «Ir al álbum» y «Ver artista» del menú. Las pistas y
+/// las canciones del catálogo no los traen: se piden solo al elegir la entrada.
+#[derive(Clone, Debug, Default)]
+pub struct Links {
+    pub album: Option<Item>,
+    pub artist: Option<Item>,
+}
+
+/// Recoge los enlaces a álbum y artista de unos `runs` («Artista • Álbum • 2024»).
+fn collect_links(runs: Option<&Value>, links: &mut Links) {
+    for run in runs.and_then(Value::as_array).into_iter().flatten() {
+        let Some(browse) = run.pointer("/navigationEndpoint/browseEndpoint") else { continue };
+        let kind = kind_of(&string(find(browse, "pageType")));
+        let found = Item {
+            title: string(run.get("text")),
+            kind: kind.to_owned(),
+            browse_id: string(browse.get("browseId")),
+            ..Item::default()
+        };
+        match kind {
+            "album" if links.album.is_none() => links.album = Some(found),
+            "artist" if links.artist.is_none() => links.artist = Some(found),
+            _ => {}
+        }
+    }
+}
+
+/// Álbum y artista de la canción `video_id`, sacados de su ficha en la cola (`next`).
+pub fn song_links(video_id: &str) -> Result<Links> {
+    let page = post("next", json!({ "videoId": video_id, "isAudioOnly": true }))?;
+    let mut renderers = Vec::new();
+    find_all(&page, "playlistPanelVideoRenderer", &mut renderers);
+    let mut links = Links::default();
+    let Some(renderer) = renderers
+        .iter()
+        .find(|renderer| string(renderer.get("videoId")) == video_id)
+        .or_else(|| renderers.first())
+    else {
+        return Ok(links);
+    };
+    collect_links(renderer.pointer("/longBylineText/runs"), &mut links);
+    collect_links(renderer.pointer("/shortBylineText/runs"), &mut links);
+    if links.album.is_some() {
+        return Ok(links);
+    }
+    // Los videoclips no llevan álbum: se busca la versión de audio de la misma canción (mismo
+    // título y artista) y se toma el suyo.
+    let title = text(renderer.get("title"));
+    let artist = links.artist.as_ref().map(|a| a.title.clone()).unwrap_or_default();
+    if title.is_empty() {
+        return Ok(links);
+    }
+    let same = |a: &str, b: &str| a.trim().to_lowercase() == b.trim().to_lowercase();
+    let found = search_one_kind(&format!("{title} {artist}"), false)
+        .unwrap_or_default()
+        .into_iter()
+        .take(5)
+        .find(|song| same(&song.title, &title) && (artist.is_empty() || song.subtitle.to_lowercase().contains(&artist.to_lowercase())));
+    if let Some(song) = found.filter(|song| song.video_id != video_id) {
+        let page = post("next", json!({ "videoId": song.video_id, "isAudioOnly": true }))?;
+        let mut renderers = Vec::new();
+        find_all(&page, "playlistPanelVideoRenderer", &mut renderers);
+        if let Some(audio) = renderers.iter().find(|r| string(r.get("videoId")) == song.video_id) {
+            let mut other = Links::default();
+            collect_links(audio.pointer("/longBylineText/runs"), &mut other);
+            links.album = other.album;
+        }
+    }
+    Ok(links)
+}
+
+/// Completa un álbum conocido solo por su `browse_id` (título, carátula y la playlist de sus
+/// canciones) y devuelve también su artista.
+pub fn album_info(browse_id: &str) -> Result<(Item, Option<Item>)> {
+    let page = post("browse", json!({ "browseId": browse_id }))?;
+    let header = find(&page, "musicResponsiveHeaderRenderer").or_else(|| find(&page, "musicDetailHeaderRenderer"));
+    let mut album = Item { kind: "album".to_owned(), browse_id: browse_id.to_owned(), ..Item::default() };
+    let mut links = Links::default();
+    if let Some(header) = header {
+        album.title = text(header.get("title"));
+        album.subtitle = text(header.get("straplineTextOne"));
+        album.thumb = header_thumb(header);
+        collect_links(header.pointer("/straplineTextOne/runs"), &mut links);
+        collect_links(header.pointer("/subtitle/runs"), &mut links);
+        // La playlist con las canciones del álbum (`OLAK5uy_…`): la del botón de reproducir de
+        // la cabecera. En el resto de la página hay otras («otras versiones» del artista).
+        album.playlist_id = string(find(header, "watchPlaylistEndpoint").and_then(|w| w.get("playlistId")));
+    }
+    if album.playlist_id.is_empty() {
+        album.playlist_id = string(find(&page, "audioPlaylistId"));
+    }
+    if album.playlist_id.is_empty() {
+        return Err("no se encontró la lista de canciones del álbum".to_owned());
+    }
+    Ok((album, links.artist))
+}
+
 /// Une las zonas de una página de biblioteca en una sola con título.
 fn titled(zones: Vec<Zone>, titulo: &str) -> Result<Vec<Zone>> {
     let items: Vec<Item> = zones.into_iter().flat_map(|zone| zone.items).collect();
@@ -596,7 +699,7 @@ pub fn playlist_tracks(playlist_id: &str) -> Result<Vec<Track>> {
     // Artista y carátula de la cabecera: las filas de un álbum no traen ni una ni otra.
     let header = find(&page, "musicResponsiveHeaderRenderer").or_else(|| find(&page, "musicDetailHeaderRenderer"));
     let album_artist = header.map(|h| text(h.get("straplineTextOne"))).unwrap_or_default();
-    let album_thumb = header.map(thumb).unwrap_or_default();
+    let album_thumb = header.map(header_thumb).unwrap_or_default();
 
     // La lista principal: la primera estantería de la página.
     let shelf = find(&page, "musicPlaylistShelfRenderer").or_else(|| find(&page, "musicShelfRenderer"));

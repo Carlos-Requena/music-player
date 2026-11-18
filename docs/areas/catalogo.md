@@ -41,8 +41,21 @@ búsqueda y el detalle de un álbum, playlist o artista. Cómo se pinta cada sec
   vuelve a pedir la sección Me gusta. Lo usan el corazón de la barra ([reproduccion](reproduccion.md))
   y la mascota al pincharla ([mascotas](mascotas.md)). Quitarlo deja la canción sin valorar, no en
   «No me gusta».
+- **Ir al álbum o al artista de una canción, o al artista de un álbum** (`Library.openRelated(item,
+  "album"|"artist")`, desde el menú de clic derecho de [ventana](ventana.md)). Las canciones y
+  pistas no traen esos enlaces, así que se piden al elegir la entrada, en un hilo:
+  `ytm::song_links` lee el artista y el álbum de la ficha de la canción (`next`) y
+  `ytm::album_info` completa el álbum (título, carátula y su playlist `OLAK5uy_…`) y da su artista.
+  El detalle se abre al momento con lo que se sabe (el nombre del artista) y comparte el contador
+  `detail_request`. Si no hay álbum o artista, se cierra y avisa con `Library.aviso`.
 
 ## Reglas y decisiones
+
+- **Los videoclips no llevan álbum** en su ficha: `song_links` busca la versión de audio de la
+  misma canción (mismo título y artista, entre los cinco primeros resultados) y toma su álbum.
+- **En la página de un álbum, la playlist y la carátula se toman de la cabecera**
+  (`header_thumb`): fuera de ella hay otras (el carrusel «otras versiones» del artista) y `find`
+  recorre las claves en orden alfabético ([TRAMPAS](../TRAMPAS.md#youtube-yt-dlp-y-mpv)).
 
 - **InnerTube como el cliente web (`WEB_REMIX`)**, recorriendo las respuestas buscando los
   *renderers* por nombre en vez de fijar rutas completas: cambian a menudo.
@@ -120,6 +133,8 @@ búsqueda y el detalle de un álbum, playlist o artista. Cómo se pinta cada sec
 | Recorrer la respuesta buscando renderers | [`find_all`](../../src/ytm.rs) |
 | Una sección por `browseId` | [`browse`](../../src/ytm.rs) |
 | Canciones de un álbum o playlist | [`playlist_tracks`](../../src/ytm.rs) |
+| Álbum y artista de una canción; artista de un álbum | [`song_links`](../../src/ytm.rs), [`album_info`](../../src/ytm.rs), [`open_related`](../../src/library.rs) |
+| Carátula de la cabecera de un álbum | [`header_thumb`](../../src/ytm.rs) |
 | Radio de una canción | [`queue`](../../src/ytm.rs) |
 | Biblioteca de la cuenta | [`library_playlists`](../../src/ytm.rs), [`liked_songs`](../../src/ytm.rs) |
 | Dar o quitar «Me gusta» | [`like`](../../src/ytm.rs), [`remove_like`](../../src/ytm.rs), [`like`](../../src/library.rs) |
@@ -150,9 +165,9 @@ búsqueda y el detalle de un álbum, playlist o artista. Cómo se pinta cada sec
 
 ## Estado actual
 
-- **Última verificación:** 2026-11-17, fuente de Explorar a elegir y sección Historial ([historial](../history/verificacion/catalogo.md)).
+- **Última verificación:** 2026-11-18, ir al álbum o al artista desde el menú ([historial](../history/verificacion/catalogo.md)).
 - **Pruebas:** ninguna en `ytm.rs` ni `library.rs` (dependen de la red); se prueban con
-  `--probe home|explore|explore-youtube|history|albums|playlists|search|album|queue`
+  `--probe home|explore|explore-youtube|history|albums|playlists|search|album|queue|links`
   (`--probe explore <usuario>` para otro usuario de ListenBrainz; `history` necesita sesión). `mod tests` de `src/listenbrainz.rs`: nombres comparables,
   primer artista del crédito, elección del resultado, MBID y fecha.
 - **Sin verificar:** la sección Historial con una sesión real (que `FEmusic_history` dé sus

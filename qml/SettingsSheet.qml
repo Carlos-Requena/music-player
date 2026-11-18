@@ -1232,6 +1232,217 @@ Item {
                     text: "Desconectar ListenBrainz"
                     onClicked: Plugins.listenbrainzDisconnect()
                 }
+
+                // Ecualizador y amplificador: filtros de mpv (`audio::effects_chain`), en su
+                // propio proceso. Se guardan en `ecualizador`, `ecualizadorBandas` y
+                // `amplificador`, y `Player.applyEffects` los pone en el audio que suena.
+                Item {
+                    id: effects
+                    width: parent.width
+                    height: 1
+
+                    readonly property var freqs: ["31", "62", "125", "250", "500", "1k", "2k", "4k", "8k", "16k"]
+                    readonly property var presets: [
+                        { id: "plano", label: "Plano", gains: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
+                        { id: "graves", label: "Graves", gains: [6, 5, 4, 2, 0, 0, 0, 0, 0, 0] },
+                        { id: "voz", label: "Voz", gains: [-2, -1, 0, 2, 4, 4, 3, 1, 0, -1] },
+                        { id: "agudos", label: "Agudos", gains: [0, 0, 0, 0, 0, 1, 2, 4, 5, 6] },
+                        { id: "electronica", label: "Electrónica", gains: [5, 4, 1, 0, -2, 1, 0, 2, 4, 5] }
+                    ]
+                    readonly property bool eqOn: {
+                        void AppSettings.revision
+                        return AppSettings.opcion("ecualizador") === "si"
+                    }
+                    // Ganancias guardadas (dB); se editan en `gains` y se guardan sin prisa.
+                    readonly property var stored: {
+                        void AppSettings.revision
+                        const raw = AppSettings.opcion("ecualizadorBandas")
+                        const out = raw === "" ? [] : raw.split(",").map(v => Number(v) || 0)
+                        while (out.length < 10)
+                            out.push(0)
+                        return out
+                    }
+                    readonly property real storedBoost: {
+                        void AppSettings.revision
+                        return Number(AppSettings.opcion("amplificador")) || 0
+                    }
+                    property var gains: stored
+                    property real boost: storedBoost
+                    readonly property string preset: {
+                        const found = presets.find(p => p.gains.every((g, i) => Math.abs(g - gains[i]) < 0.05))
+                        return found ? found.id : ""
+                    }
+
+                    function setGain(band, value) {
+                        const next = gains.slice()
+                        next[band] = Math.round(value * 2) / 2
+                        gains = next
+                        commit.restart()
+                    }
+                    function setBoost(value) {
+                        boost = Math.round(value * 2) / 2
+                        commit.restart()
+                    }
+                    function label(db) {
+                        return (db > 0 ? "+" : db < 0 ? "−" : "") + Math.abs(db).toFixed(Math.abs(db) % 1 ? 1 : 0)
+                    }
+
+                    // Guarda y aplica al soltar o tras una pausa: cambiar `af` corta el audio un
+                    // instante, así que no se hace a cada píxel del arrastre.
+                    Timer {
+                        id: commit
+                        interval: 250
+                        onTriggered: {
+                            const allZero = effects.gains.every(g => g === 0)
+                            AppSettings.setOpcion("ecualizadorBandas", allZero ? "" : effects.gains.join(","))
+                            AppSettings.setOpcion("amplificador", effects.boost === 0 ? "" : String(effects.boost))
+                            Player.applyEffects()
+                        }
+                    }
+                }
+
+                Toggle {
+                    label: "Ecualizador"
+                    hint: "Diez bandas, de 31 Hz a 16 kHz."
+                    on: effects.eqOn
+                    onChanged: on => {
+                        AppSettings.setOpcion("ecualizador", on ? "si" : "")
+                        Player.applyEffects()
+                    }
+                }
+
+                Column {
+                    visible: effects.eqOn
+                    width: parent.width
+                    spacing: 14
+
+                    Segmented {
+                        width: Math.min(parent.width, 560)
+                        options: effects.presets
+                        value: effects.preset
+                        onPicked: id => {
+                            effects.gains = effects.presets.find(p => p.id === id).gains.slice()
+                            commit.restart()
+                        }
+                    }
+
+                    Rectangle {
+                        width: parent.width
+                        height: 210
+                        radius: 14
+                        color: Qt.rgba(0, 0, 0, 0.3)
+
+                        // Línea del 0 dB.
+                        Rectangle {
+                            x: 16
+                            width: parent.width - 32
+                            y: 28 + 75
+                            height: 1
+                            color: Theme.glassBorder
+                        }
+
+                        Row {
+                            anchors.fill: parent
+                            anchors.leftMargin: 8
+                            anchors.rightMargin: 8
+
+                            Repeater {
+                                model: 10
+
+                                Item {
+                                    id: band
+                                    required property int index
+                                    readonly property real gain: effects.gains[index] || 0
+                                    width: parent.width / 10
+                                    height: parent.height
+
+                                    Text {
+                                        anchors.horizontalCenter: parent.horizontalCenter
+                                        y: 8
+                                        text: effects.label(band.gain)
+                                        color: band.gain === 0 ? Theme.textMuted : Theme.text
+                                        font.pixelSize: 12
+                                        font.weight: Font.DemiBold
+                                    }
+
+                                    // El deslizador de siempre, girado: arriba sube la banda.
+                                    Slider {
+                                        width: 150
+                                        height: 44
+                                        x: (band.width - width) / 2
+                                        y: 28 + 75 - height / 2
+                                        rotation: -90
+                                        label: "Banda de " + effects.freqs[band.index] + " Hz"
+                                        stepSize: 0.5 / (2 * 12)
+                                        value: (band.gain + 12) / 24
+                                        onMoved: v => effects.setGain(band.index, v * 24 - 12)
+                                        Keys.onUpPressed: effects.setGain(band.index, Math.min(12, band.gain + 0.5))
+                                        Keys.onDownPressed: effects.setGain(band.index, Math.max(-12, band.gain - 0.5))
+                                    }
+
+                                    Text {
+                                        anchors.horizontalCenter: parent.horizontalCenter
+                                        anchors.bottom: parent.bottom
+                                        anchors.bottomMargin: 10
+                                        text: effects.freqs[band.index]
+                                        color: Theme.textMuted
+                                        font.pixelSize: 12
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Item {
+                    width: parent.width
+                    height: Theme.hit + 8
+
+                    Column {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: parent.width - 400
+                        spacing: 2
+
+                        Text {
+                            text: "Amplificador de volumen"
+                            color: Theme.text
+                            font.pixelSize: 15
+                            font.weight: Font.DemiBold
+                        }
+
+                        Text {
+                            width: parent.width
+                            text: "Sube el volumen por encima del 100 % para pistas flojas (hasta +12 dB)."
+                            color: Theme.textMuted
+                            font.pixelSize: 12
+                            wrapMode: Text.WordWrap
+                        }
+                    }
+
+                    Slider {
+                        anchors.right: boostLabel.left
+                        anchors.rightMargin: 16
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 300
+                        height: 44
+                        label: "Amplificador de volumen"
+                        stepSize: 0.5 / 12
+                        value: effects.boost / 12
+                        onMoved: v => effects.setBoost(v * 12)
+                    }
+
+                    Text {
+                        id: boostLabel
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 64
+                        horizontalAlignment: Text.AlignRight
+                        text: effects.boost === 0 ? "No" : "+" + effects.label(effects.boost).replace("+", "") + " dB"
+                        color: effects.boost === 0 ? Theme.textMuted : Theme.text
+                        font.pixelSize: 14
+                        font.weight: Font.DemiBold
+                    }
+                }
             }
         }
         }

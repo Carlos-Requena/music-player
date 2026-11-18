@@ -2,7 +2,8 @@ import QtQuick
 import QtQuick.Effects
 import app.musicplayer
 
-// Menú contextual (clic derecho) de una canción, álbum o playlist, y aviso breve de lo hecho.
+// Menú contextual (clic derecho) de una canción, álbum o playlist, y aviso breve de lo hecho
+// (también los de `Library.aviso`).
 // Se abre con `show(item, x, y)`; `item` es una tarjeta del catálogo, una pista de la cola
 // (lleva `queueIndex`) o una pestaña de categoría. Las listas largas (playlists donde guardar,
 // categorías) van en una subpágina para que el menú principal no crezca.
@@ -14,12 +15,17 @@ Item {
     property Item backdrop: null
     // "" el menú principal, "listas" las playlists donde guardar, "categorias" las categorías.
     property string page: ""
+    // Punto donde se pidió el menú: al cambiar su alto (las entradas se crean después de
+    // abrirlo) se vuelve a colocar desde aquí para que no se salga por abajo.
+    property point anchorPoint
 
     // Lo que el menú pide a la ventana (necesita el selector de archivos o la barra de
     // categorías, que viven allí).
     signal newCategoryRequested(string playlistId)
     signal renameCategoryRequested(string name)
     signal coverRequested(var item)
+    // «Ir al álbum» o «Ver artista» (`que`: "album" o "artist"): la ventana abre el detalle.
+    signal relatedRequested(var item, string que)
 
     readonly property bool isSong: item !== null && isSongItem(item)
     readonly property bool inQueue: item !== null && item.queueIndex !== undefined
@@ -65,6 +71,11 @@ Item {
             out.push({ id: "siguiente", label: "Reproducir a continuación", icon: Theme.iconPlayNext })
             out.push({ id: "cola", label: "Añadir a la cola", icon: Theme.iconAddQueue })
         }
+        // Ir a lo que rodea a la canción o al álbum (se busca al elegirlo: ver `Library.openRelated`).
+        if (isSong && item.videoId)
+            out.push({ id: "album", label: "Ir al álbum", icon: Theme.iconAlbum })
+        if ((isSong && item.videoId) || (item.kind === "album" && item.browseId))
+            out.push({ id: "artista", label: "Ver artista", icon: Theme.iconArtist })
         out.push({ id: "temporal", label: isSong ? "Añadir a la lista temporal" : "Añadir todo a la lista temporal", icon: Theme.iconTemporal })
         if (canSave)
             out.push({ id: "page:listas", label: "Guardar en una playlist", icon: Theme.iconSaveList, more: true })
@@ -81,6 +92,7 @@ Item {
         item = target
         page = ""
         opened = true
+        anchorPoint = Qt.point(px, py)
         place(px, py)
         menu.forceActiveFocus()
     }
@@ -156,6 +168,8 @@ Item {
         } else if (action === "quitar") {
             Player.removeFromQueue(target.queueIndex)
             notify("«" + target.title + "» quitada de la cola")
+        } else if (action === "album" || action === "artista") {
+            root.relatedRequested(target, action === "album" ? "album" : "artist")
         } else if (action === "temporal") {
             Player.addToTemporal(JSON.stringify(target))
             notify(isSongItem(target) ? "«" + target.title + "» añadida a la lista temporal"
@@ -178,6 +192,9 @@ Item {
             root.notify(mensaje)
         }
         function onGustado(mensaje, error) {
+            root.notify(mensaje)
+        }
+        function onAviso(mensaje) {
             root.notify(mensaje)
         }
     }
@@ -225,6 +242,7 @@ Item {
         height: Math.min(list.height + 12, root.height - 16)
         radius: 14
         tint: Qt.rgba(Theme.ground.r, Theme.ground.g, Theme.ground.b, 0.94)
+        onHeightChanged: if (root.opened) root.place(root.anchorPoint.x, root.anchorPoint.y)
 
         Keys.onEscapePressed: {
             if (root.page !== "")

@@ -157,6 +157,8 @@ QtObject {
     readonly property string iconLomos: "M4 5v14 M8 5v14 M11 5h9v14h-9z"
     readonly property string iconCubeta: "M4 9h16v11H4z M6 6h12 M8 3h8"
     readonly property string iconMuro: "M4 4h7v7H4z M13 4h7v7h-7z M4 13h7v7H4z M13 13h7v7h-7z"
+    readonly property string iconAlbum: "M21 12a9 9 0 1 1-18 0a9 9 0 0 1 18 0z M14 12a2 2 0 1 1-4 0a2 2 0 0 1 4 0z"
+    readonly property string iconArtist: "M12 3a3 3 0 0 1 3 3v5a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3z M6 11a6 6 0 0 0 12 0 M12 17v4"
 
     function mmss(seconds) {
         const total = Math.max(0, Math.floor(seconds))

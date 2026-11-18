@@ -52,6 +52,16 @@ pub mod qobject {
         #[qinvokable]
         fn open_detail(self: Pin<&mut Library>, item: &QString);
 
+        /// Abre el álbum (`que` = "album") o el artista (`que` = "artist") de `item` (JSON de una
+        /// canción, una pista o un álbum). Se muestra al momento lo que se sabe; el álbum o el
+        /// artista se buscan en un hilo. Si no hay, cierra el detalle y avisa con `aviso`.
+        #[qinvokable]
+        fn open_related(self: Pin<&mut Library>, item: &QString, que: &QString);
+
+        /// Aviso breve para el usuario (lo muestra el menú contextual).
+        #[qsignal]
+        fn aviso(self: Pin<&mut Library>, mensaje: QString);
+
         /// Cierra el detalle.
         #[qinvokable]
         fn close_detail(self: Pin<&mut Library>);
@@ -388,6 +398,85 @@ impl qobject::Library {
                     Err(error) => library.as_mut().set_error(QString::from(&error)),
                 }
                 library.set_detalle_loading(false);
+            });
+        });
+    }
+
+    fn open_related(mut self: Pin<&mut Self>, item: &QString, que: &QString) {
+        use cxx_qt::CxxQtType;
+        let Ok(value) = serde_json::from_str::<serde_json::Value>(&item.to_string()) else { return };
+        let field = |key: &str| value.get(key).and_then(serde_json::Value::as_str).unwrap_or_default().to_owned();
+        let artist_wanted = que.to_string() == "artist";
+        let (kind, video_id, browse_id, title) = (field("kind"), field("videoId"), field("browseId"), field("title"));
+        // Nombre del artista que ya se conoce: el de la pista o el primero del subtítulo.
+        let known_artist = {
+            let artist = field("artist");
+            let artist = if artist.is_empty() { field("subtitle") } else { artist };
+            // Los resultados de búsqueda empiezan por el tipo («Canción • Artista • …»).
+            artist
+                .split(" • ")
+                .map(str::trim)
+                .find(|part| !matches!(*part, "Canción" | "Vídeo" | "Video" | "Song" | "Episodio"))
+                .unwrap_or_default()
+                .to_owned()
+        };
+        if video_id.is_empty() && !(artist_wanted && kind == "album" && !browse_id.is_empty()) {
+            return;
+        }
+        let request = self.detail_request + 1;
+        self.as_mut().rust_mut().detail_request = request;
+        let preview = ytm::Detail {
+            title: if artist_wanted { known_artist } else { String::new() },
+            kind: if artist_wanted { "artist".to_owned() } else { "album".to_owned() },
+            ..ytm::Detail::default()
+        };
+        self.as_mut().set_detalle(QString::from(&serde_json::to_string(&preview).unwrap_or_default()));
+        self.as_mut().set_detalle_loading(true);
+
+        let qt = self.qt_thread();
+        thread::spawn(move || {
+            let target: Result<ytm::Item, String> = (|| {
+                if artist_wanted {
+                    let artist = if kind == "album" && video_id.is_empty() {
+                        ytm::album_info(&browse_id)?.1
+                    } else {
+                        ytm::song_links(&video_id)?.artist
+                    };
+                    artist.ok_or_else(|| format!("«{title}» no tiene página de artista"))
+                } else {
+                    let album = ytm::song_links(&video_id)?.album
+                        .ok_or_else(|| format!("«{title}» no tiene álbum en YouTube Music"))?;
+                    Ok(ytm::album_info(&album.browse_id)?.0)
+                }
+            })();
+            let result = target.and_then(|target| {
+                ytm::detail(&target).map(|mut detail| {
+                    if detail.thumb.is_empty() {
+                        detail.thumb = target.thumb.clone();
+                    }
+                    detail
+                })
+            });
+            let _ = qt.queue(move |mut library| {
+                if library.detail_request != request {
+                    return;
+                }
+                match result {
+                    Ok(detail) => {
+                        library.as_mut().set_detalle(QString::from(&serde_json::to_string(&detail).unwrap_or_default()));
+                        library.set_detalle_loading(false);
+                    }
+                    Err(error) => {
+                        eprintln!("ir al {}: {error}", if artist_wanted { "artista" } else { "álbum" });
+                        library.as_mut().close_detail();
+                        let mensaje = if error.starts_with('«') { error } else if artist_wanted {
+                            "No se pudo abrir el artista".to_owned()
+                        } else {
+                            "No se pudo abrir el álbum".to_owned()
+                        };
+                        library.aviso(QString::from(&mensaje));
+                    }
+                }
             });
         });
     }

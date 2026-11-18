@@ -336,6 +336,7 @@ impl Default for AppSettingsRust {
         crate::resolver::set_premium(stored.opciones.get("calidad").map(String::as_str) == Some("premium"));
         crate::history::set_enabled(stored.opciones.get("historial").map(String::as_str) != Some("no"));
         crate::library::set_explorar_youtube(stored.opciones.get("explorarFuente").map(String::as_str) == Some("youtube"));
+        apply_effects(&stored.opciones);
         let skins = all_skins();
         let mascots = all_mascots();
         Self {
@@ -386,6 +387,9 @@ impl qobject::AppSettings {
             self.as_mut().rust_mut().opciones.remove(&clave.to_string());
         } else {
             self.as_mut().rust_mut().opciones.insert(clave.to_string(), valor.to_string());
+        }
+        if matches!(clave.to_string().as_str(), "ecualizador" | "ecualizadorBandas" | "amplificador") {
+            apply_effects(&self.opciones);
         }
         let revision = *self.revision() + 1;
         self.as_mut().set_revision(revision);
@@ -439,6 +443,12 @@ impl qobject::AppSettings {
             write_settings(text);
         }
     }
+}
+
+/// Pasa al motor de audio el ecualizador y el amplificador elegidos (los aplica `Player`).
+fn apply_effects(opciones: &BTreeMap<String, String>) {
+    let get = |key: &str| opciones.get(key).map(String::as_str).unwrap_or("");
+    crate::audio::configure(get("ecualizador") == "si", get("ecualizadorBandas"), get("amplificador"));
 }
 
 #[cfg(test)]

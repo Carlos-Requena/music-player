@@ -5,6 +5,18 @@ son de cuando se escribieron. El estado actual está en su [ficha](../../areas/c
 
 Lo nuevo va arriba: añade una sección `## AAAA-MM-DD · qué se verificó` encima de las anteriores.
 
+## 2026-11-18 · Ir al álbum o al artista (rama `feature/artista-y-ecualizador`)
+
+- **Cambio:** `ytm::song_links`, `ytm::album_info`, `header_thumb` y `Library.openRelated` con su
+  aviso; sonda `--probe links ID`. `playlist_tracks` toma la carátula de la cabecera (`thumbnail`),
+  no la foto del artista (`straplineThumbnail`).
+- **Verificado:** `--probe links` con dos videoclips (dQw4w9WgXcQ, kJQP7kiw5Fk): álbum, su lista
+  y artista correctos; en la app, búsqueda «despacito» → clic derecho en la canción → «Ir al
+  álbum» abre «Despacito (con Daddy Yankee)» con su carátula y su canción, y «Ver artista» abre
+  Luis Fonsi con sus canciones.
+- **No verificado:** con sesión; una canción sin álbum (el aviso); «Ver artista» de un álbum y
+  desde la cola.
+
 ## 2026-11-17 · Fuente de Explorar a elegir y sección Historial (rama `feature/explorar-listenbrainz`)
 
 - **Cambio:** opción `explorarFuente` (ListenBrainz o YouTube Music,

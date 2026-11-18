@@ -3,7 +3,7 @@ area: reproduccion
 titulo: Reproducción y cola
 resumen: Cola, lista temporal, siguiente y anterior, repetición, volumen y estado de lo que suena, con mpv como motor en un proceso aparte.
 archivos: [src/player.rs, src/audio.rs, src/signals.cpp, qml/PlayerBar.qml, qml/QueueList.qml]
-opciones: [barra]
+opciones: [barra, ecualizador, ecualizadorBandas, amplificador]
 adr: [ADR-02]
 ---
 
@@ -25,6 +25,12 @@ Del clic a que suene, y lo que pasa mientras suena. Obtener la URL es de
   órdenes llegan a `on_media_command`. Viven aquí y no en [plugins](plugins.md) porque en macOS van
   en el hilo principal.
 - **Calidad real:** mpv informa del códec y la tasa (`Player.calidad`).
+- **Ecualizador y amplificador de volumen** (Opciones › Plugins, por petición del propietario):
+  diez bandas de 31 Hz a 16 kHz (±12 dB, con preajustes Plano, Graves, Voz, Agudos y
+  Electrónica) y hasta +12 dB de ganancia. Son filtros de mpv (`af`, `lavfi`): `equalizer` por
+  cada banda que no esté a 0, `volume` y, si algo sube el nivel, `alimiter` para que no sature.
+  Opciones `ecualizador` ("si" lo activa), `ecualizadorBandas` (las diez ganancias separadas por
+  comas) y `amplificador` (dB).
 
 ## Reglas y decisiones
 
@@ -48,6 +54,10 @@ Del clic a que suene, y lo que pasa mientras suena. Obtener la URL es de
 - **Las barras de progreso se dibujan en píxeles enteros** (`Slider.drawn`, la línea de la barra
   Compacta y la del mini): la posición cambia diez veces por segundo y, si no avanza un píxel, no
   se redibuja la ventana.
+- **Los efectos se calculan en `settings` y los aplica `Player`**: `AppSettings.setOpcion` llama
+  a `audio::configure`, que guarda la cadena de filtros; `Player.applyEffects` la pone en mpv (y
+  `ensure_engine` al arrancarlo). La interfaz guarda y aplica 250 ms después del último
+  movimiento: cambiar `af` corta el audio un instante.
 - **mpv muere con la app**, también ante SIGTERM, SIGINT o SIGHUP (`kill <pid>`, Ctrl+C):
   `signals.cpp` convierte la señal en `QCoreApplication::quit()`, la salida normal destruye el
   `Player` y el `Drop` de `Mpv` cierra el proceso. Una segunda señal mata la app sin esperar. El
@@ -103,6 +113,7 @@ Stderr escribe `arranque de pista: N ms` en cada una.
 | Situación | Medida | Fecha y máquina |
 |---|---|---|
 | Proceso mpv en reposo / reproduciendo | 20 MB / ~75 MB | 2026-11-13, M4 Pro |
+| mpv reproduciendo (`--ao=null`), sin efectos / con 8 bandas y +6 dB | 232 / 231 MB; CPU 0,67 / 0,84 s en ~17 s sonando | 2026-11-18, M4 Pro, release, canciones distintas |
 
 ## Archivos
 
@@ -128,6 +139,9 @@ Stderr escribe `arranque de pista: N ms` en cada una.
 | Lanzar mpv | [`spawn`](../../src/audio.rs) |
 | Eventos de mpv | [`read_events`](../../src/audio.rs) |
 | `PATH` ampliado | [`search_path`](../../src/audio.rs) |
+| Cadena de filtros del ecualizador | [`effects_chain`](../../src/audio.rs), [`configure`](../../src/audio.rs) |
+| Aplicar los efectos a mpv | [`apply_effects`](../../src/player.rs), [`set_effects`](../../src/audio.rs) |
+| Interfaz del ecualizador | [`effects`](../../qml/SettingsSheet.qml) |
 | Cerrar mpv al salir | [`Drop for Mpv`](../../src/audio.rs) |
 | Señales de terminar → salir de Qt | [`musicplayer_handle_signals`](../../src/signals.cpp) |
 | Arrastrar en la cola | [`startDrag`](../../qml/QueueList.qml) |
@@ -147,10 +161,11 @@ Stderr escribe `arranque de pista: N ms` en cada una.
 
 ## Estado actual
 
-- **Última verificación:** 2026-11-17, colas con límite, mensajes de mpv sin árbol JSON ([historial](../history/verificacion/reproduccion.md)).
-- **Pruebas:** ninguna en `player.rs` ni `audio.rs`; se prueban con `--autoplay` y
+- **Última verificación:** 2026-11-18, ecualizador y amplificador ([historial](../history/verificacion/reproduccion.md)).
+- **Pruebas:** `mod tests` de `src/audio.rs` (cadena de filtros); nada en `player.rs`; se prueban con `--autoplay` y
   `--probe play` ([verificar-reproduccion](../runbooks/verificar-reproduccion.md)).
-- **Sin verificar:** MPRIS en GNOME y KDE con Wayland; dar y quitar «Me gusta» y «Aleatorio» de
+- **Sin verificar:** el sonido real del ecualizador y el amplificador (las pruebas van con
+  `--ao=null`) y el corte al cambiarlos mientras suena; MPRIS en GNOME y KDE con Wayland; dar y quitar «Me gusta» y «Aleatorio» de
   la barra con sesión y música sonando.
 - **Historial:** [docs/history/verificacion/reproduccion.md](../history/verificacion/reproduccion.md).
 

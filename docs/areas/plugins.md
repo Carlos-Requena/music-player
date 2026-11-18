@@ -89,4 +89,6 @@ Opciones › Plugins. Los controles del sistema (souvlaki) se activan aquí pero
 
 ## Pendiente
 
-- Más plugins: letras de otras fuentes, ecualizador, notificaciones ([ROADMAP](../ROADMAP.md)).
+- Más plugins: letras de otras fuentes, notificaciones ([ROADMAP](../ROADMAP.md)). El ecualizador y
+  el amplificador están en la pestaña Plugins, pero viven en [reproduccion](reproduccion.md): son
+  filtros de mpv, no escuchan eventos.

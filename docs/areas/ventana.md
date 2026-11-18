@@ -50,8 +50,11 @@ También el arranque del proceso y los argumentos de depuración (`--probe`, `--
   negras; si no lo tienen, queda la miniatura.
 - **Mini reproductor**: ventana pequeña siempre encima; la grande se oculta mientras tanto
   ([ADR-10](../decisions/ADR-10-mini-reproductor-oculta-la-ventana.md)).
-- **Menú de clic derecho** (`Main.openMenu` → `ContextMenu`) y aviso breve: cola, lista temporal,
-  guardar en playlist, categorías (subpáginas `page:<id>`) y portada. El aviso también da el
+- **Menú de clic derecho** (`Main.openMenu` → `ContextMenu`) y aviso breve: cola, «Ir al álbum» y
+  «Ver artista» (de una canción; «Ver artista» también de un álbum), lista temporal, guardar en
+  playlist, categorías (subpáginas `page:<id>`) y portada. «Ir al álbum» y «Ver artista» bajan
+  «Sonando» y abren el detalle (`Main.openRelated` → `Library.openRelated`,
+  [catalogo](catalogo.md)). El aviso también da el
   resultado del «Me gusta» de la mascota (`Library.gustado`).
 - **Panel lateral** (`NowPlayingPanel`): carátula con esquinas redondeadas, pestañas Letra, Cola y
   Temporal; bajo la letra, el mismo pie discreto de retraso que en «Sonando» (`LyricsTiming`, que
@@ -73,6 +76,8 @@ También el arranque del proceso y los argumentos de depuración (`--probe`, `--
 - **Carátula grande en «Sonando»**: medido el 2026-11-16, pedirla a 2000–2400 px tarda 0,6–1,5 s
   la primera vez (el servidor la redimensiona) frente a ~0,2 s a 1200 px, y pesa de 2 a 4 veces
   más; por eso la vista previa de 120 px y la opción Alta.
+- **El menú se recoloca cada vez que cambia su alto** (`anchorPoint`): las entradas se crean
+  después de abrirlo y, colocado con el alto anterior, se salía por abajo de la ventana.
 - **Una lista larga en el menú** (playlists donde guardar) va en una subpágina, no en el menú
   principal.
 - **Precarga al detenerse** (`hint`, `unhint`, `prefetchTimer`): el foco del teclado o el puntero
@@ -136,6 +141,7 @@ También el arranque del proceso y los argumentos de depuración (`--probe`, `--
 | Calidad de la carátula de «Sonando» | [`bigPixels`](../../qml/NowPlayingView.qml), [`bigThumb`](../../qml/NowPlayingView.qml) |
 | Mini y vuelta | [`showMini`](../../qml/Main.qml), [`restoreFromMini`](../../qml/Main.qml) |
 | Entradas del menú | [`entries`](../../qml/ContextMenu.qml), [`run`](../../qml/ContextMenu.qml) |
+| Ir al álbum o al artista | [`openRelated`](../../qml/Main.qml) |
 
 ## Dependencias
 
@@ -158,7 +164,7 @@ También el arranque del proceso y los argumentos de depuración (`--probe`, `--
 
 ## Estado actual
 
-- **Última verificación:** 2026-11-17, precarga al detenerse el puntero y fondo de skin en escalones ([historial](../history/verificacion/ventana.md)).
+- **Última verificación:** 2026-11-18, «Ir al álbum» y «Ver artista» en el menú ([historial](../history/verificacion/ventana.md)).
 - **Pruebas:** capturas con `--shot` ([verificar-interfaz](../runbooks/verificar-interfaz.md)).
 - **Sin verificar:** Wayland en CachyOS (panel, desenfoque, mini siempre encima); la carátula
   `hq720` de una canción que es vídeo dentro de la app (solo con `curl`); la vista previa de 120 px

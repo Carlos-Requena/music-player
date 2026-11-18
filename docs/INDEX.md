@@ -41,7 +41,7 @@ Qué leer para cada tarea. Las tablas a partir de [Áreas](#áreas) las escribe
 | [Mascotas](areas/mascotas.md) | Una imagen que cambia de pose según lo que pasa en el reproductor, reacciona unos segundos a lo que haces (pincharla, pasar canción, guardar en una playlist) y puede dar «Me gusta»; carpetas del usuario con PNG por pose. | — | — |
 | [Opciones, skins y aspecto](areas/personalizacion.md) | Preferencias guardadas (vista por sección, skin, opciones genéricas), la hoja de Opciones, los tokens visuales de Theme, el vidrio y el modo ambiente. | `ambiente`, `ambienteMovimiento`, `desenfoque` | [ADR-11](decisions/ADR-11-skins-en-json-y-opciones-genericas.md), [ADR-17](decisions/ADR-17-fondo-fluido-con-sombreador-propio.md) |
 | [Plugins (Discord, Last.fm y ListenBrainz)](areas/plugins.md) | Discord Rich Presence («Escuchando…»), scrobbling a Last.fm y escuchas en ListenBrainz, alimentados por los eventos del reproductor en un hilo propio. | — | [ADR-15](decisions/ADR-15-plugins-en-un-hilo-propio.md), [ADR-19](decisions/ADR-19-explorar-con-listenbrainz.md) |
-| [Reproducción y cola](areas/reproduccion.md) | Cola, lista temporal, siguiente y anterior, repetición, volumen y estado de lo que suena, con mpv como motor en un proceso aparte. | `barra` | [ADR-02](decisions/ADR-02-mpv-en-proceso-aparte.md) |
+| [Reproducción y cola](areas/reproduccion.md) | Cola, lista temporal, siguiente y anterior, repetición, volumen y estado de lo que suena, con mpv como motor en un proceso aparte. | `barra`, `ecualizador`, `ecualizadorBandas`, `amplificador` | [ADR-02](decisions/ADR-02-mpv-en-proceso-aparte.md) |
 | [Resolución del audio y arranque instantáneo](areas/resolucion.md) | Obtiene la URL de audio de cada pista (vía rápida, yt-dlp residente o yt-dlp) con caché y precarga, para que suene en décimas de segundo. | `calidad`, `ytdlp` | [ADR-03](decisions/ADR-03-via-rapida-y-yt-dlp-de-respaldo.md), [ADR-05](decisions/ADR-05-precarga-de-urls.md), [ADR-08](decisions/ADR-08-yt-dlp-residente.md) |
 | [Sesión de YouTube Music](areas/sesion.md) | Iniciar sesión (ventana propia o cookies del navegador), guardar solo las cookies de youtube.com y firmar las peticiones con SAPISIDHASH. | — | [ADR-07](decisions/ADR-07-inicio-de-sesion-en-proceso-aparte.md) |
 | [Ventana y navegación](areas/ventana.md) | Arranque, ventana principal con escenario, navegación superior, panel de letra y cola, pantalla «Sonando», mini reproductor, búsqueda y menú de clic derecho. | `panel`, `sonando`, `sonandoTitulo`, `caratulaCalidad` | [ADR-10](decisions/ADR-10-mini-reproductor-oculta-la-ventana.md) |
@@ -58,6 +58,7 @@ Qué leer para cada tarea. Las tablas a partir de [Áreas](#áreas) las escribe
 | [`login/src/login_linux.cpp`](../login/src/login_linux.cpp) | [Sesión de YouTube Music](areas/sesion.md) |
 | [`login/src/main.rs`](../login/src/main.rs) | [Sesión de YouTube Music](areas/sesion.md) |
 | [`qml/Ambient.qml`](../qml/Ambient.qml) | [Opciones, skins y aspecto](areas/personalizacion.md) |
+| [`qml/ArtistHero.qml`](../qml/ArtistHero.qml) | [Detalle e inspeccionar](areas/detalle.md) |
 | [`qml/Catalog.qml`](../qml/Catalog.qml) | [Catálogo de YouTube Music](areas/catalogo.md) |
 | [`qml/CategoryBar.qml`](../qml/CategoryBar.qml) | [Catálogo de YouTube Music](areas/catalogo.md) |
 | [`qml/ContextMenu.qml`](../qml/ContextMenu.qml) | [Ventana y navegación](areas/ventana.md) |
@@ -129,6 +130,7 @@ Claves de `AppSettings.opcion`. Vacío es el valor por defecto (el `fallback` de
 |---|---|---|
 | `ambiente` | Modo ambiente (apariencia) | [Opciones, skins y aspecto](areas/personalizacion.md) |
 | `ambienteMovimiento` | Movimiento del ambiente (apariencia) | [Opciones, skins y aspecto](areas/personalizacion.md) |
+| `amplificador` | — (interna) | [Reproducción y cola](areas/reproduccion.md) |
 | `barra` | Barra de reproducción (apariencia) | [Reproducción y cola](areas/reproduccion.md) |
 | `calidad` | Calidad del audio (reproduccion) | [Resolución del audio y arranque instantáneo](areas/resolucion.md) |
 | `caratulaCalidad` | Carátula de «Sonando» (apariencia) | [Ventana y navegación](areas/ventana.md) |
@@ -136,6 +138,8 @@ Claves de `AppSettings.opcion`. Vacío es el valor por defecto (el `fallback` de
 | `categoria` | — (interna) | [Catálogo de YouTube Music](areas/catalogo.md) |
 | `categorias` | — (interna) | [Catálogo de YouTube Music](areas/catalogo.md) |
 | `desenfoque` | Desenfoque (apariencia) | [Opciones, skins y aspecto](areas/personalizacion.md) |
+| `ecualizador` | — (interna) | [Reproducción y cola](areas/reproduccion.md) |
+| `ecualizadorBandas` | — (interna) | [Reproducción y cola](areas/reproduccion.md) |
 | `explorarFuente` | Fuente de Explorar (vistas) | [Catálogo de YouTube Music](areas/catalogo.md) |
 | `historial` | Registrar en YouTube Music (reproduccion) | [Registro de escuchas](areas/historial.md) |
 | `letraAlineacion` | Alineación de la letra (apariencia) | [Letra sincronizada](areas/letra.md) |

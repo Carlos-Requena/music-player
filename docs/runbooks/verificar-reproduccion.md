@@ -24,6 +24,7 @@ HOME="$PRUEBA" MUSICPLAYER_SILENT=1 ./target/release/musicplayer \
 | `--probe search "texto"` | Búsqueda |
 | `--probe queue VIDEO_ID` | Radio de una canción |
 | `--probe album PLAYLIST_ID` | Canciones de un álbum o playlist (página real) |
+| `--probe links VIDEO_ID` | Álbum y artista de una canción, y la lista del álbum («Ir al álbum» del menú) |
 | `--probe lyrics "título" "artista"` | Letra de LRCLIB |
 | `--probe play VIDEO_ID` | Mide el arranque (con `MUSICPLAYER_SILENT=1`) |
 | `--probe resolve id1,id2` | Resolución con el yt-dlp residente |

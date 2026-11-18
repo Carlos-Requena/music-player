@@ -56,6 +56,7 @@ HOME="$PRUEBA" MUSICPLAYER_SILENT=1 ./target/release/musicplayer \
 | `--then-next ms` | Pasa a la pista siguiente tras ese tiempo |
 | `--open` | (con `--autoplay`) abre el detalle del elemento enfocado en vez de reproducirlo |
 | `--shuffle` | (con `--open`) pulsa «Aleatorio» a los 5 s |
+| `--detail-at y` | (con `--open`) baja el detalle `y` píxeles a los 5 s (la rueda simulada solo mueve la primera muesca) |
 | `--inspect [flip\|open\|disc]` | (con `--autoplay`) inspecciona el elemento y deja la caja girada, abierta o con el disco fuera |
 
 Un argumento nuevo se añade a `Main.qml` (`arg`) y a esta tabla en la misma tarea.

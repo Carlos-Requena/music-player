@@ -22,6 +22,7 @@ const QML_FILES: &[&str] = &[
     "qml/PlayerBar.qml",
     "qml/SettingsSheet.qml",
     "qml/PillButton.qml",
+    "qml/ArtistHero.qml",
     "qml/DetailView.qml",
     "qml/InspectView.qml",
     "qml/MiniPlayer.qml",

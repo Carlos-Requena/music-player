@@ -110,6 +110,10 @@ pub mod qobject {
         #[qinvokable]
         fn restart_engine(self: Pin<&mut Player>);
 
+        /// Vuelve a aplicar el ecualizador y el amplificador (tras cambiarlos en Opciones).
+        #[qinvokable]
+        fn apply_effects(self: Pin<&mut Player>);
+
         /// Cambia el volumen (0–100).
         #[qinvokable]
         fn change_volume(self: Pin<&mut Player>, volume: f64);
@@ -775,6 +779,12 @@ impl qobject::Player {
         self.load(start);
     }
 
+    fn apply_effects(mut self: Pin<&mut Self>) {
+        if let Some(mpv) = self.as_mut().rust_mut().mpv.as_mut() {
+            let _ = mpv.set_effects(&crate::audio::effects());
+        }
+    }
+
     fn change_volume(mut self: Pin<&mut Self>, volume: f64) {
         let volume = volume.clamp(0.0, 100.0);
         if let Some(mpv) = self.as_mut().rust_mut().mpv.as_mut() {
@@ -994,6 +1004,10 @@ impl qobject::Player {
         match engine {
             Ok(mut mpv) => {
                 let _ = mpv.set_volume(*self.volume());
+                let effects = crate::audio::effects();
+                if !effects.is_empty() {
+                    let _ = mpv.set_effects(&effects);
+                }
                 if *self.repetir_una() {
                     let _ = mpv.set_loop_file(true);
                 }

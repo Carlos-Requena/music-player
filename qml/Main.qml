@@ -90,6 +90,13 @@ Window {
         }
     }
 
+    // «Ir al álbum» o «Ver artista» del menú: baja «Sonando» para que se vea el detalle.
+    function openRelated(item, que) {
+        nowOpen = false
+        inspecting = false
+        Library.openRelated(JSON.stringify(item), que)
+    }
+
     function closeDetail() {
         inspecting = false
         Library.closeDetail()
@@ -357,6 +364,8 @@ Window {
                         win.choose(sectionView.currentItem)
                         if (win.args.indexOf("--shuffle") >= 0)
                             shuffleTimer.start()
+                        if (win.arg("--detail-at") !== "")
+                            detailScroll.start()
                         return
                     }
                     if (win.args.indexOf("--inspect") >= 0) {
@@ -389,6 +398,13 @@ Window {
                 id: shuffleTimer
                 interval: 5000
                 onTriggered: detailView.play(0, true)
+            }
+
+            // Depuración: `--open --detail-at y` baja el detalle `y` píxeles cuando ha cargado.
+            Timer {
+                id: detailScroll
+                interval: 5000
+                onTriggered: detailView.scrollTo(parseInt(win.arg("--detail-at")))
             }
 
             Timer {
@@ -633,6 +649,7 @@ Window {
         onClosed: win.closeDetail()
         onInspect: win.inspect(null)
         onOpened: item => win.choose(item)
+        tint: stageProbe.tint
     }
 
     InspectView {
@@ -664,6 +681,7 @@ Window {
         }
         onRenameCategoryRequested: name => categoryBar.rename(name)
         onCoverRequested: item => win.changeCover(item)
+        onRelatedRequested: (item, que) => win.openRelated(item, que)
     }
 
     // Depuración: `--settings-end` / `--settings-at y` desplazan las opciones ya abiertas.

@@ -47,6 +47,26 @@ fn probe(args: &[String]) -> bool {
             }
             return true;
         }
+        // Álbum y artista de una canción (y la lista del álbum), como «Ir al álbum» del menú.
+        "links" => {
+            match ytm::song_links(argument) {
+                Ok(links) => {
+                    println!("álbum: {:?}", links.album.as_ref().map(|a| (&a.title, &a.browse_id)));
+                    println!("artista: {:?}", links.artist.as_ref().map(|a| (&a.title, &a.browse_id)));
+                    if let Some(album) = links.album {
+                        match ytm::album_info(&album.browse_id) {
+                            Ok((album, artist)) => println!(
+                                "lista del álbum: {} «{}»; artista del álbum: {:?}",
+                                album.playlist_id, album.title, artist.map(|a| a.browse_id)
+                            ),
+                            Err(error) => eprintln!("{error}"),
+                        }
+                    }
+                }
+                Err(error) => eprintln!("{error}"),
+            }
+            return true;
+        }
         "cookies" => {
             // Diagnóstico del inicio de sesión: solo cuenta y nombra cookies, no guarda nada.
             print!("{}", account::diagnose(if argument.is_empty() { "chrome" } else { argument }));

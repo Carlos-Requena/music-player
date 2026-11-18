@@ -17,6 +17,9 @@ que toque **antes** de cambiar algo ahí. Una trampa nueva se añade en su secci
 
 ## Qt Quick y QML
 
+- **Un menú que cambia de entradas al abrirse** tiene aún el alto anterior al colocarlo, y
+  `Qt.callLater` no siempre basta: recoloca en `onHeightChanged` (`ContextMenu.anchorPoint`).
+
 - **`font.pixelSize` es entero:** `12.5` hace fallar la carga del componente entero.
 - **No llames `palette`** a una propiedad propia: choca con la de `Item` y QML la ignora.
 - **Un `id` tapa una propiedad con el mismo nombre:** en `NowPlayingView`, `art` era a la vez una
@@ -83,6 +86,12 @@ que toque **antes** de cambiar algo ahí. Una trampa nueva se añade en su secci
   aparece en el historial de YouTube y no en el de YouTube Music.
 - **Cola `next` para un álbum:** trae versiones en vídeo, se corta en ~50 y mezcla canciones
   ajenas; se usa la página `VL<id>` ([ADR-06](decisions/ADR-06-canciones-por-la-pagina-de-la-lista.md)).
+- **`ytm::find` recorre las claves en orden alfabético** (serde_json sin `preserve_order`): en la
+  página de un álbum encuentra antes el carrusel lateral («otras versiones») que la cabecera, y en
+  la cabecera `straplineThumbnail` (la foto del artista) antes que `thumbnail`. Busca dentro del
+  nodo que toca (`header_thumb`, la cabecera de `album_info`), no en toda la página.
+- **Los videoclips no traen álbum** en la ficha de `next`, solo el artista: busca la versión de
+  audio de la misma canción (`song_links`).
 
 ## macOS y Linux
 

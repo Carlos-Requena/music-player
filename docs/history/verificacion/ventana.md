@@ -5,6 +5,14 @@ son de cuando se escribieron. El estado actual está en su [ficha](../../areas/v
 
 Lo nuevo va arriba: añade una sección `## AAAA-MM-DD · qué se verificó` encima de las anteriores.
 
+## 2026-11-18 · «Ir al álbum» y «Ver artista» en el menú (rama `feature/artista-y-ecualizador`)
+
+- **Cambio:** dos entradas nuevas en `ContextMenu` (iconos `Theme.iconAlbum` e `iconArtist`),
+  `Main.openRelated`, y el menú se recoloca al cambiar su alto (`anchorPoint`).
+- **Verificado:** capturas con clics de verdad (`MUSICPLAYER_DEBUG_CLICK`): el menú de una canción
+  de la búsqueda cabe entero en la ventana y sus dos entradas abren el álbum y el artista.
+- **No verificado:** el menú desde la cola de «Sonando»; Linux.
+
 ## 2026-11-17 · Precarga al detenerse el puntero y fondo de skin en escalones (rama `perf/letra`)
 
 - **Cambio:** `hint` y `unhint`: el foco o el puntero precargan a los 250 ms, nada si el puntero

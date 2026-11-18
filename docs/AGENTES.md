@@ -261,6 +261,13 @@ añadas más casos, y actualiza la lista.
   [ADR-20](decisions/ADR-20-fuente-de-explorar-a-elegir.md)).
 - **Sección Historial** en la navegación: el historial de escucha de la cuenta de YouTube Music
   ([catalogo](areas/catalogo.md)).
+- **Ir al álbum y al artista desde el clic derecho** de cualquier canción o carátula
+  ([ventana](areas/ventana.md)).
+- **Vista de artista «Órbita»**: la foto en el centro con un anillo del color de la foto y sus tres
+  canciones más escuchadas flotando alrededor; al bajar, canciones y discografía
+  ([detalle](areas/detalle.md)).
+- **Ecualizador y amplificador de volumen como plugin** (Opciones › Plugins), con filtros de mpv
+  ([reproduccion](areas/reproduccion.md)).
 - **Iniciar sesión con una ventana propia** (WebKit del sistema en macOS, Qt WebEngine opcional en
   Linux) y, como alternativa, importar del navegador; sin disfrazar el agente de usuario
   ([sesion](areas/sesion.md)).

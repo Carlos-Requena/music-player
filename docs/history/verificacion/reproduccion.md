@@ -5,6 +5,18 @@ son de cuando se escribieron. El estado actual está en su [ficha](../../areas/r
 
 Lo nuevo va arriba: añade una sección `## AAAA-MM-DD · qué se verificó` encima de las anteriores.
 
+## 2026-11-18 · Ecualizador y amplificador de volumen (rama `feature/artista-y-ecualizador`)
+
+- **Cambio:** filtros de mpv (`audio::effects_chain`) con diez bandas, amplificador hasta +12 dB y
+  limitador; opciones `ecualizador`, `ecualizadorBandas` y `amplificador`; `Player.applyEffects`;
+  interfaz en Opciones › Plugins.
+- **Verificado:** tres pruebas de la cadena de filtros; mpv 0.42 acepta la cadena (sin errores);
+  con `--autoplay`, `get_property af` por el socket de mpv devuelve la cadena guardada y
+  `sonando true`; captura de Opciones › Plugins con el preajuste Graves y +4 dB. Memoria de mpv
+  igual con y sin efectos (232 / 231 MB) y ~1 % de un núcleo más.
+- **No verificado:** cómo suena (mpv iba sin salida de audio); el corte al mover un deslizador
+  mientras suena; Linux.
+
 ## 2026-11-17 · Colas con límite, mensajes de mpv sin árbol JSON (rama `perf/letra`)
 
 - **Cambio:** `album_queue` guarda las últimas 24 colas y no descarga dos veces la misma a la vez;

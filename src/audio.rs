@@ -32,6 +32,59 @@ pub enum Event {
     Failed,
 }
 
+/// Frecuencias (Hz) de las diez bandas del ecualizador: una por octava, como los clásicos.
+pub const EQ_BANDS: [u32; 10] = [31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
+/// Ganancia máxima de cada banda y del amplificador, en dB (hacia arriba y, las bandas, abajo).
+pub const EQ_LIMIT: f64 = 12.0;
+
+/// Cadena de filtros de audio de mpv (`af`) que piden el ecualizador y el amplificador; vacía
+/// si no hay ninguno. La pone `settings` y la aplica `Player` al arrancar mpv y al cambiarla.
+static EFFECTS: std::sync::Mutex<String> = std::sync::Mutex::new(String::new());
+
+/// Cadena de filtros para unas ganancias por banda (dB, en el orden de `EQ_BANDS`; las que
+/// falten cuentan como 0) y un amplificador (dB). Las bandas a 0 no se añaden; si algo sube el
+/// nivel, un limitador al final evita la distorsión por saturación.
+pub fn effects_chain(gains: &[f64], boost_db: f64) -> String {
+    let mut filters: Vec<String> = EQ_BANDS
+        .iter()
+        .zip(gains)
+        .map(|(freq, gain)| (freq, gain.clamp(-EQ_LIMIT, EQ_LIMIT)))
+        .filter(|(_, gain)| gain.abs() >= 0.05)
+        .map(|(freq, gain)| format!("equalizer=f={freq}:t=o:w=1:g={gain:.1}"))
+        .collect();
+    let boost = boost_db.clamp(0.0, EQ_LIMIT);
+    if boost >= 0.05 {
+        filters.push(format!("volume=volume={boost:.1}dB"));
+    }
+    if boost >= 0.05 || gains.iter().any(|gain| *gain >= 0.05) {
+        filters.push("alimiter=limit=0.97:level=disabled".to_owned());
+    }
+    if filters.is_empty() {
+        String::new()
+    } else {
+        format!("lavfi=[{}]", filters.join(","))
+    }
+}
+
+/// Guarda la cadena de efectos a partir de las opciones: `ecualizador` ("si" lo activa),
+/// `ecualizadorBandas` (ganancias separadas por comas) y `amplificador` (dB).
+pub fn configure(eq_on: bool, bands: &str, boost: &str) {
+    let gains: Vec<f64> = if eq_on {
+        bands.split(',').map(|gain| gain.trim().parse().unwrap_or(0.0)).collect()
+    } else {
+        Vec::new()
+    };
+    let chain = effects_chain(&gains, boost.trim().parse().unwrap_or(0.0));
+    if let Ok(mut effects) = EFFECTS.lock() {
+        *effects = chain;
+    }
+}
+
+/// La cadena de efectos vigente (ver `configure`).
+pub fn effects() -> String {
+    EFFECTS.lock().map(|effects| effects.clone()).unwrap_or_default()
+}
+
 /// Rutas donde suelen vivir mpv y yt-dlp y que una app gráfica no hereda en su PATH.
 const EXTRA_PATHS: &[&str] = &["/opt/homebrew/bin", "/usr/local/bin"];
 
@@ -149,6 +202,11 @@ impl Mpv {
     /// opción global de mpv: sigue puesta al cargar otra pista hasta que se quite.
     pub fn set_loop_file(&mut self, on: bool) -> io::Result<()> {
         self.command(json!(["set_property", "loop-file", if on { "inf" } else { "no" }]))
+    }
+
+    /// Pone los filtros de audio (`af`): la cadena de `effects_chain`, o vacía para quitarlos.
+    pub fn set_effects(&mut self, chain: &str) -> io::Result<()> {
+        self.command(json!(["set_property", "af", chain]))
     }
 
     /// Volumen de 0 a 100.
@@ -269,7 +327,28 @@ fn read_events(socket: UnixStream, on_event: impl Fn(Event)) {
 
 #[cfg(test)]
 mod tests {
-    use super::Message;
+    use super::{effects_chain, Message};
+
+    #[test]
+    fn sin_efectos_no_hay_filtros() {
+        assert_eq!(effects_chain(&[], 0.0), "");
+        assert_eq!(effects_chain(&[0.0; 10], 0.0), "");
+    }
+
+    #[test]
+    fn bandas_y_amplificador() {
+        assert_eq!(
+            effects_chain(&[6.0, 0.0, -3.0], 4.0),
+            "lavfi=[equalizer=f=31:t=o:w=1:g=6.0,equalizer=f=125:t=o:w=1:g=-3.0,volume=volume=4.0dB,alimiter=limit=0.97:level=disabled]"
+        );
+    }
+
+    #[test]
+    fn solo_recortes_sin_limitador_y_limites() {
+        assert_eq!(effects_chain(&[-4.0], 0.0), "lavfi=[equalizer=f=31:t=o:w=1:g=-4.0]");
+        assert!(effects_chain(&[40.0], 99.0).contains("g=12.0"));
+        assert!(effects_chain(&[40.0], 99.0).contains("volume=12.0dB"));
+    }
 
     #[test]
     fn lee_los_mensajes_de_mpv() {
