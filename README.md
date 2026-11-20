@@ -208,13 +208,13 @@ detecta al arrancar y te avisa.
 ### macOS (Homebrew)
 
 ```bash
-brew install rust qtbase qtdeclarative qtshadertools mpv yt-dlp deno
+brew install rust qtbase qtdeclarative qtmultimedia qtshadertools mpv yt-dlp deno ffmpeg
 ```
 
 ### CachyOS / Arch Linux
 
 ```bash
-sudo pacman -S rust qt6-base qt6-declarative qt6-shadertools mpv yt-dlp deno
+sudo pacman -S rust qt6-base qt6-declarative qt6-multimedia qt6-shadertools mpv yt-dlp deno ffmpeg
 ```
 
 > La compilación y las pruebas se han hecho en macOS. Linux no se ha probado todavía.

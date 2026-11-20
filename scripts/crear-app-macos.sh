@@ -26,7 +26,7 @@ done
 for programa in cargo qmake6 mpv yt-dlp; do
     if ! command -v "$programa" >/dev/null 2>&1; then
         echo "Falta «$programa». Instala las dependencias (ver COMPILAR.md):" >&2
-        echo "  brew install rust qtbase qtdeclarative qtshadertools mpv yt-dlp deno" >&2
+        echo "  brew install rust qtbase qtdeclarative qtmultimedia qtshadertools mpv yt-dlp deno" >&2
         exit 1
     fi
 done
@@ -66,7 +66,7 @@ if [ "$INDEPENDIENTE" = 1 ]; then
     echo "› Copiando Qt dentro de la app (macdeployqt)…"
     # Algunos módulos QML de Homebrew enlazan QtSvg, que vive fuera de qtbase.
     LIBS=()
-    for formula in qtsvg qtdeclarative qtbase; do
+    for formula in qtsvg qtdeclarative qtmultimedia qtbase; do
         prefijo=$(brew --prefix "$formula" 2>/dev/null || true)
         [ -n "$prefijo" ] && [ -d "$prefijo/lib" ] && LIBS+=("-libpath=$prefijo/lib")
     done

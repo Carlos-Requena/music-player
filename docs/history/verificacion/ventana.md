@@ -5,6 +5,20 @@ son de cuando se escribieron. El estado actual está en su [ficha](../../areas/v
 
 Lo nuevo va arriba: añade una sección `## AAAA-MM-DD · qué se verificó` encima de las anteriores.
 
+## 2026-11-20 · Carátula animada de Apple Music en «Sonando» (rama `feature/caratula-animada`)
+
+- **Cambio:** `src/animada.rs`, `Player.animada` y `Player.buscarAnimada`, `qml/MotionCover.qml`,
+  `shaders/redondeo.frag`, opción `caratulaAnimada` y `--probe animada`. Dependencia nueva: Qt
+  Multimedia (`qtmultimedia` / `qt6-multimedia`) y `ffmpeg`.
+- **Verificado:** `--probe animada` encuentra y descarga el vídeo de *DELTARUNE Piano Collections,
+  Vol. 1* (20 s, 960×960, 6,4 MB, 1,5–2,7 s la primera vez, al instante después), tanto con el
+  artista de Apple como con el de YouTube Music («Toby Fox», por el álbum); dos capturas de
+  «Sonando» separadas 1,5 s muestran fotogramas distintos con las esquinas redondeadas; la fila
+  en Opciones › Apariencia. Medida en release (ficha, «Medidas»). Tests de `animada.rs`.
+- **No verificado:** Linux; la app empaquetada (`crear-app-macos.sh`); qué pasa sin Qt
+  Multimedia instalado (debería fallar solo el `Loader`); la disposición Clásica; un álbum sin
+  carátula animada dentro de la app (solo con `--probe`).
+
 ## 2026-11-18 · «Ir al álbum» y «Ver artista» en el menú (rama `feature/artista-y-ecualizador`)
 
 - **Cambio:** dos entradas nuevas en `ContextMenu` (iconos `Theme.iconAlbum` e `iconArtist`),

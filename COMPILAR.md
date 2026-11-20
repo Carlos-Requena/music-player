@@ -7,7 +7,7 @@ En resumen:
 
 | Sistema | Dependencias | Compilar e instalar |
 |---|---|---|
-| macOS | `brew install rust qtbase qtdeclarative qtshadertools mpv yt-dlp deno` | `scripts/crear-app-macos.sh` |
+| macOS | `brew install rust qtbase qtdeclarative qtmultimedia qtshadertools mpv yt-dlp deno ffmpeg` | `scripts/crear-app-macos.sh` |
 | CachyOS | `scripts/instalar-linux.sh --dependencias` | `scripts/instalar-linux.sh` |
 
 ## Qué necesita
@@ -35,7 +35,7 @@ xcode-select --install
 ```
 
 ```bash
-brew install rust qtbase qtdeclarative qtshadertools mpv yt-dlp deno
+brew install rust qtbase qtdeclarative qtmultimedia qtshadertools mpv yt-dlp deno ffmpeg
 ```
 
 (Si ya tienes Rust con `rustup`, quita `rust` de la lista.)
@@ -117,14 +117,14 @@ scripts/instalar-linux.sh --dependencias
 ```
 
 Instala con `pacman` (te pedirá la contraseña):
-`base-devel rust qt6-base qt6-declarative qt6-shadertools qt6-wayland qt6-webengine mpv yt-dlp deno`.
+`base-devel rust qt6-base qt6-declarative qt6-multimedia qt6-shadertools qt6-wayland qt6-webengine mpv yt-dlp deno ffmpeg`.
 (`qt6-webengine` es para la ventana de inicio de sesión; sin él la app funciona igual y puedes
 importar la sesión del navegador.)
 
 Si prefieres hacerlo a mano:
 
 ```bash
-sudo pacman -S --needed base-devel rust qt6-base qt6-declarative qt6-shadertools qt6-wayland qt6-webengine mpv yt-dlp deno
+sudo pacman -S --needed base-devel rust qt6-base qt6-declarative qt6-multimedia qt6-shadertools qt6-wayland qt6-webengine mpv yt-dlp deno ffmpeg
 ```
 
 (Si ya usas `rustup`, quita `rust` de la lista.)

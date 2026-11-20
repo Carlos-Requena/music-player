@@ -56,6 +56,9 @@ pub mod qobject {
         #[qproperty(bool, repetir_una)]
         /// Lista temporal (JSON de `[ytm::Track]`): canciones sueltas reunidas a mano.
         #[qproperty(QString, temporal)]
+        /// Carátula animada de Apple Music de lo que suena (URL `file://` de un MP4 en caché) o
+        /// vacío si no tiene o no se ha pedido (`buscar_animada`).
+        #[qproperty(QString, animada)]
         type Player = super::PlayerRust;
 
         /// Reproduce un elemento del catálogo (JSON de `ytm::Item`): una canción con
@@ -71,6 +74,11 @@ pub mod qobject {
         /// Salta a la pista `index` de la cola.
         #[qinvokable]
         fn play_index(self: Pin<&mut Player>, index: i32);
+
+        /// Busca la carátula animada de lo que suena (ver `animada.rs`) y la publica en
+        /// `animada` cuando llega. Solo la pide «Sonando», con la opción activada.
+        #[qinvokable]
+        fn buscar_animada(self: Pin<&mut Player>);
 
         /// Alterna reproducción y pausa.
         #[qinvokable]
@@ -212,6 +220,11 @@ pub struct PlayerRust {
     repetir: bool,
     repetir_una: bool,
     temporal: QString,
+    animada: QString,
+    /// Cambia con cada pista o búsqueda de carátula animada; descarta las respuestas viejas.
+    animada_token: u64,
+    /// Pista (título y artista) cuya carátula animada ya se pidió.
+    animada_pedida: Option<(String, String)>,
     /// Pistas de la lista temporal (`temporal` es su JSON).
     temporal_tracks: Vec<Track>,
     /// Escucha que se está registrando en la cuenta (opción `historial`).
@@ -408,6 +421,9 @@ impl Default for PlayerRust {
             repetir: false,
             repetir_una: false,
             temporal: QString::from("[]"),
+            animada: QString::default(),
+            animada_token: 0,
+            animada_pedida: None,
             temporal_tracks: Vec::new(),
             listen: None,
         }
@@ -1036,6 +1052,7 @@ impl qobject::Player {
         self.as_mut().set_title(QString::from(&track.title));
         self.as_mut().set_artist(QString::from(&track.artist));
         self.as_mut().set_thumb(QString::from(&track.thumb));
+        self.as_mut().clear_animada();
         self.as_mut().set_duration(track.duration);
         self.as_mut().set_position(0.0);
         self.as_mut().set_loading(true);
@@ -1095,6 +1112,46 @@ impl qobject::Player {
         if !matches!(loaded, Some(Ok(()))) {
             self.fail("Se perdió la conexión con el motor de audio.");
         }
+    }
+
+    /// Quita la carátula animada de la pista anterior y descarta su búsqueda pendiente.
+    fn clear_animada(mut self: Pin<&mut Self>) {
+        let token = self.animada_token + 1;
+        self.as_mut().rust_mut().animada_token = token;
+        self.as_mut().rust_mut().animada_pedida = None;
+        if !self.animada().is_empty() {
+            self.set_animada(QString::default());
+        }
+    }
+
+    fn buscar_animada(mut self: Pin<&mut Self>) {
+        let title = self.title().to_string();
+        let artist = self.artist().to_string();
+        if title.is_empty() {
+            return;
+        }
+        let video_id = usize::try_from(*self.index())
+            .ok()
+            .and_then(|index| self.tracks.get(index))
+            .map(|track| track.video_id.clone())
+            .unwrap_or_default();
+        let pista = Some((title.clone(), artist.clone()));
+        if self.animada_pedida == pista {
+            return;
+        }
+        self.as_mut().rust_mut().animada_pedida = pista;
+        let token = self.animada_token;
+        let qt = self.qt_thread();
+        thread::spawn(move || {
+            let found = crate::animada::find(&title, &artist, &video_id);
+            let _ = qt.queue(move |mut player| {
+                if player.animada_token != token {
+                    return;
+                }
+                let url = found.map(|path| format!("file://{}", path.display())).unwrap_or_default();
+                player.as_mut().set_animada(QString::from(&url));
+            });
+        });
     }
 
     /// Quita la letra publicada y descarta las respuestas pendientes; devuelve el contador nuevo.

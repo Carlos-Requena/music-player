@@ -37,4 +37,5 @@ reescribe: si algo cambia, se añade otra y se actualiza el estado de la antigua
 | [ADR-18](ADR-18-letra-de-varias-fuentes.md) | Letra de varias fuentes (LRCLIB, NetEase y Kugou), pedidas a la vez y elegidas en la interfaz | aceptada | [letra](../areas/letra.md) | 2026-11-16 |
 | [ADR-19](ADR-19-explorar-con-listenbrainz.md) | Explorar muestra las recomendaciones de ListenBrainz (Troi) pedidas a su API desde Rust | ampliada por ADR-20 | [catalogo](../areas/catalogo.md), [plugins](../areas/plugins.md) | 2026-11-17 |
 | [ADR-20](ADR-20-fuente-de-explorar-a-elegir.md) | La fuente de Explorar se elige en Opciones (ListenBrainz por defecto o YouTube Music) | aceptada | [catalogo](../areas/catalogo.md) | 2026-11-17 |
+| [ADR-21](ADR-21-caratula-animada-de-apple-music.md) | La carátula animada se toma de la página pública de Apple Music y se reproduce con Qt Multimedia desde la caché | aceptada | [ventana](../areas/ventana.md) | 2026-11-20 |
 <!-- /generado -->

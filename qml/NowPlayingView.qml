@@ -85,6 +85,19 @@ FocusScope {
         return Player.thumb.replace("w544-h544", "w" + bigPixels + "-h" + bigPixels)
     }
 
+    // Carátula animada de Apple Music (opción `caratulaAnimada`, desactivada por defecto): con la
+    // pantalla a la vista se pide la de lo que suena (`Player.buscarAnimada`, que no repite una
+    // pista ya pedida) y, si llega, un vídeo en bucle tapa la carátula fija.
+    readonly property bool animated: { void AppSettings.revision; return AppSettings.opcion("caratulaAnimada") === "si" }
+    readonly property bool wantsAnimated: animated && root.visible && Player.title !== ""
+    onWantsAnimatedChanged: if (wantsAnimated) Player.buscarAnimada()
+    Connections {
+        target: Player
+        enabled: root.wantsAnimated
+        function onTitleChanged() { Player.buscarAnimada() }
+        function onArtistChanged() { Player.buscarAnimada() }
+    }
+
     // Arriba del todo, tapa la ventana entera: lo de debajo no hace falta pintarlo.
     readonly property bool covering: shown >= 1
     // Lo que desenfoca el vidrio de la barra de reproducción: solo el fondo, no la letra ni la
@@ -217,6 +230,22 @@ FocusScope {
                     load: root.visible
                     radius: 18
                     placeholder: false
+                }
+
+                // Carátula animada: solo existe con la pantalla a la vista y un vídeo para lo que
+                // suena; al bajar «Sonando» se destruye y suelta el decodificador. Aparece con un
+                // fundido cuando ya pinta el primer fotograma, encima de la fija.
+                Loader {
+                    id: motion
+                    anchors.fill: parent
+                    active: root.wantsAnimated && Player.animada !== ""
+                    // En su propio archivo: si falta Qt Multimedia, solo falla la carátula animada
+                    // y «Sonando» sigue cargando.
+                    source: "MotionCover.qml"
+                    onLoaded: {
+                        item.source = Qt.binding(() => Player.animada)
+                        item.textureSide = Qt.binding(() => Math.min(960, root.art * root.dpr))
+                    }
                 }
 
                 // Brillo suave arriba a la izquierda, como un vinilo bajo una luz.

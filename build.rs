@@ -28,6 +28,7 @@ const QML_FILES: &[&str] = &[
     "qml/MiniPlayer.qml",
     "qml/TextField.qml",
     "qml/NowPlayingView.qml",
+    "qml/MotionCover.qml",
     "qml/ContextMenu.qml",
     "qml/CategoryBar.qml",
     "qml/Mascot.qml",
@@ -41,7 +42,7 @@ const QML_SINGLETONS: &[&str] = &["qml/Theme.qml", "qml/Catalog.qml"];
 
 /// Sombreadores ya compilados con `scripts/shaders.sh` (qsb). Van en el repositorio para que
 /// compilar no necesite qsb; en QML: `qrc:/qt/qml/app/musicplayer/shaders/<nombre>.qsb`.
-const SHADERS: &[&str] = &["shaders/fluido.frag", "shaders/reflejo.frag"];
+const SHADERS: &[&str] = &["shaders/fluido.frag", "shaders/reflejo.frag", "shaders/redondeo.frag"];
 
 fn main() {
     // Aviso si un sombreador cambió y su .qsb no se volvió a compilar.

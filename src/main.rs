@@ -1,4 +1,5 @@
 mod account;
+mod animada;
 mod audio;
 mod daemon;
 mod history;
@@ -165,6 +166,17 @@ fn probe(args: &[String]) -> bool {
                     }
                     None => println!("{}: sin letra sincronizada", source.id()),
                 }
+            }
+            return true;
+        }
+        "animada" => {
+            // `--probe animada <título> <artista> [videoId]`: carátula animada de Apple Music, si la tiene.
+            let artist = args.get(at + 3).map(String::as_str).unwrap_or_default();
+            let video_id = args.get(at + 4).map(String::as_str).unwrap_or_default();
+            let started = std::time::Instant::now();
+            match animada::find(argument, artist, video_id) {
+                Some(path) => println!("animada: {} ({:.1} s)", path.display(), started.elapsed().as_secs_f64()),
+                None => println!("sin carátula animada ({:.1} s)", started.elapsed().as_secs_f64()),
             }
             return true;
         }

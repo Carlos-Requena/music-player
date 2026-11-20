@@ -12,7 +12,7 @@ PREFIJO="${XDG_DATA_HOME:-$HOME/.local/share}"
 BIN="$HOME/.local/bin"
 # qt6-webengine: la ventana de inicio de sesión (musicplayer-login). Sin él la app funciona y
 # se puede importar la sesión del navegador.
-DEPENDENCIAS=(base-devel rust qt6-base qt6-declarative qt6-shadertools qt6-wayland qt6-webengine mpv yt-dlp deno)
+DEPENDENCIAS=(base-devel rust qt6-base qt6-declarative qt6-multimedia qt6-shadertools qt6-wayland qt6-webengine mpv yt-dlp deno ffmpeg)
 
 case "${1:-}" in
     --desinstalar)

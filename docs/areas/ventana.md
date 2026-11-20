@@ -2,9 +2,9 @@
 area: ventana
 titulo: Ventana y navegación
 resumen: Arranque, ventana principal con escenario, navegación superior, panel de letra y cola, pantalla «Sonando», mini reproductor, búsqueda y menú de clic derecho.
-archivos: [src/main.rs, src/window.cpp, qml/Main.qml, qml/TopNav.qml, qml/SearchField.qml, qml/NowPlayingPanel.qml, qml/NowPlayingView.qml, qml/MiniPlayer.qml, qml/ContextMenu.qml]
-opciones: [panel, sonando, sonandoTitulo, caratulaCalidad]
-adr: [ADR-10]
+archivos: [src/main.rs, src/window.cpp, src/animada.rs, qml/Main.qml, qml/TopNav.qml, qml/SearchField.qml, qml/NowPlayingPanel.qml, qml/NowPlayingView.qml, qml/MotionCover.qml, qml/MiniPlayer.qml, qml/ContextMenu.qml]
+opciones: [panel, sonando, sonandoTitulo, caratulaCalidad, caratulaAnimada]
+adr: [ADR-10, ADR-21]
 ---
 
 # Ventana y navegación
@@ -48,6 +48,27 @@ También el arranque del proceso y los argumentos de depuración (`--probe`, `--
   se suelta en cuanto la grande está a la vista (`Cover.ready`). Las canciones que son vídeos
   (`i.ytimg.com`) piden su fotograma `hq720` (1280×720) en vez de la miniatura pequeña con bandas
   negras; si no lo tienen, queda la miniatura.
+
+  **Carátula animada** (opción `caratulaAnimada`, Opciones › Apariencia; **No** por defecto), por
+  petición del propietario: si el álbum de lo que suena tiene en Apple Music una carátula en vídeo
+  («motion artwork», como *DELTARUNE Piano Collections*), se ve en bucle en lugar de la fija, con
+  un fundido al aparecer, y se queda quieta mientras la música está en pausa
+  ([ADR-21](../decisions/ADR-21-caratula-animada-de-apple-music.md)). Con la pantalla a la vista,
+  `Player.buscarAnimada` la busca en un hilo (`animada.rs`):
+  1. el álbum de la canción en YouTube Music (`ytm::song_links`);
+  2. la canción en la API pública de iTunes (`itunes.apple.com/search`), aceptando un resultado
+     con el mismo título y el mismo álbum o un artista en común (YouTube a veces da solo el
+     compositor, «Toby Fox», de un álbum que Apple pone a nombre del intérprete);
+  3. la página pública del álbum (`music.apple.com/us/album/<id>`), que trae la lista HLS del
+     vídeo cuadrado (`motionDetailSquare`);
+  4. la variante H.264 de hasta 960 px, descargada entera y copiada sin recodificar por `ffmpeg`
+     a `<caché>/musicplayer/animadas/<id>.mp4` (unos 6 MB por álbum; se guardan 40 como mucho).
+
+  El resultado de cada canción (con álbum o «no tiene») queda en `animadas/indice.json`: a Apple se
+  le pregunta una vez (un «no tiene» se vuelve a mirar a los 30 días). El vídeo lo pinta
+  `MotionCover.qml` (Qt Multimedia) dentro de un `Loader` que solo existe con «Sonando» a la vista:
+  si falta Qt Multimedia, solo falla la animación. `--probe animada <título> <artista> [videoId]`
+  prueba la búsqueda sin ventana.
 - **Mini reproductor**: ventana pequeña siempre encima; la grande se oculta mientras tanto
   ([ADR-10](../decisions/ADR-10-mini-reproductor-oculta-la-ventana.md)).
 - **Menú de clic derecho** (`Main.openMenu` → `ContextMenu`) y aviso breve: cola, «Ir al álbum» y
@@ -85,6 +106,10 @@ También el arranque del proceso y los argumentos de depuración (`--probe`, `--
   se pide nada ([resolucion](resolucion.md)).
 - **El fondo de imagen de una skin** se decodifica al tamaño de la ventana en escalones de 256 px:
   redimensionarla no lo vuelve a decodificar a cada píxel.
+- **Carátula animada sin capa con máscara:** las esquinas las redondea un sombreador
+  (`shaders/redondeo.frag`) sobre la textura del vídeo a 960 px como mucho; con `layer` y
+  `MultiEffect` costaba ~20 MB y ~5 % de CPU más. Desactivada por defecto por su coste en CPU
+  (ver «Medidas»).
 - **Lo que tapa «Sonando» no se pinta:** con la pantalla arriba del todo
   (`NowPlayingView.covering`), el escenario, el panel lateral (con su letra) y el detalle se ocultan;
   al bajar, la sección recupera el foco del teclado. Los vidrios que desenfocan el escenario
@@ -112,6 +137,7 @@ También el arranque del proceso y los argumentos de depuración (`--probe`, `--
 | Ventana lista | ~0,75 s | 2026-11-13, M4 Pro, release |
 | Ocultar para el mini reproductor | 213 → 148 MB | 2026-11-13, M4 Pro, release |
 | «Sonando» abierta, Grande con cola (1440×900, Retina) | 252–264 MB, igual que la Clásica con dos capas (254–273 MB; ruido ±10 MB) | 2026-11-16, M4 Pro, release |
+| «Sonando» Grande sin cola (1440×900, Retina) con la carátula animada de *DELTARUNE Piano Collections, Vol. 1* (960 px, 30 fps) frente a la opción en No | 311–326 MB y ~17–20 % de CPU frente a 311 MB y ~1,5 % (25 s acumulados) | 2026-11-20, M4 Pro, release |
 | «Sonando» sin cola (1440×900, Retina), carátula Máxima (1600 px) frente a Alta (1200 px) | 248–249 MB frente a 243–247 MB (~+4 MB; canciones distintas en cada pasada) | 2026-11-16, M4 Pro, release |
 
 ## Archivos
@@ -125,6 +151,8 @@ También el arranque del proceso y los argumentos de depuración (`--probe`, `--
 | `qml/SearchField.qml` | Campo de búsqueda |
 | `qml/NowPlayingPanel.qml` | Panel lateral: carátula, letra, cola, lista temporal |
 | `qml/NowPlayingView.qml` | Pantalla «Sonando» |
+| `qml/MotionCover.qml` | Vídeo de la carátula animada, con esquinas redondeadas |
+| `src/animada.rs` | Busca la carátula animada en Apple Music y la guarda en caché |
 | `qml/MiniPlayer.qml` | Mini reproductor |
 | `qml/ContextMenu.qml` | Menú de clic derecho y aviso |
 
@@ -142,6 +170,8 @@ También el arranque del proceso y los argumentos de depuración (`--probe`, `--
 | Mini y vuelta | [`showMini`](../../qml/Main.qml), [`restoreFromMini`](../../qml/Main.qml) |
 | Entradas del menú | [`entries`](../../qml/ContextMenu.qml), [`run`](../../qml/ContextMenu.qml) |
 | Ir al álbum o al artista | [`openRelated`](../../qml/Main.qml) |
+| Carátula animada: búsqueda y caché | [`find`](../../src/animada.rs), [`buscar_animada`](../../src/player.rs) |
+| Carátula animada: cuándo se pide y se muestra | [`wantsAnimated`](../../qml/NowPlayingView.qml), [`textureSide`](../../qml/MotionCover.qml) |
 
 ## Dependencias
 
@@ -164,12 +194,13 @@ También el arranque del proceso y los argumentos de depuración (`--probe`, `--
 
 ## Estado actual
 
-- **Última verificación:** 2026-11-18, «Ir al álbum» y «Ver artista» en el menú ([historial](../history/verificacion/ventana.md)).
+- **Última verificación:** 2026-11-20, carátula animada en «Sonando» ([historial](../history/verificacion/ventana.md)).
 - **Pruebas:** capturas con `--shot` ([verificar-interfaz](../runbooks/verificar-interfaz.md)).
 - **Sin verificar:** Wayland en CachyOS (panel, desenfoque, mini siempre encima); la carátula
   `hq720` de una canción que es vídeo dentro de la app (solo con `curl`); la vista previa de 120 px
   mientras carga (en las capturas la grande ya estaba); que el teclado vuelva a la sección al
-  cerrar «Sonando».
+  cerrar «Sonando»; la carátula animada en Linux y en la app empaquetada, sin Qt Multimedia
+  instalado, y con la disposición Clásica.
 - **Historial:** [docs/history/verificacion/ventana.md](../history/verificacion/ventana.md).
 
 ## Pendiente

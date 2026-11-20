@@ -59,6 +59,11 @@ que toque **antes** de cambiar algo ahí. Una trampa nueva se añade en su secci
   (`offscreen`) no pinta el relleno: compruébalo con ventana.
 - **Una `ListView` vertical pone cada delegado en x = 0** aunque el delegado diga otra `x`: el
   margen va en `leftMargin` de la lista (el Muro salía pegado al borde).
+- **Un `Loader` que pone propiedades en `onLoaded`** las pone después del `Component.onCompleted`
+  del componente: un `MediaPlayer` que llama a `play()` al crearse no tiene aún su `source` y no
+  arranca. Arráncalo también en `onSourceChanged` (`MotionCover.qml`).
+- **Vídeo con `layer` y `MultiEffect`** (máscara de esquinas): ~20 MB y ~5 % de CPU más, porque la
+  capa se rehace en cada fotograma. Un `ShaderEffect` propio sobre la textura (`redondeo.frag`).
 - **Letra en japonés o chino:** partir la línea por espacios deja una sola «palabra» enorme que se
   encoge en vez de pasar al renglón siguiente, y unir las sílabas con espacios separa los
   caracteres. Cada sílaba lleva `join` y los renglones se parten entre caracteres CJK (`rows` de
@@ -94,6 +99,10 @@ que toque **antes** de cambiar algo ahí. Una trampa nueva se añade en su secci
   audio de la misma canción (`song_links`).
 
 ## macOS y Linux
+
+- **`ffmpeg` con listas HLS de Apple** (fragmentos `BYTERANGE` de un solo archivo MP4) se queda en
+  el primer fragmento: un vídeo de 20 s salía de 4 s. Se descarga el archivo entero y `ffmpeg` lo
+  copia desde el disco (`animada::single_file`).
 
 - **Minimizar no libera memoria gráfica en macOS;** ocultar la ventana sí (`window.cpp`).
 - **Apps gráficas en macOS no heredan el `PATH`** de la terminal: `audio::search_path` añade
