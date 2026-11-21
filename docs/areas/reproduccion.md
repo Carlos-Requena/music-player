@@ -3,8 +3,8 @@ area: reproduccion
 titulo: Reproducción y cola
 resumen: Cola, lista temporal, siguiente y anterior, repetición, volumen y estado de lo que suena, con mpv como motor en un proceso aparte.
 archivos: [src/player.rs, src/audio.rs, src/signals.cpp, qml/PlayerBar.qml, qml/QueueList.qml]
-opciones: [barra, ecualizador, ecualizadorBandas, amplificador]
-adr: [ADR-02]
+opciones: [barra, ecualizador, ecualizadorBandas, amplificador, clic]
+adr: [ADR-02, ADR-23]
 ---
 
 # Reproducción y cola
@@ -14,6 +14,11 @@ Del clic a que suene, y lo que pasa mientras suena. Obtener la URL es de
 
 ## Qué hace
 
+- **Radio sin fin** (por petición del propietario): la radio de una canción elegida suelta (en
+  Inicio, una búsqueda…) no se acaba. Al quedar `RADIO_MARGIN` (5) canciones detrás de la que
+  suena, `extend_radio` pide las siguientes con la continuación de la radio
+  (`ytm::queue_more`, como la app de YouTube Music) y las añade al final, sin repetir ninguna que
+  ya esté en la cola. Una cola nueva (álbum, playlist, otra canción) olvida la continuación.
 - **Elegir una canción** la reproduce con su radio (o dentro de «Me gusta» si viene de ahí);
   **un álbum o playlist** usa su cola en caché o la pide y carga la primera pista.
 - **Cola:** reproducir a continuación o al final (`Player.enqueue`; un álbum llega por la red y
@@ -80,7 +85,8 @@ Stderr escribe `arranque de pista: N ms` en cada una.
 
 - `PlayerBar.qml`: barra flotante en uno de **tres estilos** (opción `barra`, leída en
   `Theme.barStyle`; diseños del propietario):
-  - **Islas** (por defecto): tres islas de vidrio sueltas: lo que suena (carátula redonda, título,
+  - **Islas** (por defecto): tres islas de vidrio sueltas: lo que suena (carátula redonda,
+    concéntrica con su píldora, la única carátula que no sigue la opción `esquinas`; título,
     artista y «Me gusta»), los controles con la posición, y mini reproductor, panel y volumen.
   - **Clásica**: una barra de 84 px; en el centro, aleatorio, anterior, reproducir, siguiente y
     repetir, con la posición debajo. La zona central está siempre centrada y con el mismo ancho:
@@ -104,9 +110,16 @@ Stderr escribe `arranque de pista: N ms` en cada una.
     resultado lo da el menú contextual.
   - **Aleatorio** baraja lo que queda de la cola detrás de la que suena (`Player.shuffleQueue`);
     es una acción, no un modo que se active y desactive.
-- `QueueList.qml`: la cola del panel y de «Sonando». Clic salta, clic derecho abre su menú (lleva
-  `queueIndex`) y arrastrar reordena; un `MouseArea` con `preventStealing: true` impide que la
-  lista se quede el gesto.
+- `QueueList.qml`: la cola del panel y de «Sonando», con filas `TrackRow`
+  ([interfaz-comun](interfaz-comun.md)): la que suena, con el título en acento y ▸ sobre la
+  miniatura. Clic derecho abre su menú (lleva `queueIndex`) y arrastrar reordena; un `MouseArea`
+  con `preventStealing: true` impide que la lista se quede el gesto.
+- **Clic en una canción** (opción `clic`, Opciones › Reproducción), a elegir por el propietario
+  ([ADR-23](../decisions/ADR-23-sistema-de-diseno-medidas-y-piezas-comunes.md)): «Doble clic»
+  (por defecto: un clic la elige, en vidrio claro, y el doble la hace sonar) o «Un clic» (suena
+  al momento). Vale en el detalle, la cola, la temporal y el Muro ([vistas](vistas.md))
+  (`Theme.singleClick`).
+- Los errores de reproducción salen en el color `error` de la skin, no en el acento.
 
 ## Medidas
 
@@ -130,6 +143,7 @@ Stderr escribe `arranque de pista: N ms` en cada una.
 | Concepto | Símbolo |
 |---|---|
 | Estilo de la barra y su alto | [`barStyle`](../../qml/Theme.qml), [`barHeight`](../../qml/Theme.qml) |
+| Radio sin fin | [`extend_radio`](../../src/player.rs), [`RADIO_MARGIN`](../../src/player.rs) |
 | Elegir algo para reproducir | [`play_item`](../../src/player.rs) |
 | Barajar | [`shuffle_tracks`](../../src/player.rs) |
 | Colas en caché | [`QUEUES`](../../src/player.rs) |
@@ -161,9 +175,10 @@ Stderr escribe `arranque de pista: N ms` en cada una.
 
 ## Estado actual
 
-- **Última verificación:** 2026-11-18, ecualizador y amplificador ([historial](../history/verificacion/reproduccion.md)).
+- **Última verificación:** 2026-11-21, filas `TrackRow` en la cola, opción `clic` y medidas comunes en la barra ([historial](../history/verificacion/reproduccion.md)).
 - **Pruebas:** `mod tests` de `src/audio.rs` (cadena de filtros); nada en `player.rs`; se prueban con `--autoplay` y
-  `--probe play` ([verificar-reproduccion](../runbooks/verificar-reproduccion.md)).
+  `--probe play` ([verificar-reproduccion](../runbooks/verificar-reproduccion.md)); la radio sin
+  fin, con `--play ID --play-index 46` y `--probe radio ID`.
 - **Sin verificar:** el sonido real del ecualizador y el amplificador (las pruebas van con
   `--ao=null`) y el corte al cambiarlos mientras suena; MPRIS en GNOME y KDE con Wayland; dar y quitar «Me gusta» y «Aleatorio» de
   la barra con sesión y música sonando.

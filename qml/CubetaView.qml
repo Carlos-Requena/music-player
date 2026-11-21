@@ -6,7 +6,6 @@ FocusScope {
     id: root
 
     property var zonas: []
-    property string titulo: ""
     property int index: 0
 
     readonly property var items: Catalog.allItems(zonas)
@@ -94,66 +93,37 @@ FocusScope {
         }
     }
 
-    // Frontal de la cubeta.
+    // Frontal de la cubeta, del color de fondo de la skin. Sin rótulo de sección (la navegación ya
+    // dice dónde estás, ADR-23): solo la posición, como la etiqueta de la caja.
     Rectangle {
         x: root.stackX - root.side / 2 - 34
         y: root.frontY + root.side - 44
         z: 150
         width: root.side + 68
         height: 120
-        radius: 10
+        radius: Theme.radiusS
         border.width: 1
         border.color: Theme.glassBorder
         gradient: Gradient {
-            GradientStop { position: 0; color: "#1A1D24" }
-            GradientStop { position: 1; color: "#0E1014" }
+            GradientStop { position: 0; color: Qt.tint(Theme.ground, Qt.rgba(1, 1, 1, 0.07)) }
+            GradientStop { position: 1; color: Qt.tint(Theme.ground, Qt.rgba(1, 1, 1, 0.02)) }
         }
 
         Text {
-            x: 22
-            y: 18
-            text: root.titulo
-            color: Theme.text
-            font.pixelSize: 20
-            font.weight: Font.ExtraBold
-            font.letterSpacing: 2.6
-            font.capitalization: Font.AllUppercase
-        }
-
-        Text {
-            anchors.right: parent.right
-            anchors.rightMargin: 22
-            y: 22
+            anchors.horizontalCenter: parent.horizontalCenter
+            y: 20
             text: root.items.length ? (root.index + 1) + " de " + root.items.length : ""
             color: Theme.textMuted
-            font.pixelSize: 12
+            font.pixelSize: Theme.fontSmall
         }
     }
 
-    Column {
+    FocusedCaption {
         x: root.width * 0.56
         y: root.frontY + 20
-        width: root.width - x - 48
-        spacing: 10
-
-        Text {
-            width: parent.width
-            text: root.currentItem ? root.currentItem.title : ""
-            color: Theme.text
-            font.pixelSize: 46
-            font.weight: Font.Bold
-            font.letterSpacing: -0.7
-            wrapMode: Text.WordWrap
-            maximumLineCount: 3
-            elide: Text.ElideRight
-        }
-
-        Text {
-            width: parent.width
-            text: root.currentItem ? root.currentItem.subtitle : ""
-            color: Theme.textMuted
-            font.pixelSize: 15
-            elide: Text.ElideRight
-        }
+        width: root.width - x - Theme.margin
+        alignment: Text.AlignLeft
+        lines: 3
+        item: root.currentItem
     }
 }

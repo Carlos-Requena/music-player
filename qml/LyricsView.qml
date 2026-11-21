@@ -189,7 +189,7 @@ Item {
         horizontalAlignment: root.centered ? Text.AlignHCenter : Text.AlignLeft
         text: "Sin letra sincronizada para esta canción."
         color: Theme.textFaint
-        font.pixelSize: 15
+        font.pixelSize: Theme.fontBody
         wrapMode: Text.WordWrap
     }
 

@@ -5,6 +5,30 @@ son de cuando se escribieron. El estado actual está en su [ficha](../../areas/r
 
 Lo nuevo va arriba: añade una sección `## AAAA-MM-DD · qué se verificó` encima de las anteriores.
 
+## 2026-11-21 · Cola con `TrackRow`, opción `clic` y medidas comunes en la barra (en `master`)
+
+- **Cambio:** la cola (panel y «Sonando») usa `TrackRow`; un clic elige o hace sonar según la
+  opción `clic` (doble clic por defecto) y la fila elegida se marca en vidrio claro; la que suena,
+  con el título en acento y ▸ sobre la miniatura. Barra: radios de la skin en Clásica y Compacta,
+  carátula según `esquinas` (Islas sigue redonda), errores en `Theme.error`
+  ([ADR-23](../../decisions/ADR-23-sistema-de-diseno-medidas-y-piezas-comunes.md)).
+- **Cómo:** 29 capturas con `--shot` (release, `HOME` de pruebas, `MUSICPLAYER_SILENT=1`, macOS Retina 1440×900, sin sesión), revisadas a ojo, sin errores de QML en la salida: `--play dQw4w9WgXcQ --panel --tab cola`, `--now`, barra Clásica.
+- **Resultado:** `estado: … | sonando true | error  |`; la que suena, marcada en la cola.
+  Arrastre con `MUSICPLAYER_DEBUG_CLICK="1224,580,draghold,10000,1224,700"`: la fila levantada
+  lleva borde y vidrio claro y las de en medio se apartan, como antes.
+- **No verificado:** soltar el arrastre (la captura es a mitad del gesto); el clic con el ratón de
+  verdad; el sonido real.
+
+## 2026-11-21 · Radio sin fin (en `master`)
+
+- **Cambio:** `Player.extend_radio` y `RADIO_MARGIN`: la radio de una canción guarda su
+  continuación (`ytm::queue_page`) y, con 5 canciones o menos por delante, pide las siguientes
+  (`ytm::queue_more`) y las añade sin repetir. Arnés: `--play-index N`.
+- **Verificado:** `--probe radio 3qmkPx8R--Y 3`: cuatro páginas de 50 y 49 pistas, todas nuevas.
+  En la app, `--play 3qmkPx8R--Y --play-index 46`: «radio: +29 canciones (cola de 79)» (las otras
+  20 ya estaban) y siguió sonando.
+- **No verificado:** escuchar hasta el final de verdad (varias tandas seguidas); con sesión; Linux.
+
 ## 2026-11-18 · Ecualizador y amplificador de volumen (rama `feature/artista-y-ecualizador`)
 
 - **Cambio:** filtros de mpv (`audio::effects_chain`) con diez bandas, amplificador hasta +12 dB y

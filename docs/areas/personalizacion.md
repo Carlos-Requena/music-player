@@ -3,8 +3,8 @@ area: personalizacion
 titulo: Opciones, skins y aspecto
 resumen: Preferencias guardadas (vista por sección, skin, opciones genéricas), la hoja de Opciones, los tokens visuales de Theme, el vidrio y el modo ambiente.
 archivos: [src/settings.rs, qml/Theme.qml, qml/SettingsSheet.qml, qml/Ambient.qml, qml/TintProbe.qml, skins/vidrio.json, skins/medianoche.json, skins/grafito.json, skins/neon.json]
-opciones: [ambiente, ambienteMovimiento, desenfoque]
-adr: [ADR-11, ADR-17]
+opciones: [ambiente, ambienteMovimiento, desenfoque, esquinas, compacto]
+adr: [ADR-11, ADR-17, ADR-23]
 ---
 
 # Opciones, skins y aspecto
@@ -35,6 +35,12 @@ Vistas y Plugins. Cómo crear una skin o una mascota, para quien usa la app: [RE
   despacio, cada uno por su camino (una vuelta cada ~40 s), solo mientras suena música. No (por
   defecto), En Sonando o Siempre. Quien usa el fondo lo enciende con `Ambient.moving`.
   **Desenfoque** (`desenfoque`): desactivarlo ahorra memoria y batería.
+- **Esquinas de las carátulas** (`esquinas`), a elegir por el propietario: «Redondeadas» (por
+  defecto) o «Cuadradas» (`Theme.roundCovers`, `Theme.coverRadius`). Ver la regla de medidas abajo.
+- **Hoja compacta** (`compacto`), un segmento «Normal / Compacta» junto a la × de Opciones, por
+  petición del propietario cuando crecieron las opciones: sin descripciones en las filas (la de
+  la fila bajo el ratón sale en un pie de la hoja, sin mover nada), filas y huecos más bajos y
+  miniaturas de skin (seis por fila) y mascota más pequeñas.
 
 ## Reglas y decisiones
 
@@ -42,7 +48,16 @@ Vistas y Plugins. Cómo crear una skin o una mascota, para quien usa la app: [RE
   ([ADR-11](../decisions/ADR-11-skins-en-json-y-opciones-genericas.md)): una skin con el mismo id
   que una incluida la sustituye; las mal formadas se ignoran con un aviso en stderr.
 - **Colores solo por `Theme`**; lo que falte en una skin toma el valor de Vidrio (`pick`). Un color
-  nuevo: [runbooks/nuevo-color-de-skin.md](../runbooks/nuevo-color-de-skin.md).
+  nuevo: [runbooks/nuevo-color-de-skin.md](../runbooks/nuevo-color-de-skin.md). `error` (errores de
+  reproducción y de la cuenta) va aparte del acento, que queda para «activado» y «suena».
+- **Medidas solo por `Theme`** ([ADR-23](../decisions/ADR-23-sistema-de-diseno-medidas-y-piezas-comunes.md)):
+  tipografía en ocho niveles (`fontDisplay` 40 … `fontMini` 11), `margin` 32 (borde del contenido y
+  de los botones sueltos en todas las pantallas), `gap` 12 (paneles de vidrio pegados a la
+  ventana) y radios `radiusS`/`radiusM`/`radiusL` = 0,4 / 0,7 / 1 × el `radio` de la skin. Las
+  carátulas toman `coverRadius(lado)`: S hasta 120 px, M por encima, 0 con «Cuadradas». También
+  `scrim` (velo de lo que tapa el escenario), `well` (pozo de pestañas y campos), `placeholder`,
+  `rowHeight`. `docs.py check` rechaza tamaños de letra, radios y colores escritos a mano en
+  `qml/`; una línea que lo necesite lleva `// fijo: <motivo>`.
 - **Opción nueva**: [runbooks/nueva-opcion.md](../runbooks/nueva-opcion.md). Vacío = valor por
   defecto (`fallback` de su fila).
 - **`TintProbe` (Canvas)** necesita su propio `loadImage` y su `Timer`, y estar dentro de la zona
@@ -63,14 +78,19 @@ Vistas y Plugins. Cómo crear una skin o una mascota, para quien usa la app: [RE
   para en pausa, con la ventana oculta o minimizada (mini reproductor), en «Plano» y sin ambiente
   (`Ambient.drifting`); en «Siempre», el fondo de la ventana se para mientras «Sonando» está
   abierta (se mueve el suyo).
+- **Con Opciones abierta, el ratón no llega a lo de debajo**: un `HoverHandler` con `blocking` en
+  la capa de la hoja corta el «hover» (brillo del Muro, nombre de abajo, pestañas de la
+  navegación); lo de la hoja va encima y sigue reaccionando. Lo pidió el propietario.
 - **Opciones que tocan Rust** (`calidad`, `historial`, `ytdlp`) se aplican al cargar y al cambiar,
   en `set_opcion`.
 
 ## Interfaz
 
-`SettingsSheet.qml`: barra lateral de categorías; las filas sueltas se declaran en `optionRows`
-(`cat`, `key`, `label`, `hint`, `fallback`, `options`); las de Cuenta y Plugins son bloques
-propios. `--settings-cat id` abre una categoría para capturarla.
+`SettingsSheet.qml`: barra lateral de categorías (pestañas en columna: la elegida, en blanco,
+porque dice dónde estás); las filas sueltas se declaran en `optionRows` (`cat`, `key`, `label`,
+`hint`, `fallback`, `options`); las de Cuenta y Plugins son bloques propios. Los valores se eligen
+con `Segmented` (`Tabs` en vidrio claro: regla de dos, [interfaz-comun](interfaz-comun.md)).
+`--settings-cat id` abre una categoría para capturarla.
 
 En Apariencia, diseño elegido por el propietario con sus muestras:
 
@@ -104,7 +124,7 @@ Estas medidas se tomaron quitando a mano la condición de que suene música (You
 | Archivo | Contenido |
 |---|---|
 | `src/settings.rs` | Singleton `AppSettings`: vistas, skin, mascota, opciones; skins incluidas y del usuario |
-| `qml/Theme.qml` | Tokens visuales: colores de la skin, opciones de aspecto, iconos, `renderEpoch` |
+| `qml/Theme.qml` | Tokens visuales: colores de la skin, medidas comunes (letra, margen, radios), opciones de aspecto, iconos, `renderEpoch` |
 | `qml/SettingsSheet.qml` | Hoja de Opciones |
 | `qml/Ambient.qml` | Modo ambiente |
 | `qml/TintProbe.qml` | Color dominante de una carátula |
@@ -120,6 +140,8 @@ Estas medidas se tomaron quitando a mano la condición de que suene música (You
 | Skins incluidas | [`BUILTIN_SKINS`](../../src/settings.rs) |
 | Juntar skins incluidas y del usuario | [`all_skins`](../../src/settings.rs) |
 | Color con valor por defecto | [`pick`](../../qml/Theme.qml) |
+| Radio de una carátula (opción `esquinas`) | [`coverRadius`](../../qml/Theme.qml) |
+| Pie de descripciones de la hoja compacta | [`showHint`](../../qml/SettingsSheet.qml) |
 | Imagen de una skin de carpeta | [`skinImage`](../../qml/Theme.qml) |
 | Filas de Opciones | [`optionRows`](../../qml/SettingsSheet.qml) |
 | Fondo «Fluido» y su fundido | [`fluid`](../../qml/Ambient.qml), [`fluido.frag`](../../shaders/fluido.frag) |
@@ -141,13 +163,14 @@ Estas medidas se tomaron quitando a mano la condición de que suene música (You
 
 ## Estado actual
 
-- **Última verificación:** 2026-11-17, preferencias guardadas en un hilo y sondas que sueltan la carátula ([historial](../history/verificacion/personalizacion.md)).
+- **Última verificación:** 2026-11-21, medidas comunes, color `error`, opciones `esquinas` y `compacto` ([historial](../history/verificacion/personalizacion.md)).
 - **Pruebas:** `preview_image` y `skins_list` en `cargo test`; capturas con `--settings-cat`.
 - **Sin verificar:** que «Fluido» fluya bien a la vista (la CPU confirma que se redibuja, pero cada
   prueba sacaba otra canción y no se compararon dos fotogramas de la misma carátula); el fundido
   entre carátulas; «Fluido» en Linux (OpenGL/Vulkan) y en Windows; la deriva con música sonando de verdad (YouTube pedía sesión); en Linux;
   «Plano» en una pantalla antigua de verdad (solo en Retina); skins claras (los velos asumen fondo oscuro); la miniatura de una skin de
-  carpeta con fondo; abrir la carpeta en Linux (`xdg-open`).
+  carpeta con fondo; abrir la carpeta en Linux (`xdg-open`); la hoja compacta con el teclado (el
+  pie solo sigue al ratón).
 - **Historial:** [docs/history/verificacion/personalizacion.md](../history/verificacion/personalizacion.md).
 
 ## Pendiente

@@ -5,6 +5,24 @@ son de cuando se escribieron. El estado actual está en su [ficha](../../areas/i
 
 Lo nuevo va arriba: añade una sección `## AAAA-MM-DD · qué se verificó` encima de las anteriores.
 
+## 2026-11-21 · Piezas comunes nuevas, regla de dos y esquinas con sombreador (en `master`)
+
+- **Cambio:** `Tabs`, `TabButton`, `FocusRing`, `TrackRow`, `SectionLabel`, `FocusedCaption` y
+  `EmptyState` ([ADR-23](../../decisions/ADR-23-sistema-de-diseno-medidas-y-piezas-comunes.md));
+  `TabStrip` desaparece (lo sustituye `Tabs`). Foco de `IconButton`, `PillButton` y `Slider` con
+  `FocusRing` (antes, borde interior blanco o de acento). `Cover` redondea con un sombreador
+  (`shaders/caratula.frag`) en vez de una `Shape`.
+- **Cómo:** 29 capturas con `--shot` (release, `HOME` de pruebas, `MUSICPLAYER_SILENT=1`, macOS Retina 1440×900, sin sesión), revisadas a ojo, sin errores de QML en la salida. Memoria: Inicio en Muro a los 30 s, `footprint … phys_footprint`, alternando
+  `esquinas` redondeadas y cuadradas en el mismo `HOME`.
+- **Resultado:** pestañas de navegación en blanco (navegación, panel, «Sonando», categorías de
+  Opciones) y segmentos en vidrio claro (Opciones); filas de detalle, cola y temporal iguales; la
+  que suena con título en acento y ▸. Carátulas redondeadas, artistas en círculo y miniaturas de
+  vídeo recortadas sin deformar; repintadas tras ocultar y restaurar la ventana (`--minimize
+  --hide --restore`). Memoria con `Shape`: 218–243 MB frente a 197–223 MB cuadradas (cuatro de
+  cada); con el sombreador: 216–219 MB frente a 205–208 MB (tres de cada).
+- **No verificado:** el foco del teclado en las capturas (la ventana de prueba no queda activa);
+  Linux; pantalla sin Retina.
+
 ## 2026-11-17 · TabStrip, vidrio a media resolución y Cover.picture (rama `perf/letra`)
 
 - **Cambio:** `TabStrip`, las pestañas del panel y de «Sonando» en un solo componente (con agarre

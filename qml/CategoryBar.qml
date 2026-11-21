@@ -59,41 +59,31 @@ Glass {
         Repeater {
             model: [""].concat(Catalog.categorias.map(c => c.nombre))
 
+            // Una pestaña por categoría (regla de dos: la elegida, en blanco). Al renombrarla, su
+            // sitio lo ocupa un campo de texto.
             Item {
                 id: tab
                 required property string modelData
-                readonly property bool active: modelData === Catalog.categoria
                 readonly property bool renaming: modelData !== "" && root.editing === modelData
                 readonly property string label: modelData === "" ? "Todas" : modelData
 
-                width: renaming ? 180 : text.implicitWidth + 26
+                width: renaming ? 180 : button.implicitWidth
                 height: Theme.hit
-                activeFocusOnTab: !renaming
 
-                Accessible.role: Accessible.PageTab
-                Accessible.name: "Categoría " + label
-                Accessible.onPressAction: Catalog.chooseCategoria(modelData)
-                Keys.onReturnPressed: Catalog.chooseCategoria(modelData)
-
-                Rectangle {
+                TabButton {
+                    id: button
                     anchors.fill: parent
                     visible: !tab.renaming
-                    radius: height / 2
-                    color: tab.active ? Theme.text : (tabHover.hovered ? Theme.control : "transparent")
-                    border.width: tab.activeFocus ? 2 : 0
-                    border.color: Theme.text
-
-                    Behavior on color { ColorAnimation { duration: Theme.animFast } }
-                }
-
-                Text {
-                    id: text
-                    anchors.centerIn: parent
-                    visible: !tab.renaming
+                    activeFocusOnTab: !tab.renaming
                     text: tab.label
-                    color: tab.active ? Theme.ground : Theme.textMuted
-                    font.pixelSize: 14
-                    font.weight: tab.active ? Font.DemiBold : Font.Normal
+                    chosen: tab.modelData === Catalog.categoria
+                    navigate: true
+                    Accessible.name: "Categoría " + tab.label
+                    onClicked: Catalog.chooseCategoria(tab.modelData)
+                    onContextRequested: scenePoint => {
+                        if (tab.modelData !== "")
+                            tab.Window.window.openMenu({ kind: "categoria", title: tab.modelData }, scenePoint)
+                    }
                 }
 
                 Loader {
@@ -105,31 +95,9 @@ Glass {
                         item.start()
                     }
                 }
-
-                HoverHandler {
-                    id: tabHover
-                    enabled: !tab.renaming
-                    cursorShape: Qt.PointingHandCursor
-                }
-
-                TapHandler {
-                    enabled: !tab.renaming
-                    gesturePolicy: TapHandler.ReleaseWithinBounds
-                    onTapped: Catalog.chooseCategoria(tab.modelData)
-                }
-
-                // «Todas» no se puede renombrar ni borrar.
-                TapHandler {
-                    enabled: !tab.renaming && tab.modelData !== ""
-                    acceptedButtons: Qt.RightButton
-                    gesturePolicy: TapHandler.ReleaseWithinBounds
-                    onTapped: eventPoint => tab.Window.window.openMenu({ kind: "categoria", title: tab.modelData },
-                                                                       eventPoint.scenePosition)
-                }
             }
         }
 
-        // «+»: crea una categoría; mientras se escribe el nombre, es un campo de texto.
         Item {
             id: add
             width: root.editing === "+" ? 180 : Theme.hit

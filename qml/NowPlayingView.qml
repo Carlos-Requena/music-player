@@ -4,15 +4,15 @@ import app.musicplayer
 
 // Pantalla «Sonando»: la carátula de lo que suena en grande a la izquierda, sobre el fondo
 // ambiente de sus colores, y a la derecha su letra (si la hay) y la cola. Sube desde abajo al
-// elegir una canción o pulsar la de la barra de reproducción; baja con la carátula, la flecha
-// o Esc. La barra de reproducción queda encima.
+// elegir una canción o pulsar la de la barra de reproducción; baja con la flecha o Esc (pulsar la
+// carátula la hace «latir»). La barra de reproducción queda encima.
 FocusScope {
     id: root
 
     property bool open: false
     // Alto de la barra de reproducción (y su margen), que queda por encima.
     property real bottomInset: 100
-    property color tint: "#3A3F4B"
+    property color tint: Theme.neutralTint
     // Letra y cola a la derecha. El botón del panel de la barra las quita y la carátula se
     // centra.
     property bool side: true
@@ -46,7 +46,7 @@ FocusScope {
     readonly property real artTop: 76
     // Mismo hueco hasta la barra (que empieza un `Theme.gap` por encima de `bottomInset`) que
     // hasta el borde de arriba.
-    readonly property real sideMargin: 32
+    readonly property real sideMargin: Theme.margin
     readonly property real bottomEdge: height - bottomInset + Theme.gap - sideMargin
     readonly property real sideWidth: big ? Math.max(380, Math.min(460, width * 0.3)) : width * 0.55 - 200
     readonly property real art: big
@@ -58,6 +58,8 @@ FocusScope {
     readonly property real artLeft: (big ? groupLeft : width * 0.45 - root.art) * sideShown
                                     + (width - root.art) / 2 * (1 - sideShown)
     readonly property real artRight: artLeft + root.art
+    // Esquinas de la carátula (opción `esquinas`).
+    readonly property real artRadius: Theme.coverRadius(root.art)
     readonly property real sideX: (big ? groupLeft + root.art + gutter : width * 0.45 + 100) + 60 * (1 - sideShown)
     readonly property real tabsHeight: Theme.hit + 8
     // Pestaña de la derecha. Sin letra solo existe «Cola».
@@ -130,6 +132,35 @@ FocusScope {
             thumb: Player.thumb
             fluidDarken: 0.35
         }
+
+        // Pulso de luz del «latido» (`beat`): un velo del color de la carátula que sube y se apaga.
+        Rectangle {
+            id: beatGlow
+            anchors.fill: parent
+            color: Qt.lighter(tint.tint, 1.7)
+            opacity: 0
+            visible: opacity > 0.001
+        }
+    }
+
+    // «Latido» al pulsar la carátula (elegido por el propietario): se encoge, rebota y vuelve, y
+    // el fondo da un pulso de luz. Unos 450 ms; no se repite solo. Pulsar la carátula ya no cierra
+    // «Sonando» (se cierra con la flecha o con Esc).
+    property real beatScale: 1
+    function beat() {
+        beatAnimation.restart()
+    }
+    ParallelAnimation {
+        id: beatAnimation
+        SequentialAnimation {
+            NumberAnimation { target: root; property: "beatScale"; to: 0.95; duration: 110; easing.type: Easing.OutQuad }
+            NumberAnimation { target: root; property: "beatScale"; to: 1.03; duration: 160; easing.type: Easing.OutQuad }
+            NumberAnimation { target: root; property: "beatScale"; to: 1; duration: 180; easing.type: Easing.InOutQuad }
+        }
+        SequentialAnimation {
+            NumberAnimation { target: beatGlow; property: "opacity"; to: 0.16; duration: 150; easing.type: Easing.OutQuad }
+            NumberAnimation { target: beatGlow; property: "opacity"; to: 0; duration: 420; easing.type: Easing.InQuad }
+        }
     }
 
     Item {
@@ -159,7 +190,7 @@ FocusScope {
         }
 
         IconButton {
-            x: 24
+            x: Theme.margin
             y: 20
             icon: Theme.iconDown
             label: "Cerrar la pantalla Sonando"
@@ -167,15 +198,10 @@ FocusScope {
             onClicked: root.closeRequested()
         }
 
-        Text {
+        SectionLabel {
             x: root.artRight - root.art / 2 - width / 2
-            y: 32
+            y: 34
             text: "Sonando"
-            color: Theme.textMuted
-            font.pixelSize: 12
-            font.letterSpacing: 2.4
-            font.capitalization: Font.AllUppercase
-            font.weight: Font.DemiBold
         }
 
         Item {
@@ -195,7 +221,7 @@ FocusScope {
                 y: art.y + root.art * 0.04
                 width: root.art
                 height: root.art
-                radius: 18
+                radius: root.artRadius
                 blur: root.art * 0.18
                 spread: root.art * 0.02
                 color: Qt.rgba(Math.min(1, tint.tint.r * 1.4), Math.min(1, tint.tint.g * 1.4), Math.min(1, tint.tint.b * 1.4), 0.85)
@@ -206,7 +232,7 @@ FocusScope {
                 x: (parent.width - width) / 2
                 width: root.art
                 height: root.art
-                scale: 0.94 + 0.06 * root.shown
+                scale: (0.94 + 0.06 * root.shown) * root.beatScale
 
                 // Mientras llega la grande (a máxima calidad tarda hasta un segundo la primera
                 // vez), la de la barra de reproducción ampliada: es la misma URL y el mismo
@@ -217,7 +243,7 @@ FocusScope {
                     pixels: 120
                     load: root.visible && !cover.ready
                     visible: !cover.ready
-                    radius: 18
+                    radius: root.artRadius
                 }
 
                 // Redondeada con su propia forma, sin capa ni máscara: a este tamaño, dos capas
@@ -228,7 +254,7 @@ FocusScope {
                     thumb: root.bigThumb
                     pixels: root.bigPixels
                     load: root.visible
-                    radius: 18
+                    radius: root.artRadius
                     placeholder: false
                 }
 
@@ -245,13 +271,14 @@ FocusScope {
                     onLoaded: {
                         item.source = Qt.binding(() => Player.animada)
                         item.textureSide = Qt.binding(() => Math.min(960, root.art * root.dpr))
+                        item.radius = Qt.binding(() => root.artRadius)
                     }
                 }
 
                 // Brillo suave arriba a la izquierda, como un vinilo bajo una luz.
                 Rectangle {
                     anchors.fill: parent
-                    radius: 18
+                    radius: root.artRadius
                     gradient: Gradient {
                         orientation: Gradient.Horizontal
                         GradientStop { position: 0; color: Qt.rgba(1, 1, 1, 0.08) }
@@ -261,20 +288,31 @@ FocusScope {
 
                 Rectangle {
                     anchors.fill: parent
-                    radius: 18
+                    radius: root.artRadius
                     color: "transparent"
                     border.width: 1
-                    border.color: Qt.rgba(1, 1, 1, 0.12)
+                    border.color: Theme.glassBorder
                 }
 
                 HoverHandler { cursorShape: Qt.PointingHandCursor }
                 TapHandler {
                     gesturePolicy: TapHandler.ReleaseWithinBounds
-                    onTapped: root.closeRequested()
+                    onTapped: root.beat()
+                }
+                // Clic derecho: también «late» y abre el menú de la canción (cola, álbum, artista,
+                // «Relacionado»…). `art.Window`: dentro de un gestor, `Window.window` es nulo.
+                TapHandler {
+                    acceptedButtons: Qt.RightButton
+                    gesturePolicy: TapHandler.ReleaseWithinBounds
+                    onTapped: eventPoint => {
+                        root.beat()
+                        art.Window.window.openPlayingMenu(eventPoint.scenePosition)
+                    }
                 }
 
                 Accessible.role: Accessible.Button
-                Accessible.name: "Cerrar la pantalla Sonando"
+                Accessible.name: "Carátula de " + (Player.title !== "" ? Player.title : "lo que suena")
+                Accessible.onPressAction: root.beat()
             }
 
             Column {
@@ -290,9 +328,9 @@ FocusScope {
                     horizontalAlignment: Text.AlignHCenter
                     text: Player.title !== "" ? Player.title : "Nada sonando"
                     color: Theme.text
-                    font.pixelSize: 34
+                    font.pixelSize: Theme.fontTitle
                     font.weight: Font.Bold
-                    font.letterSpacing: -0.4
+                    font.letterSpacing: Theme.displaySpacing
                     elide: Text.ElideRight
                 }
 
@@ -301,7 +339,7 @@ FocusScope {
                     horizontalAlignment: Text.AlignHCenter
                     text: Player.artist
                     color: Theme.textMuted
-                    font.pixelSize: 17
+                    font.pixelSize: Theme.fontBody
                     elide: Text.ElideRight
                 }
             }
@@ -309,7 +347,8 @@ FocusScope {
 
         // ---- Derecha: pestañas Letra (solo si la hay) y Cola ----
 
-        TabStrip {
+        // Pestañas de navegación (regla de dos: lo elegido, en blanco).
+        Tabs {
             id: tabs
             opacity: root.sideShown
             visible: opacity > 0.01
@@ -317,8 +356,10 @@ FocusScope {
             y: root.sideTop
             width: root.sideWidth
             height: root.tabsHeight
-            fontSize: 15
-            innerRadius: 12
+            fontSize: Theme.fontBody
+            navigate: true
+            fill: true
+            well: true
             current: root.shownTab
             tabs: root.hasLyrics
                 ? [{ id: "letra", label: "Letra" }, { id: "cola", label: "Cola · " + Catalog.queue.length }]
@@ -334,10 +375,10 @@ FocusScope {
             y: root.sideTop + root.tabsHeight + 12
             width: root.sideWidth
             height: root.sideBottom - y
-            radius: 22
+            radius: Theme.radiusL
             // Con el fondo «Fluido», la letra y la cola van sobre él, sin recuadro (como en
             // Better Lyrics).
-            color: Theme.ambientFluid ? "transparent" : Qt.rgba(0, 0, 0, 0.22)
+            color: Theme.ambientFluid ? "transparent" : Theme.well
             border.width: Theme.ambientFluid ? 0 : 1
             border.color: Theme.glassBorder
 
@@ -366,10 +407,10 @@ FocusScope {
             y: root.sideTop + root.tabsHeight + 12
             width: root.sideWidth
             height: root.sideBottom - y
-            radius: 22
+            radius: Theme.radiusL
             // Con el fondo «Fluido», la letra y la cola van sobre él, sin recuadro (como en
             // Better Lyrics).
-            color: Theme.ambientFluid ? "transparent" : Qt.rgba(0, 0, 0, 0.22)
+            color: Theme.ambientFluid ? "transparent" : Theme.well
             border.width: Theme.ambientFluid ? 0 : 1
             border.color: Theme.glassBorder
 
@@ -379,12 +420,7 @@ FocusScope {
                 y: 12
                 width: parent.width - 24
                 height: parent.height - 24
-                rowHeight: 46
-                coverSize: 42
-                titleSize: 15
-                rowRadius: 12
                 followTop: true
-                showPlaying: true
             }
         }
     }

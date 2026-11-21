@@ -15,6 +15,7 @@ const QML_FILES: &[&str] = &[
     "qml/ViewSwitcher.qml",
     "qml/SectionView.qml",
     "qml/MuroView.qml",
+    "qml/CategoriasView.qml",
     "qml/LomosView.qml",
     "qml/CubetaView.qml",
     "qml/NowPlayingPanel.qml",
@@ -34,7 +35,13 @@ const QML_FILES: &[&str] = &[
     "qml/Mascot.qml",
     "qml/QueueList.qml",
     "qml/LyricsTiming.qml",
-    "qml/TabStrip.qml",
+    "qml/Tabs.qml",
+    "qml/TabButton.qml",
+    "qml/FocusRing.qml",
+    "qml/TrackRow.qml",
+    "qml/SectionLabel.qml",
+    "qml/FocusedCaption.qml",
+    "qml/EmptyState.qml",
 ];
 
 /// Singletons QML (tema y datos de ejemplo).
@@ -42,7 +49,7 @@ const QML_SINGLETONS: &[&str] = &["qml/Theme.qml", "qml/Catalog.qml"];
 
 /// Sombreadores ya compilados con `scripts/shaders.sh` (qsb). Van en el repositorio para que
 /// compilar no necesite qsb; en QML: `qrc:/qt/qml/app/musicplayer/shaders/<nombre>.qsb`.
-const SHADERS: &[&str] = &["shaders/fluido.frag", "shaders/reflejo.frag", "shaders/redondeo.frag"];
+const SHADERS: &[&str] = &["shaders/fluido.frag", "shaders/reflejo.frag", "shaders/redondeo.frag", "shaders/caratula.frag"];
 
 fn main() {
     // Aviso si un sombreador cambió y su .qsb no se volvió a compilar.

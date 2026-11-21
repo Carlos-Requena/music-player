@@ -81,7 +81,9 @@ Item {
     component NowPlaying: Item {
         id: now
         property real coverSize: 46
-        property real coverRadius: 23
+        // En Islas, redonda: concéntrica con su píldora. En Clásica y Compacta, la de la opción
+        // `esquinas`.
+        property real coverRadius: coverSize / 2
         readonly property real natural: coverSize + 12 + Math.min(180, Math.max(titleText.implicitWidth, artistText.implicitWidth)) + 6 + Theme.hit
 
         height: parent ? parent.height : 0
@@ -116,8 +118,8 @@ Item {
                 width: parent.width
                 text: Player.title !== "" ? Player.title : "Nada sonando"
                 color: Theme.text
-                font.pixelSize: 14
-                font.weight: Font.Bold
+                font.pixelSize: Theme.fontBase
+                font.weight: Font.DemiBold
                 elide: Text.ElideRight
             }
 
@@ -125,8 +127,8 @@ Item {
                 id: artistText
                 width: parent.width
                 text: Player.error !== "" ? Player.error : (Player.loading ? "Cargando…" : Player.artist)
-                color: Player.error !== "" ? Theme.accent : Theme.textMuted
-                font.pixelSize: 13
+                color: Player.error !== "" ? Theme.error : Theme.textMuted
+                font.pixelSize: Theme.fontSmall
                 elide: Text.ElideRight
             }
         }
@@ -220,7 +222,7 @@ Item {
         anchors.verticalCenter: parent ? parent.verticalCenter : undefined
         width: 38
         color: Theme.textMuted
-        font.pixelSize: 12
+        font.pixelSize: Theme.fontSmall
         font.features: { "tnum": 1 }
     }
 
@@ -423,7 +425,7 @@ Item {
         Glass {
             id: bar
             tint: Theme.glassStrong
-            radius: 22
+            radius: Theme.radiusL
             backdrop: root.backdrop
 
             ExpandTap {}
@@ -433,7 +435,7 @@ Item {
                 x: 14
                 width: Math.min(300, now.natural)
                 coverSize: 56
-                coverRadius: 8
+                coverRadius: Theme.coverRadius(coverSize)
             }
 
             // Botones y posición centrados en la barra, siempre en el mismo sitio: el margen de
@@ -473,7 +475,7 @@ Item {
         Glass {
             id: bar
             tint: Theme.glassStrong
-            radius: 20
+            radius: Theme.radiusL
             backdrop: root.backdrop
 
             ExpandTap {}
@@ -533,7 +535,7 @@ Item {
                 x: 10
                 width: Math.min(300, now.natural)
                 coverSize: 46
-                coverRadius: 8
+                coverRadius: Theme.coverRadius(coverSize)
             }
 
             Transport {
@@ -554,7 +556,7 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
                     text: Theme.mmss(Player.position) + " / " + Theme.mmss(Player.duration)
                     color: Theme.textMuted
-                    font.pixelSize: 13
+                    font.pixelSize: Theme.fontSmall
                     font.features: { "tnum": 1 }
                 }
 

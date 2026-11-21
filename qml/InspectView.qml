@@ -73,7 +73,7 @@ FocusScope {
         anchors.fill: parent
         radius: 0
         backdrop: root.backdrop
-        tint: Qt.rgba(0.02, 0.025, 0.04, 0.72)
+        tint: Theme.scrim
     }
 
     TapHandler { acceptedButtons: Qt.AllButtons; gesturePolicy: TapHandler.ReleaseWithinBounds }
@@ -424,21 +424,18 @@ FocusScope {
             y: caseItem.y + caseItem.height + 26
             spacing: 4
 
-            Text {
+            SectionLabel {
                 anchors.horizontalCenter: parent.horizontalCenter
                 text: root.flipped ? "Contraportada" : (root.discOut ? "Disco fuera" : (root.open ? "Abierta" : "Cerrada"))
-                color: Theme.textMuted
-                font.pixelSize: 11
-                font.letterSpacing: 1.8
-                font.capitalization: Font.AllUppercase
             }
 
             Text {
                 anchors.horizontalCenter: parent.horizontalCenter
                 text: root.detail ? root.detail.title : ""
                 color: Theme.text
-                font.pixelSize: 26
+                font.pixelSize: Theme.fontTitle
                 font.weight: Font.Bold
+                font.letterSpacing: Theme.displaySpacing
             }
         }
     }
@@ -454,6 +451,15 @@ FocusScope {
         PillButton { text: root.open ? "Cerrar caja  Espacio" : "Abrir caja  Espacio"; onClicked: root.toggleOpen() }
         PillButton { text: root.discOut ? "Guardar disco  D" : "Sacar disco  D"; onClicked: root.toggleDisc() }
         PillButton { text: "Reproducir  ↵"; icon: Theme.iconPlay; primary: true; enabled: root.tracks.length > 0; onClicked: root.play() }
-        PillButton { text: "Salir  Esc"; onClicked: root.closed() }
+    }
+
+    // Salir, en el mismo sitio que «Volver» del detalle y que cerrar «Sonando» (ADR-23).
+    IconButton {
+        x: Theme.margin
+        y: 20
+        icon: Theme.iconBack
+        label: "Salir (Esc)"
+        solid: true
+        onClicked: root.closed()
     }
 }

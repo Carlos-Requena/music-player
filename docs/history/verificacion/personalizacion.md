@@ -5,6 +5,33 @@ son de cuando se escribieron. El estado actual está en su [ficha](../../areas/p
 
 Lo nuevo va arriba: añade una sección `## AAAA-MM-DD · qué se verificó` encima de las anteriores.
 
+## 2026-11-21 · Sin «hover» bajo Opciones (en `master`)
+
+- **Cambio:** `HoverHandler { blocking: true }` en la capa de `SettingsSheet.qml`.
+- **Cómo:** `--shot` (release, `HOME` de pruebas) con Opciones › Apariencia abierta y el ratón
+  simulado (`MUSICPLAYER_DEBUG_CLICK` con `wheel` de 0 pasos) sobre una carátula del Muro que asoma
+  a la izquierda y sobre el segmento «Suave».
+- **Resultado:** la carátula de debajo no brilla; «Suave» se ilumina.
+- **No verificado:** el ratón de verdad; Linux.
+
+## 2026-11-21 · Medidas comunes, color `error`, opciones `esquinas` y `compacto` (en `master`)
+
+- **Cambio:** `Theme` gana la tipografía en ocho niveles, `margin`, `radiusS/M/L`,
+  `coverRadius`, `scrim`, `well`, `placeholder`, `rowHeight`, `cursorWidth`, `singleClick` y
+  `compactSettings`; color `error` en las cuatro skins. Opciones: categorías y segmentos con
+  `Tabs` (regla de dos), botón de sesión con `PillButton`, filas nuevas `esquinas` y `clic`, y
+  segmento «Normal / Compacta» con el pie de descripciones
+  ([ADR-23](../../decisions/ADR-23-sistema-de-diseno-medidas-y-piezas-comunes.md)).
+  `docs.py check` rechaza tamaños de letra, radios y colores escritos a mano en `qml/`.
+- **Cómo:** 29 capturas con `--shot` (release, `HOME` de pruebas, `MUSICPLAYER_SILENT=1`, macOS Retina 1440×900, sin sesión), revisadas a ojo, sin errores de QML en la salida; Opciones en Cuenta, Reproducción, Apariencia (normal y compacta, con el ratón
+  sobre una fila: `MUSICPLAYER_DEBUG_CLICK` con `wheel` de 0 pasos) y Plugins; skins Vidrio, Neón y
+  Grafito.
+- **Resultado:** la hoja compacta quita las descripciones, pone seis skins por fila y muestra la
+  descripción de la fila bajo el ratón en el pie. Neón (radio 26) redondea más las carátulas y
+  Grafito (6) casi nada.
+- **No verificado:** la hoja compacta con el teclado (el pie solo sigue al ratón); Medianoche;
+  Linux.
+
 ## 2026-11-17 · Preferencias guardadas en un hilo y sondas que sueltan la carátula (rama `perf/letra`)
 
 - **Cambio:** `settings.json` se escribe en un hilo, siempre la última versión y de una vez

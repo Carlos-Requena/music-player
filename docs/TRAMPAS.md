@@ -21,6 +21,10 @@ que toque **antes** de cambiar algo ahí. Una trampa nueva se añade en su secci
   `Qt.callLater` no siempre basta: recoloca en `onHeightChanged` (`ContextMenu.anchorPoint`).
 
 - **`font.pixelSize` es entero:** `12.5` hace fallar la carga del componente entero.
+- **`cargo build` no comprueba el QML:** quitar una propiedad que otro archivo escucha
+  (`onTituloChanged` en Lomos) compila sin avisos y la ventana no carga («Type LomosView
+  unavailable», «Cannot assign to non-existent property»). Tras tocar QML, arranca con `--shot` y
+  mira la salida. `qmllint` sin el módulo compilado no sirve: marca todo `Theme` como desconocido.
 - **No llames `palette`** a una propiedad propia: choca con la de `Item` y QML la ignora.
 - **Un `id` tapa una propiedad con el mismo nombre:** en `NowPlayingView`, `art` era a la vez una
   propiedad de la raíz y el `id` de la carátula; en los enlaces de la raíz `art` daba el elemento
@@ -46,6 +50,8 @@ que toque **antes** de cambiar algo ahí. Una trampa nueva se añade en su secci
   caja se usa un pliegue plano (`Scale` en X).
 - **Máscaras de `MultiEffect`:** sin `maskThresholdMin: 0.5` y `maskSpreadAtMin: 1` la máscara
   recorta en seco en vez de seguir el degradado.
+- **`TintProbe` debajo de una `Cover` redondeada** asoma por la esquina (un cuadradito de 8 px):
+  céntrala (`anchors.centerIn`), como en `CategoriasView`.
 - **`TintProbe` (Canvas):** cada lienzo debe llamar a `loadImage` aunque otro ya tenga la imagen, y
   repintar con su propio `Timer`; si no, la segunda sonda con la misma carátula no pinta. Una sonda
   fuera de la zona visible (recortada) tampoco: usa la de `Main.qml` (`playingProbe`).
@@ -103,6 +109,10 @@ que toque **antes** de cambiar algo ahí. Una trampa nueva se añade en su secci
 - **`ffmpeg` con listas HLS de Apple** (fragmentos `BYTERANGE` de un solo archivo MP4) se queda en
   el primer fragmento: un vídeo de 20 s salía de 4 s. Se descarga el archivo entero y `ffmpeg` lo
   copia desde el disco (`animada::single_file`).
+- **Las carátulas animadas de Apple no acaban como empiezan:** en bucle, corte en seco. Se funde el
+  último segundo con el primero al guardarla (`animada::loop_filter`). Para medir una costura,
+  compara con SSIM codificando sin pérdida (`-qp 0`): con pérdida, el primer fotograma (clave)
+  siempre se parece menos al último.
 
 - **Minimizar no libera memoria gráfica en macOS;** ocultar la ventana sí (`window.cpp`).
 - **Apps gráficas en macOS no heredan el `PATH`** de la terminal: `audio::search_path` añade

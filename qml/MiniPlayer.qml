@@ -29,7 +29,7 @@ Window {
     Rectangle {
         id: card
         anchors.fill: parent
-        radius: 18
+        radius: Theme.radiusL
         color: Theme.glassStrong
         border.width: 1
         border.color: Theme.glassBorder
@@ -54,6 +54,7 @@ Window {
             anchors.verticalCenter: parent.verticalCenter
             width: 80
             height: 80
+            radius: Theme.coverRadius(width)
             thumb: Player.thumb
             pixels: 160
         }
@@ -70,7 +71,7 @@ Window {
                 width: parent.width - 36
                 text: Player.title !== "" ? Player.title : "Nada sonando"
                 color: Theme.text
-                font.pixelSize: 14
+                font.pixelSize: Theme.fontBase
                 font.weight: Font.DemiBold
                 elide: Text.ElideRight
             }
@@ -79,7 +80,7 @@ Window {
                 width: parent.width - 36
                 text: Player.artist
                 color: Theme.textMuted
-                font.pixelSize: 12
+                font.pixelSize: Theme.fontSmall
                 elide: Text.ElideRight
             }
 
@@ -131,7 +132,7 @@ Window {
             anchors.bottomMargin: 6
             width: Math.round((parent.width - 2 * card.radius) * (Player.duration > 0 ? Math.min(1, Player.position / Player.duration) : 0))
             height: 3
-            radius: 1.5
+            radius: height / 2
             color: Theme.accent
         }
     }

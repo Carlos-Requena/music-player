@@ -150,9 +150,7 @@ Pro con pantalla ProMotion, ventana 1440×900 en Retina, release, audio local
 
 ## Estado actual
 
-- **Última verificación:** 2026-11-16, menos CPU en la letra: medida antes y después en «Calidad»
-  y «Equilibrado», en el panel y en «Sonando», y capturas del barrido con su brillo
-  ([historial](../history/verificacion/letra.md)).
+- **Última verificación:** 2026-11-21, tamaños de `Theme` en el aviso y el pie de retraso ([historial](../history/verificacion/letra.md)).
 - **Pruebas:** `mod tests` de `src/lyrics.rs` (pausas e intro, LRC con palabras, KRC y YRC,
   créditos, limpieza del título, elección por duración, orden de las fuentes).
 - **Sin verificar:** el barrido con el audio real de YouTube (pedía sesión: se midió con un audio

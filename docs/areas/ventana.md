@@ -4,7 +4,7 @@ titulo: Ventana y navegación
 resumen: Arranque, ventana principal con escenario, navegación superior, panel de letra y cola, pantalla «Sonando», mini reproductor, búsqueda y menú de clic derecho.
 archivos: [src/main.rs, src/window.cpp, src/animada.rs, qml/Main.qml, qml/TopNav.qml, qml/SearchField.qml, qml/NowPlayingPanel.qml, qml/NowPlayingView.qml, qml/MotionCover.qml, qml/MiniPlayer.qml, qml/ContextMenu.qml]
 opciones: [panel, sonando, sonandoTitulo, caratulaCalidad, caratulaAnimada]
-adr: [ADR-10, ADR-21]
+adr: [ADR-10, ADR-21, ADR-23]
 ---
 
 # Ventana y navegación
@@ -14,7 +14,17 @@ También el arranque del proceso y los argumentos de depuración (`--probe`, `--
 
 ## Qué hace
 
-- **Navegación superior** en píldoras (`TopNav`) y **búsqueda** (`SearchField`).
+- **Navegación superior** en píldoras (`TopNav`, con `Tabs`: la sección elegida en blanco) y
+  **búsqueda** (`SearchField`). Los botones sueltos de arriba (Opciones, cuenta, selector de
+  vista) y el contenido de cada sección empiezan en el mismo margen (`Theme.margin`). El selector
+  de vista se oculta con un detalle abierto, donde no cambia nada.
+- **Resultados de búsqueda con cabecera** («Resultados de «…»», `searchHeading`): es la única
+  sección que la lleva, porque ninguna pestaña de la navegación está elegida
+  ([ADR-23](../decisions/ADR-23-sistema-de-diseno-medidas-y-piezas-comunes.md)).
+- **Aviso de sección vacía** (`EmptyState`): sin sesión, Me gusta, Historial y la biblioteca piden
+  iniciar sesión con un botón «Iniciar sesión» que abre Opciones › Cuenta.
+- **Velo del detalle** en `Main.qml`, sobre toda la ventana (también tras la navegación, que va
+  encima): sin el corte recto que dejaba una franja más clara bajo ella.
 - **Panel de letra y cola** a la derecha (por defecto) o a la izquierda (opción `panel`), o
   cerrado; con el panel a la izquierda todo el escenario se desplaza con `stageX`. **Arranca
   oculto**, por petición del propietario (`lyricsOn`), y se abre con su botón de la barra
@@ -37,8 +47,17 @@ También el arranque del proceso y los argumentos de depuración (`--probe`, `--
   Con el fondo «Fluido» ([personalizacion](personalizacion.md)), la letra y la cola van sin
   recuadro, directamente sobre él.
 
+  **Pulsar la carátula la hace «latir»** (elegido por el propietario entre Latido, Vibración y
+  Onda): se encoge, rebota y vuelve (`beatScale`, ~450 ms) y el fondo da un pulso de luz del color
+  de la carátula (`beatGlow`). Ya no cierra «Sonando»: se cierra con la flecha o con Esc. El
+  **clic derecho** también la hace latir y abre el menú de la canción que suena
+  (`Main.openPlayingMenu`: la pista de la cola con su `queueIndex`), con «Ir al álbum», «Ver
+  artista» y «Relacionado»; elegir una de ellas baja «Sonando» y abre el detalle.
+
   Sin letra ni cola (botón del panel), la carátula va al centro. Se redondea con `Cover.radius`,
-  sin capas.
+  sin capas, con el radio de la opción `esquinas` (`artRadius`). Se cierra con ⌄ en el mismo sitio
+  que «Volver» del detalle (arriba a la izquierda, en el margen de página); sus pestañas Letra y
+  Cola son `Tabs` de navegación (la elegida, en blanco).
 
   **Calidad de la carátula** (opción `caratulaCalidad`, Opciones › Apariencia): **Máxima** (por
   defecto, elegido por el propietario) la pide al tamaño que ocupa en pantalla en píxeles
@@ -61,8 +80,11 @@ También el arranque del proceso y los argumentos de depuración (`--probe`, `--
      compositor, «Toby Fox», de un álbum que Apple pone a nombre del intérprete);
   3. la página pública del álbum (`music.apple.com/us/album/<id>`), que trae la lista HLS del
      vídeo cuadrado (`motionDetailSquare`);
-  4. la variante H.264 de hasta 960 px, descargada entera y copiada sin recodificar por `ffmpeg`
-     a `<caché>/musicplayer/animadas/<id>.mp4` (unos 6 MB por álbum; se guardan 40 como mucho).
+  4. la variante H.264 de hasta 960 px, descargada entera y recodificada una vez por `ffmpeg`
+     como **bucle sin corte** en `<caché>/musicplayer/animadas/<id>-bucle.mp4` (unos 3 MB por
+     álbum; se guardan 40 como mucho). Los vídeos de Apple no acaban como empiezan; el último
+     segundo se funde con el primero (`loop_filter`) y la costura queda como dos fotogramas
+     seguidos. Si no se puede recodificar, se guarda la copia tal cual.
 
   El resultado de cada canción (con álbum o «no tiene») queda en `animadas/indice.json`: a Apple se
   le pregunta una vez (un «no tiene» se vuelve a mirar a los 30 días). El vídeo lo pinta
@@ -71,14 +93,16 @@ También el arranque del proceso y los argumentos de depuración (`--probe`, `--
   prueba la búsqueda sin ventana.
 - **Mini reproductor**: ventana pequeña siempre encima; la grande se oculta mientras tanto
   ([ADR-10](../decisions/ADR-10-mini-reproductor-oculta-la-ventana.md)).
-- **Menú de clic derecho** (`Main.openMenu` → `ContextMenu`) y aviso breve: cola, «Ir al álbum» y
-  «Ver artista» (de una canción; «Ver artista» también de un álbum), lista temporal, guardar en
+- **Menú de clic derecho** (`Main.openMenu` → `ContextMenu`) y aviso breve: cola, «Ir al álbum»,
+  «Ver artista» y «Relacionado» (de una canción; «Ver artista» también de un álbum; «Relacionado»
+  abre la página de [catalogo](catalogo.md) en el detalle), lista temporal, guardar en
   playlist, categorías (subpáginas `page:<id>`) y portada. «Ir al álbum» y «Ver artista» bajan
   «Sonando» y abren el detalle (`Main.openRelated` → `Library.openRelated`,
   [catalogo](catalogo.md)). El aviso también da el
   resultado del «Me gusta» de la mascota (`Library.gustado`).
-- **Panel lateral** (`NowPlayingPanel`): carátula con esquinas redondeadas, pestañas Letra, Cola y
-  Temporal; bajo la letra, el mismo pie discreto de retraso que en «Sonando» (`LyricsTiming`, que
+- **Panel lateral** (`NowPlayingPanel`): carátula (esquinas de la opción `esquinas`), pestañas
+  Letra, Cola y Temporal (`Tabs` de navegación: la elegida, en blanco); la temporal usa
+  `TrackRow` y, vacía, `EmptyState`; bajo la letra, el mismo pie discreto de retraso que en «Sonando» (`LyricsTiming`, que
   pone la propia `LyricsView`; ver [letra](letra.md)).
 - **Barra de reproducción**: su alto (`barHeight`) sale de `Theme.barHeight`: 84 px en el estilo
   Clásica y 64 en los demás ([reproduccion](reproduccion.md)).
@@ -106,6 +130,10 @@ También el arranque del proceso y los argumentos de depuración (`--probe`, `--
   se pide nada ([resolucion](resolucion.md)).
 - **El fondo de imagen de una skin** se decodifica al tamaño de la ventana en escalones de 256 px:
   redimensionarla no lo vuelve a decodificar a cada píxel.
+- **Bucle de la carátula animada fundido al guardarlo:** el vídeo de *DELTARUNE Piano
+  Collections, Vol. 1* acaba con un fotograma muy distinto del primero (SSIM 0,91, frente a 0,99
+  entre dos seguidos) y se veía un corte en seco. Recodificarlo una vez (~2 s, libx264, o
+  VideoToolbox si no está) cuesta menos que fundirlo en QML con dos reproductores.
 - **Carátula animada sin capa con máscara:** las esquinas las redondea un sombreador
   (`shaders/redondeo.frag`) sobre la textura del vídeo a 960 px como mucho; con `layer` y
   `MultiEffect` costaba ~20 MB y ~5 % de CPU más. Desactivada por defecto por su coste en CPU
@@ -171,6 +199,8 @@ También el arranque del proceso y los argumentos de depuración (`--probe`, `--
 | Entradas del menú | [`entries`](../../qml/ContextMenu.qml), [`run`](../../qml/ContextMenu.qml) |
 | Ir al álbum o al artista | [`openRelated`](../../qml/Main.qml) |
 | Carátula animada: búsqueda y caché | [`find`](../../src/animada.rs), [`buscar_animada`](../../src/player.rs) |
+| «Latido» de la carátula | [`beat`](../../qml/NowPlayingView.qml), [`beatScale`](../../qml/NowPlayingView.qml) |
+| Menú de la canción que suena | [`openPlayingMenu`](../../qml/Main.qml) |
 | Carátula animada: cuándo se pide y se muestra | [`wantsAnimated`](../../qml/NowPlayingView.qml), [`textureSide`](../../qml/MotionCover.qml) |
 
 ## Dependencias
@@ -194,7 +224,7 @@ También el arranque del proceso y los argumentos de depuración (`--probe`, `--
 
 ## Estado actual
 
-- **Última verificación:** 2026-11-20, carátula animada en «Sonando» ([historial](../history/verificacion/ventana.md)).
+- **Última verificación:** 2026-11-21, interfaz unificada: margen común, cabecera de búsqueda, velo y aviso vacío ([historial](../history/verificacion/ventana.md)).
 - **Pruebas:** capturas con `--shot` ([verificar-interfaz](../runbooks/verificar-interfaz.md)).
 - **Sin verificar:** Wayland en CachyOS (panel, desenfoque, mini siempre encima); la carátula
   `hq720` de una canción que es vídeo dentro de la app (solo con `curl`); la vista previa de 120 px

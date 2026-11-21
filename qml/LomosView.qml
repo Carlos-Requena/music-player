@@ -13,7 +13,8 @@ FocusScope {
     id: root
 
     property var zonas: []
-    property string titulo: ""
+    // Sección (y categoría) que se ve: al cambiar, la estantería vuelve al principio. No se pinta.
+    property string seccion: ""
     property int index: 0
 
     readonly property var items: Catalog.allItems(zonas)
@@ -131,7 +132,7 @@ FocusScope {
 
     // Otra sección: vuelve al principio sin animar. La misma sección refrescada (la caché y
     // luego la red): conserva el sitio.
-    onTituloChanged: {
+    onSeccionChanged: {
         animate = false
         index = 0
         pos = 0
@@ -164,27 +165,8 @@ FocusScope {
         }
     }
 
-    Column {
-        x: 40
-        y: 4
-        spacing: 2
-
-        Text {
-            text: root.titulo
-            color: Theme.text
-            font.pixelSize: 24
-            font.weight: Font.ExtraBold
-            font.letterSpacing: 3.4
-            font.capitalization: Font.AllUppercase
-        }
-
-        Text {
-            text: root.items.length ? (root.index + 1) + " / " + root.items.length : ""
-            color: Theme.textMuted
-            font.pixelSize: 12
-            font.letterSpacing: 1.2
-        }
-    }
+    // Sin cabecera de sección: la navegación ya dice dónde estás, y la posición la da la barra de
+    // recorrer, abajo (ADR-23).
 
     // Color de la elegida, para el halo del suelo.
     TintProbe {
@@ -456,33 +438,12 @@ FocusScope {
         }
     }
 
-    Column {
+    FocusedCaption {
         id: captions
         anchors.horizontalCenter: parent.horizontalCenter
         y: root.centerY + root.side * root.centerScale / 2 + 22
-        width: parent.width - 80
-        spacing: 6
-
-        Text {
-            width: parent.width
-            horizontalAlignment: Text.AlignHCenter
-            text: root.currentItem ? root.currentItem.title : ""
-            color: Theme.text
-            font.pixelSize: 40
-            font.weight: Font.Bold
-            font.letterSpacing: -0.5
-            elide: Text.ElideRight
-        }
-
-        Text {
-            width: parent.width
-            horizontalAlignment: Text.AlignHCenter
-            text: root.currentItem ? root.currentItem.subtitle : ""
-            color: Theme.textMuted
-            font.pixelSize: 13
-            font.letterSpacing: 0.5
-            elide: Text.ElideRight
-        }
+        width: parent.width - 2 * Theme.margin
+        item: root.currentItem
     }
 
     // Barra para recorrer la estantería: arrastrarla salta a cualquier álbum o playlist; las
@@ -494,11 +455,15 @@ FocusScope {
         height: Theme.hit
         spacing: 16
 
+        // Posición de la elegida y total (lo que antes iba en la cabecera, «1 / 60»).
         Text {
             anchors.verticalCenter: parent.verticalCenter
-            text: "1"
-            color: Theme.textMuted
-            font.pixelSize: 13
+            width: totalText.implicitWidth
+            horizontalAlignment: Text.AlignRight
+            text: root.index + 1
+            color: Theme.text
+            font.pixelSize: Theme.fontSmall
+            font.weight: Font.DemiBold
         }
 
         Slider {
@@ -512,10 +477,11 @@ FocusScope {
         }
 
         Text {
+            id: totalText
             anchors.verticalCenter: parent.verticalCenter
             text: root.items.length
             color: Theme.textMuted
-            font.pixelSize: 13
+            font.pixelSize: Theme.fontSmall
         }
     }
 }

@@ -103,6 +103,12 @@ Cada archivo de `src/`, `qml/`, `skins/` y `login/src/` pertenece a **una sola**
 - **Colores solo a través de `Theme`.** Un color que deba cambiar con la skin es una clave nueva
   en `colores`, con su valor por defecto en `Theme.pick` y en las cuatro skins de `skins/`
   ([runbooks/nuevo-color-de-skin.md](runbooks/nuevo-color-de-skin.md)).
+- **Medidas solo a través de `Theme` y piezas comunes**
+  ([ADR-23](decisions/ADR-23-sistema-de-diseno-medidas-y-piezas-comunes.md)): tamaños de letra
+  (`Theme.fontDisplay` … `fontMini`), radios (`radiusS/M/L`, `coverRadius`), margen (`margin`);
+  pestañas con `Tabs`, filas de canción con `TrackRow`, etiquetas con `SectionLabel`, vacíos con
+  `EmptyState`, foco con `FocusRing` ([interfaz-comun](areas/interfaz-comun.md)). `docs.py check`
+  rechaza un tamaño de letra, un radio o un color escritos a mano en `qml/`.
 - **Opciones nuevas:** `AppSettings.opcion("clave")` (vacío = valor por defecto) y `setOpcion`,
   leídas con `void AppSettings.revision` delante; su fila en `optionRows` de `SettingsSheet.qml`
   y la clave en el `opciones:` de la ficha de su área
@@ -261,16 +267,40 @@ añadas más casos, y actualiza la lista.
   [ADR-20](decisions/ADR-20-fuente-de-explorar-a-elegir.md)).
 - **Sección Historial** en la navegación: el historial de escucha de la cuenta de YouTube Music
   ([catalogo](areas/catalogo.md)).
-- **Ir al álbum y al artista desde el clic derecho** de cualquier canción o carátula
-  ([ventana](areas/ventana.md)).
+- **Ir al álbum y al artista desde el clic derecho** de cualquier canción o carátula, y
+  **«Relacionado»** (la pestaña de YouTube Music) desde el mismo menú ([ventana](areas/ventana.md),
+  [catalogo](areas/catalogo.md)).
+- **Radio sin fin**: la cola de una canción elegida suelta pide más canciones al acercarse al
+  final ([reproduccion](areas/reproduccion.md)).
+- **Pulsar la carátula de «Sonando» la hace «latir»** (rebote y pulso de luz del fondo); ya no
+  cierra la pantalla. Con el clic derecho, además, abre el menú de la canción («Relacionado»,
+  álbum, artista) ([ventana](areas/ventana.md)).
 - **Vista de artista «Órbita»**: la foto en el centro con un anillo del color de la foto y sus tres
   canciones más escuchadas flotando alrededor; al bajar, canciones y discografía
   ([detalle](areas/detalle.md)).
+- **Explorar por categorías**: en Muro, una tarjeta por categoría («Portada con rótulo»), más
+  separadas y que brillan con el color de su carátula al pasar el ratón; al pulsarla se abre como
+  detalle. La primera es **Recomendados**, la fila de canciones del Inicio de YouTube Music (lo que
+  en japonés es 「おすすめ」) ([vistas](areas/vistas.md), [catalogo](areas/catalogo.md),
+  [ADR-22](decisions/ADR-22-explorar-por-categorias-con-recomendados.md)). El mismo brillo al pasar
+  el ratón en el Muro de todas las secciones, desactivable en Opciones (`brillo`) ([vistas](areas/vistas.md)).
 - **Ecualizador y amplificador de volumen como plugin** (Opciones › Plugins), con filtros de mpv
   ([reproduccion](areas/reproduccion.md)).
 - **Carátula animada de Apple Music en «Sonando»** (opción, desactivada por defecto): el vídeo se
   descarga una vez a la caché y se reproduce con Qt Multimedia ([ventana](areas/ventana.md),
   [ADR-21](decisions/ADR-21-caratula-animada-de-apple-music.md)).
+- **Interfaz unificada** ([ADR-23](decisions/ADR-23-sistema-de-diseno-medidas-y-piezas-comunes.md)):
+  **regla de dos** (lo que dice dónde estás, en blanco; un valor elegido, en vidrio claro), sin
+  cabecera de sección salvo en la búsqueda, y volver o cerrar siempre arriba a la izquierda
+  ([interfaz-comun](areas/interfaz-comun.md), [vistas](areas/vistas.md)).
+- **Esquinas de las carátulas y clic, a elegir en Opciones**: redondeadas (por defecto) o
+  cuadradas; doble clic para abrir o que suene (por defecto) o un clic, que además muestra abajo el
+  nombre de lo que está bajo el ratón en el Muro ([personalizacion](areas/personalizacion.md),
+  [reproduccion](areas/reproduccion.md), [vistas](areas/vistas.md)).
+- **Categoría de Explorar con álbumes**: se recorre igual que Inicio, con el Muro
+  ([detalle](areas/detalle.md)).
+- **Opciones compactas**: un segmento «Normal / Compacta» junto a la × quita las descripciones de
+  las filas (salen en el pie al pasar el ratón) ([personalizacion](areas/personalizacion.md)).
 - **Iniciar sesión con una ventana propia** (WebKit del sistema en macOS, Qt WebEngine opcional en
   Linux) y, como alternativa, importar del navegador; sin disfrazar el agente de usuario
   ([sesion](areas/sesion.md)).
@@ -280,7 +310,8 @@ añadas más casos, y actualiza la lista.
 ## 12. Checklist final de cada tarea
 
 - [ ] Nada lento en el hilo de Qt; las respuestas obsoletas se descartan.
-- [ ] Colores por `Theme`; opciones por `AppSettings.opcion`, con su fila y en su ficha.
+- [ ] Colores y medidas por `Theme`, piezas de [interfaz-comun](areas/interfaz-comun.md); opciones
+      por `AppSettings.opcion`, con su fila y en su ficha.
 - [ ] QML y puentes nuevos registrados en `build.rs` y `main.rs`.
 - [ ] `cargo build --release` sin avisos, `cargo test` en verde y `python3 scripts/docs.py check`
       sin problemas.

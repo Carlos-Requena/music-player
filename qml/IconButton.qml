@@ -31,10 +31,13 @@ Item {
         anchors.fill: parent
         radius: height / 2
         color: root.background
-        border.width: root.activeFocus ? 2 : 0
-        border.color: Theme.text
 
         Behavior on color { ColorAnimation { duration: Theme.animFast } }
+    }
+
+    FocusRing {
+        shown: root.activeFocus
+        corner: height / 2
     }
 
     Icon {

@@ -24,6 +24,8 @@ fn probe(args: &[String]) -> bool {
 
     let zones = match what {
         "home" => ytm::browse("FEmusic_home"),
+        // Primera categoría de Explorar: las filas de canciones del Inicio.
+        "recomendados" => ytm::recomendados().map(|zone| vec![zone]),
         // Explorar de ListenBrainz; `argumento`: un usuario de ListenBrainz (si no, el conectado).
         "explore" => {
             let user = if argument.is_empty() { plugins::listenbrainz_user() } else { Some(argument.to_owned()) };
@@ -165,6 +167,44 @@ fn probe(args: &[String]) -> bool {
                         }
                     }
                     None => println!("{}: sin letra sincronizada", source.id()),
+                }
+            }
+            return true;
+        }
+        "related" => {
+            // `--probe related <videoId>`: la pestaña «Relacionado» de una canción.
+            match ytm::related(argument) {
+                Ok(detail) => {
+                    println!("{}: {} canciones", detail.subtitle, detail.tracks.len());
+                    for track in detail.tracks.iter().take(3) {
+                        println!("   {} — {}", track.title, track.artist);
+                    }
+                    for zone in &detail.zonas {
+                        println!("{} ({}): {}", zone.titulo, zone.items.len(), zone.items.first().map(|i| format!("{} [{}]", i.title, i.kind)).unwrap_or_default());
+                    }
+                }
+                Err(error) => println!("error: {error}"),
+            }
+            return true;
+        }
+        "radio" => {
+            // `--probe radio <videoId> [páginas]`: la radio de una canción y sus continuaciones.
+            let pages: usize = args.get(at + 3).and_then(|n| n.parse().ok()).unwrap_or(3);
+            let mut seen = std::collections::HashSet::new();
+            let mut page = ytm::queue_page(argument, "");
+            for n in 0..=pages {
+                match page {
+                    Ok((tracks, more)) => {
+                        let new = tracks.iter().filter(|t| seen.insert(t.video_id.clone())).count();
+                        let first = tracks.first().map(|t| format!("{} — {}", t.title, t.artist)).unwrap_or_default();
+                        println!("página {n}: {} pistas ({new} nuevas), primera: {first}", tracks.len());
+                        let Some(more) = more.filter(|_| n < pages) else { break };
+                        page = ytm::queue_more(&more);
+                    }
+                    Err(error) => {
+                        println!("error: {error}");
+                        break;
+                    }
                 }
             }
             return true;

@@ -1,4 +1,5 @@
 import QtQuick
+import app.musicplayer
 
 // Calcula el color dominante de una carátula a partir de su miniatura más pequeña.
 // Debe estar visible (aunque quede tapado) para que Qt lo pinte.
@@ -6,7 +7,7 @@ Canvas {
     id: probe
 
     property string thumb: ""
-    property color tint: "#3A3F4B"
+    property color tint: Theme.neutralTint
 
     readonly property string url: thumb.replace("w544-h544", "w60-h60")
 

@@ -5,6 +5,47 @@ son de cuando se escribieron. El estado actual está en su [ficha](../../areas/d
 
 Lo nuevo va arriba: añade una sección `## AAAA-MM-DD · qué se verificó` encima de las anteriores.
 
+## 2026-11-21 · Categoría de Explorar con el Muro de Inicio (en `master`)
+
+- **Cambio:** una categoría de Explorar con álbumes o listas se recorre con `MuroView` (un clic
+  elige con aro y brillo, el nombre sale abajo, el doble la abre; o lo que diga la opción `clic`).
+- **Cómo:** `--shot` (release, `HOME` de pruebas, `explorarFuente` = `youtube`) con `--section
+  explorar --index 1 --autoplay --open`, en «Doble clic» y en «Un clic» con el ratón sobre la
+  segunda carátula (`MUSICPLAYER_DEBUG_CLICK` con `wheel` de 0 pasos).
+- **Resultado:** la primera elegida con su aro entero; con «Un clic», el nombre de abajo es el de
+  la carátula bajo el ratón.
+- **No verificado:** abrir un álbum con el clic de verdad; las flechas del teclado en la cuadrícula.
+
+## 2026-11-21 · Interfaz unificada: `TrackRow`, opción `clic` y «Volver» de Inspeccionar (en `master`)
+
+- **Cambio:** filas con `TrackRow` (56 px, la que suena con título en acento y ▸, la elegida en
+  vidrio claro); un clic elige o hace sonar según `clic`; título del álbum `fontTitle`, nombre del
+  artista `fontDisplay`; discografía con artistas en círculo; Inspeccionar con el botón «Volver»
+  arriba a la izquierda en lugar de la píldora «Salir Esc»
+  ([ADR-23](../../decisions/ADR-23-sistema-de-diseno-medidas-y-piezas-comunes.md)).
+- **Cómo:** 29 capturas con `--shot` (release, `HOME` de pruebas, `MUSICPLAYER_SILENT=1`, macOS Retina 1440×900, sin sesión), revisadas a ojo, sin errores de QML en la salida: detalle de Recomendados (Vidrio y Grafito), artista «Aimer», Relacionado e
+  Inspeccionar (`--inspect open`).
+- **Resultado:** la primera fila sale elegida en vidrio claro; Grafito redondea apenas la carátula.
+- **No verificado:** el clic y el doble clic con el ratón de verdad en las dos opciones de `clic`.
+
+## 2026-11-21 · Categorías de Explorar como detalle (en `master`)
+
+- **Cambio:** `DetailView.zona` (`kind` "zona"): canciones en la lista con Reproducir y Aleatorio,
+  o los elementos en una cuadrícula que llena el ancho; sin inspeccionar. Las tarjetas de las
+  tiras y de la cuadrícula son un componente (`ZoneCard`).
+- **Verificado:** capturas de «Recomendados» (lista de 20) y de «Álbumes y singles nuevos»
+  (24 álbumes en 5 columnas), y de «Relacionado» bajado hasta sus tiras (sin cambios a la vista).
+- **No verificado:** la cuadrícula con la rueda de verdad, en una ventana estrecha y en Linux.
+
+## 2026-11-21 · Página «Relacionado» (en `master`)
+
+- **Cambio:** `DetailView.related`: título «También te puede interesar» sobre las canciones y sin
+  el botón de inspeccionar.
+- **Verificado:** capturas desde el clic derecho en la primera tarjeta de Inicio (cabecera,
+  canciones, Reproducir y Aleatorio) y con `--related 3qmkPx8R--Y --detail-at 3000` (los tres
+  carruseles).
+- **No verificado:** abrir una lista o un artista desde sus carruseles; Linux.
+
 ## 2026-11-18 · Vista de artista «Órbita» (rama `feature/artista-y-ecualizador`)
 
 - **Cambio:** `ArtistHero.qml` (foto, anillo de rayas del color de la foto y tres canciones

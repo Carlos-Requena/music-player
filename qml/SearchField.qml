@@ -34,7 +34,7 @@ Glass {
         anchors.rightMargin: 16
         anchors.verticalCenter: parent.verticalCenter
         color: Theme.text
-        font.pixelSize: 14
+        font.pixelSize: Theme.fontBase
         clip: true
         selectByMouse: true
         selectionColor: Theme.controlActive

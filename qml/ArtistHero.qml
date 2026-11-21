@@ -12,7 +12,7 @@ Item {
     property var detail: null
     property var tracks: []
     // Color dominante de la foto (la sonda de la ventana): tiñe el anillo.
-    property color tint: "#3A3F4B"
+    property color tint: Theme.neutralTint
 
     signal play(int index, bool shuffle)
 
@@ -111,7 +111,7 @@ Item {
 
             width: 268
             height: 76
-            radius: 18
+            radius: Theme.radiusM
             x: Math.max(16, Math.min(root.width - width - 16, root.cx + Math.cos(angle) * reach - width / 2))
             y: Math.max(8, root.cy + Math.sin(angle) * root.ringOuter * 0.82 - height / 2)
             tint: Qt.rgba(Theme.ground.r, Theme.ground.g, Theme.ground.b, 0.72)
@@ -127,8 +127,13 @@ Item {
                 anchors.fill: parent
                 radius: card.radius
                 color: "transparent"
-                border.width: card.activeFocus ? 2 : 1
-                border.color: card.activeFocus ? Theme.text : (cardHover.hovered ? Theme.glassBorder : Qt.rgba(1, 1, 1, 0.08))
+                border.width: 1
+                border.color: cardHover.hovered ? Theme.glassBorder : Qt.rgba(1, 1, 1, 0.08)
+            }
+
+            FocusRing {
+                shown: card.activeFocus
+                corner: card.radius
             }
 
             Cover {
@@ -136,7 +141,7 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 width: 52
                 height: 52
-                radius: 10
+                radius: Theme.coverRadius(width)
                 thumb: card.track.thumb
                 pixels: 120
             }
@@ -151,7 +156,7 @@ Item {
                     width: parent.width
                     text: card.track.title
                     color: Theme.text
-                    font.pixelSize: 14
+                    font.pixelSize: Theme.fontBase
                     font.weight: Font.DemiBold
                     elide: Text.ElideRight
                 }
@@ -160,7 +165,7 @@ Item {
                     width: parent.width
                     text: "Nº " + (card.index + 1) + " · más escuchada"
                     color: Theme.textMuted
-                    font.pixelSize: 12
+                    font.pixelSize: Theme.fontSmall
                     elide: Text.ElideRight
                 }
             }
@@ -172,7 +177,7 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 width: 40
                 height: 40
-                radius: 20
+                radius: height / 2
                 color: root.shade(0.42, 1)
 
                 Icon {
@@ -205,7 +210,7 @@ Item {
     Column {
         anchors.horizontalCenter: parent.horizontalCenter
         y: root.cy + root.ringOuter + 6
-        width: Math.min(parent.width - 80, 720)
+        width: Math.min(parent.width - 2 * Theme.margin, 720)
         spacing: 10
 
         Text {
@@ -213,8 +218,9 @@ Item {
             horizontalAlignment: Text.AlignHCenter
             text: root.detail ? root.detail.title : ""
             color: Theme.text
-            font.pixelSize: 44
+            font.pixelSize: Theme.fontDisplay
             font.weight: Font.Bold
+            font.letterSpacing: Theme.displaySpacing
             elide: Text.ElideRight
         }
 
@@ -224,7 +230,7 @@ Item {
             visible: text !== ""
             text: root.detail && root.detail.subtitle ? root.detail.subtitle : ""
             color: Theme.textMuted
-            font.pixelSize: 14
+            font.pixelSize: Theme.fontBody
         }
 
         Row {

@@ -8,8 +8,8 @@ import app.musicplayer
 Item {
     id: root
 
-    property color stageTint: "#1D3F8A"
-    property color playingTint: "#F2553D"
+    property color stageTint: Theme.neutralTint
+    property color playingTint: Theme.neutralTint
     // Centro horizontal del escenario y del foco de "sonando", en píxeles.
     property real stageCenter: width * 0.37
     property real playingCenter: width * 0.88

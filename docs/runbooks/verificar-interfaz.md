@@ -37,10 +37,12 @@ HOME="$PRUEBA" MUSICPLAYER_SILENT=1 ./target/release/musicplayer \
 | `--shot ruta.png` | Captura la ventana y sale |
 | `--delay ms` | Espera antes de capturar (por defecto 1500) |
 | `--section id` | `inicio`, `explorar`, `playlists`, `albumes` o `buscar` |
-| `--index n` | Lleva Lomos o Cubeta al elemento `n` |
+| `--index n` | Lleva Lomos, Cubeta o las tarjetas de Explorar al elemento `n` |
 | `--step n` | Mueve la vista `n` elementos (negativo = izquierda) a los `--step-delay` ms (1500 por defecto); con `--delay` se captura en mitad del movimiento |
 | `--search texto` | Busca al arrancar |
 | `--play ID` | Reproduce esa canción al arrancar (como un clic en su tarjeta); `--play-title texto` le pone título |
+| `--related ID` | Abre «Relacionado» de esa canción (como el clic derecho); `--related-title texto` le pone título y `--detail-at y` lo baja a los 5 s |
+| `--play-index N` | (con `--play`) salta a la pista N en cuanto llega la cola; con N cerca del final, la radio pide más canciones |
 | `--settings` | Abre las opciones |
 | `--settings-end` | Abre las opciones desplazadas hasta el final |
 | `--settings-cat id` | Abre las opciones en esa categoría (`cuenta`, `reproduccion`, `apariencia`, `vistas`, `plugins`) |
@@ -68,7 +70,9 @@ Un argumento nuevo se añade a `Main.qml` (`arg`) y a esta tabla en la misma tar
 `"120,250,right,5000;245,348,left,5500"` abre el menú de la primera tarjeta de Inicio y pulsa
 «Reproducir a continuación». `"x,y,drag,ms,x2,y2"` arrastra con el botón izquierdo hasta
 `(x2, y2)` y `draghold` lo hace sin soltar (para capturar a mitad del gesto, p. ej. reordenando
-la cola). `"x,y,wheel,ms,pasos"` gira la rueda `pasos` muescas (positivo, hacia abajo).
+la cola). `"x,y,wheel,ms,pasos"` gira la rueda `pasos` muescas (positivo, hacia abajo); antes
+mueve el ratón allí, así que con `0` pasos sirve para ver el «hover» sin pulsar (un `drag` no lo
+deja).
 
 ## Qué mirar
 

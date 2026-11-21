@@ -11,7 +11,15 @@ carátula), letra sincronizada palabra a palabra, y tres formas de recorrer la b
 |---|---|---|
 | **Lomos** | Estantería de cajas en 3D: la elegida de frente y más grande, sus vecinas giradas hacia ella y el resto como lomos, con reflejo en el suelo y halo de color | Playlists, Álbumes |
 | **Cubeta** | Pasar discos de uno en uno, como en una tienda | — |
-| **Muro** | Cuadrícula de carátulas por zonas | Inicio, Explorar, Me gusta, Historial |
+| **Muro** | Cuadrícula de carátulas por zonas; en Explorar, una tarjeta por categoría («Recomendados», «Álbumes y singles nuevos»…) que brilla al pasar el ratón y se abre al pulsarla | Inicio, Explorar, Me gusta, Historial |
+
+En el Muro y en Explorar, lo que está bajo el ratón brilla con el color de su carátula
+(Opciones › Vistas › «Brillo al pasar el ratón» lo desactiva).
+
+Las carátulas llevan las esquinas redondeadas con el radio de la skin, o cuadradas (Opciones ›
+Apariencia › «Esquinas de las carátulas»); los artistas, siempre en círculo. Si las opciones se
+hacen largas, «Compacta», arriba en Opciones, quita las descripciones (salen abajo al pasar el
+ratón).
 
 Cada sección puede usar cualquier vista (Opciones → «Vista de cada sección», el selector de
 arriba a la derecha o la tecla `V`). La letra y la cola van en un panel lateral que se puede
@@ -54,7 +62,8 @@ abre.
     "fondo": "#0A0C11", "texto": "#FFFFFF",
     "textoSecundario": "#BDFFFFFF", "textoTenue": "#80FFFFFF",
     "vidrio": "#12FFFFFF", "vidrioDenso": "#94121419", "bordeVidrio": "#1FFFFFFF",
-    "control": "#1AFFFFFF", "controlActivo": "#2EFFFFFF", "acento": "#FFB070"
+    "control": "#1AFFFFFF", "controlActivo": "#2EFFFFFF", "acento": "#FFB070",
+    "error": "#FF6B6B"
   },
   "radio": 20,
   "ambiente": 1.0
@@ -62,7 +71,9 @@ abre.
 ```
 
 Los colores admiten `#RRGGBB` y `#AARRGGBB` (los dos primeros dígitos son la opacidad). Lo
-que falte toma el valor de Vidrio. `radio` es el redondeo de los paneles en píxeles y
+que falte toma el valor de Vidrio. `error` es el color de los errores (el acento es para lo
+activado y lo que suena). `radio` es el redondeo de los paneles en píxeles (las carátulas, filas
+y menús toman una parte de él) y
 `ambiente`, la intensidad del color de fondo (0 lo apaga). Una skin con el mismo nombre de
 archivo que una incluida la sustituye. Por ahora las skins son oscuras: los velos sobre el
 contenido asumen un fondo oscuro.
@@ -159,7 +170,8 @@ En **Opciones › Plugins**:
   recomendaciones y las novedades de tus artistas. Tarda unos días en tener datos; puedes
   importar tu historial de Last.fm desde su web. Sin cuenta, Explorar muestra lo más escuchado
   de la semana en ListenBrainz. En Opciones › Vistas › **Fuente de Explorar** puedes volver al
-  Explorar de YouTube Music (novedades, listas de éxitos y ánimos).
+  Explorar de YouTube Music (novedades, listas de éxitos y ánimos). Con las dos fuentes, Explorar
+  empieza por **Recomendados**: las canciones que YouTube Music te propone en su Inicio.
 
 La sección **Historial** (con sesión) muestra lo que has escuchado en tu cuenta de YouTube Music,
 por días.
@@ -237,14 +249,14 @@ siguientes, unos 10 s.
 |---|---|
 | Moverse por la vista | Flechas, rueda del ratón o clic |
 | Abrir lo enfocado | `Intro`, doble clic en el Muro o clic en la carátula central. Una canción suena; un álbum, playlist o artista abre su detalle |
-| En el detalle | `↑ ↓` elegir canción, `Intro` reproducir, `S` aleatorio, `I` inspeccionar, `Esc` volver |
+| En el detalle | `↑ ↓` elegir canción, `Intro` reproducir, `S` aleatorio, `I` inspeccionar, `Esc` volver. Con el ratón, un clic elige la canción y el doble la hace sonar (en la cola, la temporal y el Muro también); Opciones › Reproducción › «Clic en una canción» › «Un clic» la hace sonar al primero, y en el Muro el nombre de lo que tienes bajo el ratón sale abajo |
 | Inspeccionar una caja | `I` sobre un álbum o playlist: `← →` girar (contraportada con las canciones), `Espacio` abrir, `D` sacar el disco, `Intro` reproducir, `Esc` salir |
 | Pausa / reanudar | `Espacio` |
 | Cambiar de vista | `V` o el selector de arriba a la derecha |
 | Buscar | `⌘F` / `Ctrl+F` o el campo «Buscar» |
 | Opciones | `⌘,` / `Ctrl+,` o el botón de ajustes |
 | Mini reproductor | `M` o el botón junto al volumen; `Esc` o la flecha vuelven a la ventana completa |
-| Pantalla «Sonando» | Se abre sola al elegir una canción, o con un clic en la canción de la barra de reproducción: la carátula en grande sobre sus colores, y a la derecha la letra (si la hay) y la cola. Se cierra con un clic en la carátula, la flecha o `Esc` |
+| Pantalla «Sonando» | Se abre sola al elegir una canción, o con un clic en la canción de la barra de reproducción: la carátula en grande sobre sus colores, y a la derecha la letra (si la hay) y la cola. Se cierra con la flecha o `Esc`; un clic en la carátula la hace «latir» |
 | Letra | Al estilo de Better Lyrics: la línea que suena, grande y brillante a un tercio de la altura, con sus palabras rellenándose al cantarse; las demás, atenuadas, y en las pausas instrumentales tres puntos. Clic en una línea salta a ese momento. Si en «Sonando» no quieres letra ni cola, el botón del panel de la barra las quita y centra la carátula. Opciones › Apariencia › «Calidad de la letra»: Calidad (todo a 60 Hz, ~32 % de CPU), Equilibrado (~20 %, por defecto) o Bajo (~14 %, lo mismo que con la cola a la vista) |
 | Letra desincronizada | Bajo la letra: `−` la adelanta y `+` la atrasa medio segundo; se guarda para esa canción. Clic en el texto la deja en hora. Si no encaja, prueba otra fuente: pulsa su nombre («· NetEase ↻») y pasa a la siguiente (también se recuerda). Origen preferido, tamaño, tipo de letra y grosor en Opciones › Apariencia |
 | Lista temporal | Clic derecho en una canción, álbum o playlist › «Añadir a la lista temporal». Se ve en la pestaña «Temporal» del panel: «Reproducir en bucle», quitar canciones o vaciarla. No se guarda al cerrar la app |

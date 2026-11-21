@@ -59,7 +59,7 @@ Row {
             text: root.delay === 0 ? "letra en hora"
                 : "Letra " + (root.delay > 0 ? "+" : "−") + Math.abs(root.delay).toFixed(1).replace(".", ",") + " s"
             color: root.tone
-            font.pixelSize: 13
+            font.pixelSize: Theme.fontSmall
             font.features: { "tnum": 1 }
         }
 
@@ -110,7 +110,7 @@ Row {
             anchors.centerIn: parent
             text: root.chosen ? "· " + root.chosen.label + (root.canSwitch ? "  ↻" : "") : ""
             color: Theme.textFaint
-            font.pixelSize: 13
+            font.pixelSize: Theme.fontSmall
         }
 
         HoverHandler {

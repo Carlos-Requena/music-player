@@ -5,6 +5,15 @@ son de cuando se escribieron. El estado actual está en su [ficha](../../areas/l
 
 Lo nuevo va arriba: añade una sección `## AAAA-MM-DD · qué se verificó` encima de las anteriores.
 
+## 2026-11-21 · Tamaños de letra de `Theme` en el aviso y el pie de retraso (en `master`)
+
+- **Cambio:** «Sin letra sincronizada…» y el pie de retraso toman `Theme.fontBody` y
+  `Theme.fontSmall` ([ADR-23](../../decisions/ADR-23-sistema-de-diseno-medidas-y-piezas-comunes.md));
+  la letra sigue con su propia escala.
+- **Cómo:** 29 capturas con `--shot` (release, `HOME` de pruebas, `MUSICPLAYER_SILENT=1`, macOS Retina 1440×900, sin sesión), revisadas a ojo, sin errores de QML en la salida: panel con la letra de «Never Gonna Give You Up».
+- **Resultado:** sin cambios a la vista (mismos tamaños).
+- **No verificado:** el aviso de canción sin letra.
+
 ## 2026-11-16 · Menos CPU en la letra (rama `perf/letra`)
 
 - **Cambio:** «Calidad» a 60 Hz como tope (la pantalla ProMotion daba hasta 120); brillo y puntos

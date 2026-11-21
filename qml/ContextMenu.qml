@@ -24,7 +24,8 @@ Item {
     signal newCategoryRequested(string playlistId)
     signal renameCategoryRequested(string name)
     signal coverRequested(var item)
-    // «Ir al álbum» o «Ver artista» (`que`: "album" o "artist"): la ventana abre el detalle.
+    // «Ir al álbum», «Ver artista» o «Relacionado» (`que`: "album", "artist" o "related"): la
+    // ventana abre el detalle.
     signal relatedRequested(var item, string que)
 
     readonly property bool isSong: item !== null && isSongItem(item)
@@ -76,6 +77,9 @@ Item {
             out.push({ id: "album", label: "Ir al álbum", icon: Theme.iconAlbum })
         if ((isSong && item.videoId) || (item.kind === "album" && item.browseId))
             out.push({ id: "artista", label: "Ver artista", icon: Theme.iconArtist })
+        // Lo que se parece a la canción: la pestaña «Relacionado» de YouTube Music.
+        if (isSong && item.videoId)
+            out.push({ id: "relacionado", label: "Relacionado", icon: Theme.iconRelated })
         out.push({ id: "temporal", label: isSong ? "Añadir a la lista temporal" : "Añadir todo a la lista temporal", icon: Theme.iconTemporal })
         if (canSave)
             out.push({ id: "page:listas", label: "Guardar en una playlist", icon: Theme.iconSaveList, more: true })
@@ -168,8 +172,8 @@ Item {
         } else if (action === "quitar") {
             Player.removeFromQueue(target.queueIndex)
             notify("«" + target.title + "» quitada de la cola")
-        } else if (action === "album" || action === "artista") {
-            root.relatedRequested(target, action === "album" ? "album" : "artist")
+        } else if (action === "album" || action === "artista" || action === "relacionado") {
+            root.relatedRequested(target, action === "album" ? "album" : action === "artista" ? "artist" : "related")
         } else if (action === "temporal") {
             Player.addToTemporal(JSON.stringify(target))
             notify(isSongItem(target) ? "«" + target.title + "» añadida a la lista temporal"
@@ -227,7 +231,7 @@ Item {
         y: menu.y + 6
         width: menu.width
         height: menu.height
-        radius: 14
+        radius: Theme.radiusM
         blur: 28
         color: Qt.rgba(0, 0, 0, 0.45)
     }
@@ -240,7 +244,7 @@ Item {
         width: 300
         // Las listas largas (muchas playlists) se desplazan dentro del menú.
         height: Math.min(list.height + 12, root.height - 16)
-        radius: 14
+        radius: Theme.radiusM
         tint: Qt.rgba(Theme.ground.r, Theme.ground.g, Theme.ground.b, 0.94)
         onHeightChanged: if (root.opened) root.place(root.anchorPoint.x, root.anchorPoint.y)
 
@@ -287,7 +291,7 @@ Item {
                         : root.page === "categorias" ? "Categorías de «" + root.item.title + "»"
                         : root.item.title
                     color: Theme.textMuted
-                    font.pixelSize: 12
+                    font.pixelSize: Theme.fontSmall
                     font.weight: Font.DemiBold
                     elide: Text.ElideRight
                 }
@@ -310,8 +314,8 @@ Item {
 
                         Rectangle {
                             anchors.fill: parent
-                            radius: 10
-                            color: entryHover.hovered || entry.activeFocus ? Theme.controlActive : "transparent"
+                            radius: Theme.radiusS
+                            color: entryHover.hovered || entry.activeFocus ? Theme.control : "transparent"
                         }
 
                         Icon {
@@ -329,7 +333,7 @@ Item {
                             anchors.verticalCenter: parent.verticalCenter
                             text: entry.modelData.label
                             color: Theme.text
-                            font.pixelSize: 14
+                            font.pixelSize: Theme.fontBase
                             elide: Text.ElideRight
                         }
 
@@ -367,10 +371,10 @@ Item {
         y: parent.height - 150
         width: toast.implicitWidth + 36
         height: 40
-        radius: 20
+        radius: height / 2
         color: Theme.glassStrong
         border.width: 1
-        border.color: Qt.rgba(1, 1, 1, 0.1)
+        border.color: Theme.glassBorder
         opacity: toastTimer.running ? 1 : 0
         visible: opacity > 0
 
@@ -380,7 +384,7 @@ Item {
             id: toast
             anchors.centerIn: parent
             color: Theme.text
-            font.pixelSize: 14
+            font.pixelSize: Theme.fontBase
         }
 
         Timer {

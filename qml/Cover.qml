@@ -1,10 +1,9 @@
 import QtQuick
-import QtQuick.Shapes
 import app.musicplayer
 
 // Carátula a partir de la URL de su miniatura, con un fondo neutro mientras carga. Con
-// `radius` sale con las esquinas redondeadas (o en círculo): la imagen rellena una forma, sin
-// capa ni máscara aparte.
+// `radius` sale con las esquinas redondeadas (o en círculo): un sombreador (`caratula.frag`) lee
+// la textura de la imagen y recorta el borde, sin capa ni máscara aparte.
 Item {
     id: root
 
@@ -28,7 +27,7 @@ Item {
         anchors.fill: parent
         visible: root.placeholder
         radius: root.radius
-        color: "#1A1D24"
+        color: Theme.placeholder
     }
 
     Image {
@@ -44,45 +43,22 @@ Item {
         Behavior on opacity { NumberAnimation { duration: Theme.animFast } }
     }
 
-    // Se recrea cuando la ventana vuelve de estar oculta (ver `Theme.renderEpoch`).
-    Loader {
-        id: rounded
+    // Redondeada: la textura de `image` (oculta) con las esquinas recortadas. Una `Shape` por
+    // carátula costaba unos 24 MB más en un Muro lleno (ADR-23). `crop` hace lo que
+    // `PreserveAspectCrop`: muestra la parte central que cubre el recuadro.
+    ShaderEffect {
         anchors.fill: parent
-        active: root.radius > 0
+        visible: root.radius > 0 && image.status === Image.Ready
+        opacity: image.opacity
 
-        readonly property int epoch: Theme.renderEpoch
-        onEpochChanged: if (active) {
-            active = false
-            active = Qt.binding(() => root.radius > 0)
-        }
+        readonly property real imageAspect: image.implicitHeight > 0 ? image.implicitWidth / image.implicitHeight : 1
+        readonly property real boxAspect: root.height > 0 ? root.width / root.height : 1
 
-        sourceComponent: Shape {
-            id: shape
-            preferredRendererType: Shape.CurveRenderer
-            opacity: image.opacity
-
-            // La forma coloca la textura en su esquina con su tamaño en píxeles físicos, no con el
-            // de `image`: sin escalarla, en una carátula mayor que eso se repetía el último píxel
-            // por la derecha y por abajo. Se escala para cubrir la carátula (como
-            // PreserveAspectCrop) y se centra.
-            readonly property real dpr: Screen.devicePixelRatio > 0 ? Screen.devicePixelRatio : 1
-            readonly property real texW: Math.max(1, image.implicitWidth / dpr)
-            readonly property real texH: Math.max(1, image.implicitHeight / dpr)
-            readonly property real scale: Math.max(root.width / texW, root.height / texH)
-
-            ShapePath {
-                strokeColor: "transparent"
-                fillItem: image
-                fillTransform: Qt.matrix4x4(shape.scale, 0, 0, (root.width - shape.texW * shape.scale) / 2,
-                                            0, shape.scale, 0, (root.height - shape.texH * shape.scale) / 2,
-                                            0, 0, 1, 0,
-                                            0, 0, 0, 1)
-                PathRectangle {
-                    width: root.width
-                    height: root.height
-                    radius: root.radius
-                }
-            }
-        }
+        property variant source: image
+        property size size: Qt.size(width, height)
+        property real radius: Math.min(root.radius, width / 2, height / 2)
+        property size crop: imageAspect > boxAspect ? Qt.size(boxAspect / imageAspect, 1)
+                                                    : Qt.size(1, imageAspect / boxAspect)
+        fragmentShader: "qrc:/qt/qml/app/musicplayer/shaders/caratula.frag.qsb"
     }
 }

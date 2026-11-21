@@ -52,8 +52,9 @@ pub mod qobject {
         #[qinvokable]
         fn open_detail(self: Pin<&mut Library>, item: &QString);
 
-        /// Abre el álbum (`que` = "album") o el artista (`que` = "artist") de `item` (JSON de una
-        /// canción, una pista o un álbum). Se muestra al momento lo que se sabe; el álbum o el
+        /// Abre el álbum (`que` = "album"), el artista (`que` = "artist") o los relacionados
+        /// (`que` = "related", solo de una canción) de `item` (JSON de una canción, una pista o
+        /// un álbum). Se muestra al momento lo que se sabe; el álbum o el
         /// artista se buscan en un hilo. Si no hay, cierra el detalle y avisa con `aviso`.
         #[qinvokable]
         fn open_related(self: Pin<&mut Library>, item: &QString, que: &QString);
@@ -61,6 +62,12 @@ pub mod qobject {
         /// Aviso breve para el usuario (lo muestra el menú contextual).
         #[qsignal]
         fn aviso(self: Pin<&mut Library>, mensaje: QString);
+
+        /// Abre como detalle una categoría de Explorar (`zona`: JSON de `ytm::Zone`): si son
+        /// canciones, como una lista con Reproducir y Aleatorio; si no, sus elementos en
+        /// cuadrícula. No pide nada a la red.
+        #[qinvokable]
+        fn open_zona(self: Pin<&mut Library>, zona: &QString);
 
         /// Cierra el detalle.
         #[qinvokable]
@@ -194,6 +201,27 @@ fn explorar_cache(youtube: bool) -> &'static str {
     if youtube { "explorar" } else { "explorar-listenbrainz" }
 }
 
+/// Explorar con «Recomendados» delante ([catalogo](../docs/areas/catalogo.md)). Si no llegan, se
+/// queda el resto (el detalle, a stderr); si falla el resto, al menos Recomendados.
+fn with_recomendados(recomendados: ytm::Result<Zone>, rest: ytm::Result<Vec<Zone>>) -> ytm::Result<Vec<Zone>> {
+    let recomendados = match recomendados {
+        Ok(zone) if !zone.items.is_empty() => Some(zone),
+        Ok(_) => None,
+        Err(error) => {
+            eprintln!("recomendados: {error}");
+            None
+        }
+    };
+    match (recomendados, rest) {
+        (Some(zone), Ok(rest)) => Ok(std::iter::once(zone).chain(rest).collect()),
+        (Some(zone), Err(error)) => {
+            eprintln!("explorar: {error}");
+            Ok(vec![zone])
+        }
+        (None, rest) => rest,
+    }
+}
+
 /// Historial de escucha de la cuenta; sin sesión, vacío.
 fn history() -> ytm::Result<Vec<Zone>> {
     if signed_in() { ytm::browse("FEmusic_history") } else { Ok(Vec::new()) }
@@ -304,21 +332,50 @@ impl qobject::Library {
         // Sin copia de esta fuente se vacía: no se muestra la de la otra mientras llega.
         let stored = cache::read(name, false).unwrap_or_default();
         self.as_mut().set_explorar(QString::from(&stored));
+        // Si Recomendados no llega, se queda la de la copia: si no, las tarjetas se correrían
+        // un sitio bajo el ratón.
+        let previous = serde_json::from_str::<Vec<Zone>>(&stored)
+            .ok()
+            .and_then(|zones| zones.into_iter().next())
+            .filter(|zone| zone.titulo == ytm::RECOMENDADOS);
+        let recomendados = move || {
+            ytm::recomendados().or_else(|error| match &previous {
+                Some(zone) => {
+                    eprintln!("recomendados: {error}; se queda la copia guardada");
+                    Ok(zone.clone())
+                }
+                None => Err(error),
+            })
+        };
         let qt = self.qt_thread();
         thread::spawn(move || {
             let partial = qt.clone();
+            let publish = move |zones: &[Zone]| {
+                let json = to_json(zones);
+                let _ = partial.queue(move |library| {
+                    if library.load_generation == generation {
+                        library.set_explorar(QString::from(&json));
+                    }
+                });
+            };
             let result = if youtube {
-                ytm::browse("FEmusic_explore")
+                // Recomendados (Inicio) y Explorar a la vez: tarda lo que la más lenta.
+                let (recomendados, explore) = thread::scope(|scope| {
+                    let recomendados = scope.spawn(&recomendados);
+                    let explore = ytm::browse("FEmusic_explore");
+                    (recomendados.join().unwrap_or_else(|_| Err("Recomendados falló.".to_owned())), explore)
+                });
+                with_recomendados(recomendados, explore)
             } else {
+                // ListenBrainz tarda segundos: Recomendados se ve antes, sola.
+                let first: Vec<Zone> = with_recomendados(recomendados(), Ok(Vec::new())).unwrap_or_default();
+                if !first.is_empty() {
+                    publish(&first);
+                }
                 let user = crate::plugins::listenbrainz_user();
-                listenbrainz::explorar(user.as_deref(), |zones| {
-                    let json = to_json(zones);
-                    let _ = partial.queue(move |library| {
-                        if library.load_generation == generation {
-                            library.set_explorar(QString::from(&json));
-                        }
-                    });
-                })
+                listenbrainz::explorar(user.as_deref(), |zones| publish(&[first.as_slice(), zones].concat()))
+                    .map(|zones| [first.clone(), zones].concat())
+                    .or_else(|error| if first.is_empty() { Err(error) } else { Ok(first.clone()) })
             };
             match result {
                 Ok(zones) => {
@@ -407,6 +464,7 @@ impl qobject::Library {
         let Ok(value) = serde_json::from_str::<serde_json::Value>(&item.to_string()) else { return };
         let field = |key: &str| value.get(key).and_then(serde_json::Value::as_str).unwrap_or_default().to_owned();
         let artist_wanted = que.to_string() == "artist";
+        let related = que.to_string() == "related";
         let (kind, video_id, browse_id, title) = (field("kind"), field("videoId"), field("browseId"), field("title"));
         // Nombre del artista que ya se conoce: el de la pista o el primero del subtítulo.
         let known_artist = {
@@ -421,6 +479,10 @@ impl qobject::Library {
                 .to_owned()
         };
         if video_id.is_empty() && !(artist_wanted && kind == "album" && !browse_id.is_empty()) {
+            return;
+        }
+        if related {
+            self.open_song_related(video_id, title, field("thumb"), known_artist);
             return;
         }
         let request = self.detail_request + 1;
@@ -479,6 +541,80 @@ impl qobject::Library {
                 }
             });
         });
+    }
+
+    /// «Relacionado» de una canción (`ytm::related`): su carátula y su título se ven al momento,
+    /// las filas llegan del hilo.
+    fn open_song_related(mut self: Pin<&mut Self>, video_id: String, title: String, thumb: String, artist: String) {
+        use cxx_qt::CxxQtType;
+        let request = self.detail_request + 1;
+        self.as_mut().rust_mut().detail_request = request;
+        let heading = if artist.is_empty() { format!("Como «{title}»") } else { format!("Como «{title}» · {artist}") };
+        let preview = ytm::Detail {
+            title: "Relacionado".to_owned(),
+            subtitle: heading.clone(),
+            thumb: thumb.clone(),
+            kind: "related".to_owned(),
+            ..ytm::Detail::default()
+        };
+        self.as_mut().set_detalle(QString::from(&serde_json::to_string(&preview).unwrap_or_default()));
+        self.as_mut().set_detalle_loading(true);
+        let qt = self.qt_thread();
+        thread::spawn(move || {
+            let result = ytm::related(&video_id).map(|mut detail| {
+                detail.title = "Relacionado".to_owned();
+                detail.subtitle = heading;
+                detail.thumb = thumb;
+                detail
+            });
+            let _ = qt.queue(move |mut library| {
+                if library.detail_request != request {
+                    return;
+                }
+                match result {
+                    Ok(detail) => {
+                        library.as_mut().set_detalle(QString::from(&serde_json::to_string(&detail).unwrap_or_default()));
+                        library.set_detalle_loading(false);
+                    }
+                    Err(error) => {
+                        eprintln!("relacionado: {error}");
+                        library.as_mut().close_detail();
+                        library.aviso(QString::from("No se pudieron cargar los relacionados"));
+                    }
+                }
+            });
+        });
+    }
+
+    fn open_zona(mut self: Pin<&mut Self>, zona: &QString) {
+        use cxx_qt::CxxQtType;
+        let Ok(zona) = serde_json::from_str::<Zone>(&zona.to_string()) else { return };
+        // Anula lo que estuviera llegando de un detalle anterior.
+        self.as_mut().rust_mut().detail_request += 1;
+        let mut detail = ytm::Detail {
+            title: zona.titulo.clone(),
+            subtitle: "Explorar".to_owned(),
+            thumb: zona.items.first().map(|item| item.thumb.clone()).unwrap_or_default(),
+            kind: "zona".to_owned(),
+            ..ytm::Detail::default()
+        };
+        if ytm::all_songs(&zona.items) {
+            detail.tracks = zona.items.into_iter().map(ytm::item_track).collect();
+        } else {
+            // El detalle cuenta las canciones él mismo; lo demás, aquí.
+            let first = zona.items.first().map(|item| item.kind.as_str()).unwrap_or_default();
+            let same = zona.items.iter().all(|item| item.kind == first);
+            let name = match (same, first) {
+                (true, "album") => "álbumes",
+                (true, "playlist") => "listas",
+                (true, "artist") => "artistas",
+                _ => "elementos",
+            };
+            detail.subtitle = format!("Explorar · {} {name}", zona.items.len());
+            detail.zonas = vec![zona];
+        }
+        self.as_mut().set_detalle_loading(false);
+        self.as_mut().set_detalle(QString::from(&serde_json::to_string(&detail).unwrap_or_default()));
     }
 
     fn close_detail(mut self: Pin<&mut Self>) {

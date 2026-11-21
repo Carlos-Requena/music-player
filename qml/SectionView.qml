@@ -56,7 +56,19 @@ FocusScope {
         id: loader
         anchors.fill: parent
         focus: true
-        sourceComponent: root.view === "lomos" ? lomos : (root.view === "cubeta" ? cubeta : muro)
+        // Explorar en Muro: una tarjeta por categoría en vez de todas sus carátulas.
+        sourceComponent: root.view === "lomos" ? lomos
+                       : root.view === "cubeta" ? cubeta
+                       : root.section === "explorar" ? categorias : muro
+    }
+
+    Component {
+        id: categorias
+        CategoriasView {
+            zonas: root.zonas
+            focus: true
+            onActivated: item => root.activated(item)
+        }
     }
 
     Component {
@@ -73,7 +85,7 @@ FocusScope {
         id: lomos
         LomosView {
             zonas: root.zonas
-            titulo: Catalog.label(root.section)
+            seccion: Catalog.label(root.section)
             focus: true
             onActivated: item => root.activated(item)
             onHinted: (item, on) => root.hinted(item, on)
@@ -84,7 +96,6 @@ FocusScope {
         id: cubeta
         CubetaView {
             zonas: root.zonas
-            titulo: Catalog.label(root.section)
             focus: true
             onActivated: item => root.activated(item)
         }

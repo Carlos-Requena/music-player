@@ -11,14 +11,11 @@ import app.musicplayer
 ListView {
     id: root
 
-    property int rowHeight: 56
-    property int coverSize: 40
-    property int titleSize: 14
-    property real rowRadius: 10
+    readonly property int rowHeight: Theme.rowHeight
     // Al cambiar de pista: true = la que suena arriba del todo; false = basta con que se vea.
     property bool followTop: false
-    // Pone «Sonando» en lugar de la duración de la que suena.
-    property bool showPlaying: false
+    // Fila elegida con un clic (opción `clic` en «doble»: el doble clic la hace sonar).
+    property int chosen: -1
 
     // Arrastre en curso: fila que se arrastra (-1 ninguna), hueco donde caería, dónde se pulsó
     // (en coordenadas del contenido) y dónde está el puntero (en las de la vista).
@@ -39,7 +36,10 @@ ListView {
         if (dragFrom < 0 && count > 0)
             positionViewAtIndex(Math.max(0, Player.index), followTop ? ListView.Beginning : ListView.Contain)
     }
-    onCountChanged: follow()
+    onCountChanged: {
+        chosen = -1
+        follow()
+    }
     onVisibleChanged: if (visible) follow()
     Connections {
         target: Player
@@ -111,56 +111,17 @@ ListView {
         Accessible.name: track.title + ", " + track.artist
         Accessible.onPressAction: Player.playIndex(index)
 
-        Rectangle {
+        TrackRow {
             anchors.fill: parent
-            radius: root.rowRadius
-            color: row.dragged ? Theme.controlActive
-                : row.current ? Theme.controlActive
-                : (mouse.containsMouse && root.dragFrom < 0 ? Theme.control : "transparent")
-            border.width: row.dragged ? 1 : 0
-            border.color: Theme.glassBorder
-        }
-
-        Cover {
-            x: 8
-            anchors.verticalCenter: parent.verticalCenter
-            width: root.coverSize
-            height: root.coverSize
+            title: row.track.title
+            artist: row.track.artist
             thumb: row.track.thumb
-            pixels: 120
-        }
-
-        Column {
-            x: root.coverSize + 18
-            anchors.verticalCenter: parent.verticalCenter
-            width: parent.width - x - 60
-            spacing: 1
-
-            Text {
-                width: parent.width
-                text: row.track.title
-                color: Theme.text
-                font.pixelSize: root.titleSize
-                font.weight: row.current ? Font.DemiBold : Font.Normal
-                elide: Text.ElideRight
-            }
-
-            Text {
-                width: parent.width
-                text: row.track.artist
-                color: Theme.textMuted
-                font.pixelSize: 12
-                elide: Text.ElideRight
-            }
-        }
-
-        Text {
-            anchors.right: parent.right
-            anchors.rightMargin: 12
-            anchors.verticalCenter: parent.verticalCenter
-            text: row.current && root.showPlaying ? "Sonando" : Theme.mmss(row.track.duration)
-            color: row.current && root.showPlaying ? Theme.accent : Theme.textMuted
-            font.pixelSize: 12
+            duration: row.track.duration
+            playing: row.current
+            chosen: root.chosen === row.index && !row.dragged
+            lifted: row.dragged
+            hoverEnabled: root.dragFrom < 0
+            hovered: mouse.containsMouse
         }
 
         // Un `MouseArea` y no gestores: con `preventStealing` la lista no se queda el arrastre
@@ -194,13 +155,20 @@ ListView {
             }
             onReleased: if (moved) root.endDrag()
             onCanceled: if (moved) root.endDrag()
+            // Un clic hace sonar o elige según la opción `clic`; el doble, siempre suena.
             onClicked: event => {
                 if (moved)
                     return
                 if (event.button === Qt.RightButton)
                     row.Window.window.openMenu(Object.assign({ queueIndex: row.index }, row.track),
                                                mapToItem(null, event.x, event.y))
+                else if (Theme.singleClick)
+                    Player.playIndex(row.index)
                 else
+                    root.chosen = row.index
+            }
+            onDoubleClicked: event => {
+                if (!moved && event.button === Qt.LeftButton && !Theme.singleClick)
                     Player.playIndex(row.index)
             }
         }

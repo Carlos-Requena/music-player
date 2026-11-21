@@ -22,6 +22,9 @@ use crate::{
     ytm::{self, Item, Track},
 };
 
+/// Canciones que deben quedar detrás de la que suena antes de pedir más a la radio.
+const RADIO_MARGIN: usize = 5;
+
 #[cxx_qt::bridge]
 pub mod qobject {
     unsafe extern "C++" {
@@ -221,6 +224,10 @@ pub struct PlayerRust {
     repetir_una: bool,
     temporal: QString,
     animada: QString,
+    /// Continuación de la radio que suena: al quedar `RADIO_MARGIN` canciones, trae más.
+    radio_more: Option<String>,
+    /// Ya se están pidiendo más canciones de la radio.
+    radio_loading: bool,
     /// Cambia con cada pista o búsqueda de carátula animada; descarta las respuestas viejas.
     animada_token: u64,
     /// Pista (título y artista) cuya carátula animada ya se pidió.
@@ -422,6 +429,8 @@ impl Default for PlayerRust {
             repetir_una: false,
             temporal: QString::from("[]"),
             animada: QString::default(),
+            radio_more: None,
+            radio_loading: false,
             animada_token: 0,
             animada_pedida: None,
             temporal_tracks: Vec::new(),
@@ -468,15 +477,20 @@ impl qobject::Player {
 
         let qt = self.qt_thread();
         thread::spawn(move || {
-            let result = if started {
-                ytm::queue(&item.video_id, &item.playlist_id)
+            // La radio de una canción (sin playlist) sigue sin fin: guarda su continuación.
+            let (result, more) = if started {
+                match ytm::queue_page(&item.video_id, &item.playlist_id) {
+                    Ok((tracks, more)) => (Ok(tracks), more.filter(|_| item.playlist_id.is_empty())),
+                    Err(error) => (Err(error), None),
+                }
             } else {
-                album_queue(&item.playlist_id)
+                (album_queue(&item.playlist_id), None)
             };
             let _ = qt.queue(move |mut player| {
                 if player.request != request {
                     return;
                 }
+                player.as_mut().rust_mut().radio_more = more;
                 match result {
                     Ok(tracks) if !tracks.is_empty() => player.as_mut().adopt_queue(tracks, started),
                     Ok(_) if !started => player.as_mut().fail("No se encontraron canciones."),
@@ -973,6 +987,9 @@ impl qobject::Player {
     fn new_request(mut self: Pin<&mut Self>) -> u64 {
         let request = self.request + 1;
         self.as_mut().rust_mut().request = request;
+        // Una cola nueva deja de ser la radio anterior.
+        self.as_mut().rust_mut().radio_more = None;
+        self.as_mut().rust_mut().radio_loading = false;
         self.set_error(QString::default());
         request
     }
@@ -1005,7 +1022,48 @@ impl qobject::Player {
         // La cola trae el artista limpio y la duración; con eso la letra se encuentra mejor.
         self.as_mut().set_artist(QString::from(&track.artist));
         self.as_mut().fetch_lyrics(track);
-        self.prefetch_next();
+        self.as_mut().prefetch_next();
+        self.extend_radio();
+    }
+
+    /// Si la cola es una radio y quedan `RADIO_MARGIN` canciones o menos tras la que suena, pide
+    /// las siguientes y las añade al final (sin repetir ninguna que ya esté en la cola).
+    fn extend_radio(mut self: Pin<&mut Self>) {
+        let left = self.tracks.len().saturating_sub(*self.index() as usize + 1);
+        if left > RADIO_MARGIN || self.radio_loading {
+            return;
+        }
+        let Some(continuation) = self.radio_more.clone() else { return };
+        self.as_mut().rust_mut().radio_loading = true;
+        let request = self.request;
+        let qt = self.qt_thread();
+        thread::spawn(move || {
+            let result = ytm::queue_more(&continuation);
+            let _ = qt.queue(move |mut player| {
+                if player.request != request {
+                    return;
+                }
+                player.as_mut().rust_mut().radio_loading = false;
+                let (added, more) = match result {
+                    Ok(page) => page,
+                    Err(error) => {
+                        // Sin más radio la cola acaba como antes; se reintenta en la próxima pista.
+                        eprintln!("radio: {error}");
+                        return;
+                    }
+                };
+                player.as_mut().rust_mut().radio_more = more;
+                let mut tracks = player.tracks.clone();
+                let known: HashSet<String> = tracks.iter().map(|track| track.video_id.clone()).collect();
+                let before = tracks.len();
+                tracks.extend(added.into_iter().filter(|track| !known.contains(&track.video_id)));
+                if tracks.len() > before {
+                    eprintln!("radio: +{} canciones (cola de {})", tracks.len() - before, tracks.len());
+                    player.as_mut().set_tracks(tracks);
+                    player.as_mut().prefetch_next();
+                }
+            });
+        });
     }
 
     /// Arranca mpv la primera vez que hace falta.
@@ -1095,10 +1153,11 @@ impl qobject::Player {
         }
         if defer_lyrics {
             // La de la pista anterior no debe quedarse en pantalla mientras llega la cola.
-            self.clear_lyrics();
+            self.as_mut().clear_lyrics();
         } else {
-            self.fetch_lyrics(track);
+            self.as_mut().fetch_lyrics(track);
         }
+        self.extend_radio();
     }
 
     /// Ordena a mpv que reproduzca: la URL resuelta si la hay, si no la página de YouTube.

@@ -30,13 +30,13 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         width: parent.width
         height: 4
-        radius: 2
+        radius: height / 2
         color: Qt.rgba(1, 1, 1, 0.22)
 
         Rectangle {
             width: parent.width * root.drawn
             height: parent.height
-            radius: 2
+            radius: height / 2
             color: root.fill
         }
     }
@@ -46,10 +46,13 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         width: 12
         height: 12
-        radius: 6
+        radius: width / 2
         color: Theme.text
-        border.width: root.activeFocus ? 2 : 0
-        border.color: Theme.accent
+
+        FocusRing {
+            shown: root.activeFocus
+            corner: width / 2
+        }
     }
 
     MouseArea {

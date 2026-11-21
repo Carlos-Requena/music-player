@@ -17,6 +17,8 @@ Qué comprueba:
   citan las citen también a ellas.
 - Código: cada QML registrado en build.rs, cada puente de cxx-qt en `.files([...])` y cada
   módulo declarado en main.rs (las trampas que más veces han roto la compilación).
+- Interfaz: ningún QML escribe a mano un tamaño de letra, un radio ni un color (ADR-23): salen de
+  `Theme`. Una línea que lo necesite de verdad lleva `// fijo: <motivo>`.
 - Toda la documentación: enlaces y anclas, símbolos enlazados (`[`símbolo`](archivo)`) que
   existan en su archivo, sin cifras que caducan ni frases de historia fuera de docs/history,
   sin comandos que borren datos del propietario y sin archivos ajenos en docs/.
@@ -166,7 +168,9 @@ SINGLETONS = {
 # Lo que usa casi todo: no hace falta citarlo en «Dependencias».
 TRANSVERSAL = {
     "qml/Theme.qml", "qml/Icon.qml", "qml/IconButton.qml", "qml/PillButton.qml",
-    "qml/Slider.qml", "qml/TextField.qml", "qml/TabStrip.qml", "qml/Glass.qml", "qml/Cover.qml",
+    "qml/Slider.qml", "qml/TextField.qml", "qml/Glass.qml", "qml/Cover.qml",
+    "qml/Tabs.qml", "qml/TabButton.qml", "qml/FocusRing.qml", "qml/TrackRow.qml",
+    "qml/SectionLabel.qml", "qml/FocusedCaption.qml", "qml/EmptyState.qml",
 }
 
 
@@ -214,6 +218,31 @@ def check_registration() -> None:
             error(ROOT / "build.rs", f"{rel} es un puente de cxx-qt y no está en .files([...])")
         if p.stem != "main" and not re.search(rf"(?m)^\s*(pub )?mod {p.stem};", main):
             error(ROOT / "src/main.rs", f"falta `mod {p.stem};`")
+
+
+# ─── Medidas de la interfaz (ADR-23) ─────────────────────────────────────────
+
+# Archivos que no pasan por la regla: `Theme` (donde viven las medidas) e Inspeccionar, que dibuja
+# un objeto físico (caja, papel, disco) con sus propios colores y medidas.
+MEASURE_EXEMPT = {"qml/Theme.qml", "qml/InspectView.qml"}
+MEASURE_PATTERNS = [
+    (re.compile(r"\bfont\.pixelSize:\s*\d"), "tamaño de letra escrito a mano: usa Theme.fontDisplay…fontMini"),
+    (re.compile(r"(?<![\w.])radius:\s*(?!0\b)\d"),
+     "radio escrito a mano: usa Theme.radiusS/M/L, Theme.coverRadius(lado) o height / 2"),
+    (re.compile(r'"#[0-9A-Fa-f]{3,8}"'), "color escrito a mano: usa Theme o una clave nueva de la skin"),
+]
+
+
+def check_measures() -> None:
+    for p in sorted((ROOT / "qml").glob("*.qml")):
+        if p.relative_to(ROOT).as_posix() in MEASURE_EXEMPT:
+            continue
+        for n, line in enumerate(read(p).splitlines(), 1):
+            if line.lstrip().startswith("//") or "// fijo:" in line:
+                continue
+            for pattern, msg in MEASURE_PATTERNS:
+                if pattern.search(line):
+                    error(p, f"línea {n}: {msg}")
 
 
 # ─── Fichas de área ─────────────────────────────────────────────────────────
@@ -545,6 +574,7 @@ def main() -> int:
     check_adrs(adrs, areas)
     owner = check_areas(areas, adrs)
     check_registration()
+    check_measures()
     check_foreign()
     fill(DOCS / "INDEX.md", {
         "areas": areas_table(areas, adrs),

@@ -16,7 +16,7 @@ Glass {
         height: width
         thumb: Player.thumb
         pixels: 544
-        radius: 12
+        radius: Theme.coverRadius(width)
     }
 
     Column {
@@ -31,7 +31,7 @@ Glass {
             width: parent.width
             text: Player.title !== "" ? Player.title : "Elige algo para escuchar"
             color: Theme.text
-            font.pixelSize: 24
+            font.pixelSize: Theme.fontHeading
             font.weight: Font.Bold
             elide: Text.ElideRight
         }
@@ -40,28 +40,30 @@ Glass {
             width: parent.width
             text: Player.artist
             color: Theme.textMuted
-            font.pixelSize: 14
+            font.pixelSize: Theme.fontBase
             elide: Text.ElideRight
         }
 
         // Formato real del audio, informado por mpv.
-        Text {
+        SectionLabel {
             visible: Player.calidad !== ""
+            topPadding: 4
             text: Player.calidad
             color: Theme.textFaint
-            font.pixelSize: 11
-            font.letterSpacing: 0.8
-            font.capitalization: Font.AllUppercase
         }
     }
 
-    TabStrip {
+    // Pestañas de navegación (regla de dos: lo elegido, en blanco).
+    Tabs {
         id: tabs
         anchors.top: heading.bottom
         anchors.topMargin: 14
         x: root.pad
         width: root.width - 2 * root.pad
         visible: Player.title !== "" || Catalog.temporal.length > 0
+        navigate: true
+        fill: true
+        well: true
         current: root.tab
         tabs: [
             { id: "letra", label: "Letra" },
@@ -78,7 +80,7 @@ Glass {
         active: root.visible && root.tab === "letra"
         asynchronous: true
         anchors.top: tabs.bottom
-        anchors.topMargin: 14
+        anchors.topMargin: 12
         anchors.bottom: parent.bottom
         anchors.bottomMargin: 6
         x: root.pad
@@ -90,7 +92,7 @@ Glass {
         id: queue
         visible: root.tab === "cola"
         anchors.top: tabs.bottom
-        anchors.topMargin: 10
+        anchors.topMargin: 12
         anchors.bottom: parent.bottom
         anchors.bottomMargin: root.pad
         x: root.pad
@@ -108,16 +110,12 @@ Glass {
         x: root.pad
         width: root.width - 2 * root.pad
 
-        Text {
+        EmptyState {
             visible: Catalog.temporal.length === 0
             width: parent.width
             topPadding: 18
-            horizontalAlignment: Text.AlignHCenter
-            wrapMode: Text.WordWrap
+            icon: Theme.iconTemporal
             text: "Haz clic derecho en una canción, un álbum o una playlist y elige «Añadir a la lista temporal» para escucharlas juntas en bucle."
-            color: Theme.textMuted
-            font.pixelSize: 14
-            lineHeight: 1.2
         }
 
         Row {
@@ -149,63 +147,33 @@ Glass {
             boundsBehavior: Flickable.StopAtBounds
             model: Catalog.temporal
 
-            delegate: Item {
+            // Elegida con un clic (opción `clic` en «doble»).
+            property int chosen: -1
+
+            delegate: TrackRow {
                 id: entry
                 required property var modelData
                 required property int index
 
                 width: temporalList.width
-                height: 56
+                title: modelData.title
+                artist: modelData.artist
+                thumb: modelData.thumb
+                playing: Player.queue !== "" && Player.title === modelData.title && Player.artist === modelData.artist
+                chosen: temporalList.chosen === index
+                rightInset: Theme.hit - 6
 
-                Accessible.role: Accessible.Button
-                Accessible.name: modelData.title + ", " + modelData.artist
                 Accessible.onPressAction: Player.playTemporal(index)
 
-                Rectangle {
-                    anchors.fill: parent
-                    radius: 10
-                    color: entryHover.hovered ? Theme.control : "transparent"
-                }
-
-                Cover {
-                    x: 8
-                    anchors.verticalCenter: parent.verticalCenter
-                    width: 40
-                    height: 40
-                    thumb: entry.modelData.thumb
-                    pixels: 120
-                }
-
-                Column {
-                    x: 58
-                    anchors.verticalCenter: parent.verticalCenter
-                    width: parent.width - 58 - Theme.hit - 6
-                    spacing: 1
-
-                    Text {
-                        width: parent.width
-                        text: entry.modelData.title
-                        color: Theme.text
-                        font.pixelSize: 14
-                        elide: Text.ElideRight
-                    }
-
-                    Text {
-                        width: parent.width
-                        text: entry.modelData.artist
-                        color: Theme.textMuted
-                        font.pixelSize: 12
-                        elide: Text.ElideRight
-                    }
-                }
-
-                HoverHandler {
-                    id: entryHover
-                    cursorShape: Qt.PointingHandCursor
-                }
-
+                // Un clic hace sonar o elige según la opción `clic`; el doble, siempre suena.
                 TapHandler {
-                    onTapped: Player.playTemporal(entry.index)
+                    onTapped: {
+                        if (!Theme.singleClick)
+                            temporalList.chosen = entry.index
+                        else if (tapCount === 1)
+                            Player.playTemporal(entry.index)
+                    }
+                    onDoubleTapped: if (!Theme.singleClick) Player.playTemporal(entry.index)
                 }
 
                 IconButton {

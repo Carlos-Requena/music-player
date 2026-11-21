@@ -18,7 +18,7 @@ use std::{
     collections::HashMap,
     fs,
     io::Read,
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::{Command, Stdio},
     sync::Mutex,
     thread,
@@ -268,7 +268,7 @@ fn single_file(variant_url: &str, playlist: &str) -> Option<String> {
 }
 
 /// Descarga un archivo entero a `target` (hasta 64 MB).
-fn fetch_file(url: &str, target: &PathBuf) -> bool {
+fn fetch_file(url: &str, target: &Path) -> bool {
     let request = crate::ytm::http()
         .get(url)
         .header("User-Agent", USER_AGENT)
@@ -283,31 +283,106 @@ fn fetch_file(url: &str, target: &PathBuf) -> bool {
     bytes.is_some_and(|bytes| fs::write(target, bytes).is_ok())
 }
 
-/// Descarga la variante (copia, sin recodificar) a `target` como un MP4 normal.
-fn download(variant: &str, target: &PathBuf) -> bool {
+/// Descarga la variante a `target` como un MP4 normal y le funde el final con el principio
+/// (`loop_filter`) para que el bucle no se corte. Si no se puede recodificar, queda la copia tal
+/// cual (con el corte).
+fn download(variant: &str, target: &Path) -> bool {
     let source = target.with_extension("fuente.mp4");
     let input = match get(variant).and_then(|playlist| single_file(variant, &playlist)) {
         Some(file) if fetch_file(&file, &source) => source.to_string_lossy().into_owned(),
         _ => variant.to_owned(),
     };
-    let ok = remux(&input, target);
+    let copy = target.with_extension("copia.mp4");
+    let mut args: Vec<String> = Vec::new();
+    if input.starts_with("https://") {
+        args.extend(["-user_agent".into(), USER_AGENT.into()]);
+    }
+    args.extend(["-i".into(), input]);
+    args.extend(["-map", "0:v:0", "-c", "copy", "-an"].map(String::from));
+    let copied = ffmpeg(&args, &copy);
     let _ = fs::remove_file(&source);
-    ok
+    if !copied {
+        return false;
+    }
+    if !seamless(&copy, target) {
+        eprintln!("animada: sin fundido de bucle; se guarda el vídeo tal cual");
+        if fs::rename(&copy, target).is_err() {
+            return false;
+        }
+    }
+    let _ = fs::remove_file(&copy);
+    true
 }
 
-/// `ffmpeg` copia el vídeo de `input` (archivo o lista HLS) a un MP4 con el índice delante.
-fn remux(input: &str, target: &PathBuf) -> bool {
-    let path = crate::audio::search_path();
-    let Some(ffmpeg) = crate::audio::which("ffmpeg", &path) else {
+/// Fotogramas y fotogramas por segundo del vídeo (con `ffprobe`).
+fn frames(file: &Path) -> Option<(u32, f64)> {
+    let ffprobe = crate::audio::which("ffprobe", &crate::audio::search_path())?;
+    let output = Command::new(ffprobe)
+        .args(["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=nb_frames,r_frame_rate"])
+        .args(["-of", "default=noprint_wrappers=1"])
+        .arg(file)
+        .stdin(Stdio::null())
+        .output()
+        .ok()?;
+    let text = String::from_utf8_lossy(&output.stdout);
+    let field = |name: &str| text.lines().find_map(|line| line.strip_prefix(name)).map(str::trim);
+    let count = field("nb_frames=")?.parse().ok()?;
+    let (num, den) = field("r_frame_rate=")?.split_once('/')?;
+    let fps = num.parse::<f64>().ok()? / den.parse::<f64>().ok()?;
+    (fps > 0.0).then_some((count, fps))
+}
+
+/// Filtro de `ffmpeg` que convierte un vídeo de `count` fotogramas en un bucle sin corte: el
+/// vídeo empieza en el fotograma `fade + 1` y su último segundo se funde con el primero del
+/// original (`xfade`), que sigue hasta el fotograma `fade`. Al volver a empezar, tras el
+/// fotograma `fade` viene el `fade + 1`: la costura es como dos fotogramas seguidos cualesquiera.
+/// `None` si el vídeo es demasiado corto (menos de 4 s) para fundirlo.
+fn loop_filter(count: u32, fps: f64) -> Option<String> {
+    let fade = fps.round() as u32;
+    if fade == 0 || count < 4 * fade {
+        return None;
+    }
+    let main = count - fade - 1;
+    let offset = f64::from(main - fade) / fps;
+    let duration = f64::from(fade) / fps;
+    Some(format!(
+        "[0:v]split[a][b];[a]trim=start_frame={start},setpts=PTS-STARTPTS[m];\
+         [b]trim=end_frame={start},setpts=PTS-STARTPTS[h];\
+         [m][h]xfade=transition=fade:duration={duration:.4}:offset={offset:.4},format=yuv420p[v]",
+        start = fade + 1
+    ))
+}
+
+/// Recodifica `copy` como bucle sin corte en `target` (H.264, sin pérdida visible).
+fn seamless(copy: &Path, target: &Path) -> bool {
+    let Some(filter) = frames(copy).and_then(|(count, fps)| loop_filter(count, fps)) else {
+        return false;
+    };
+    // libx264 suele estar; si no, el codificador del sistema (macOS).
+    let encoders: [&[&str]; 2] = [
+        &["-c:v", "libx264", "-preset", "veryfast", "-crf", "18"],
+        &["-c:v", "h264_videotoolbox", "-b:v", "6M"],
+    ];
+    encoders.iter().any(|encoder| {
+        let mut args: Vec<String> = vec!["-i".into(), copy.to_string_lossy().into_owned()];
+        args.extend(["-filter_complex".into(), filter.clone(), "-map".into(), "[v]".into(), "-an".into()]);
+        args.extend(encoder.iter().map(|arg| arg.to_string()));
+        ffmpeg(&args, target)
+    })
+}
+
+/// Ejecuta `ffmpeg` con `args` hacia `output` (vía un `.part.mp4`, con el índice delante y un
+/// límite de tiempo).
+fn ffmpeg(args: &[String], output: &Path) -> bool {
+    let Some(ffmpeg) = crate::audio::which("ffmpeg", &crate::audio::search_path()) else {
         eprintln!("animada: no se encontró ffmpeg");
         return false;
     };
-    let part = target.with_extension("part.mp4");
+    let part = output.with_extension("part.mp4");
     let child = Command::new(ffmpeg)
         .args(["-nostdin", "-loglevel", "error", "-y"])
-        .args(if input.starts_with("https://") { vec!["-user_agent", USER_AGENT] } else { vec![] })
-        .args(["-i", input])
-        .args(["-map", "0:v:0", "-c", "copy", "-an", "-movflags", "+faststart"])
+        .args(args)
+        .args(["-movflags", "+faststart"])
         .arg(&part)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
@@ -334,7 +409,7 @@ fn remux(input: &str, target: &PathBuf) -> bool {
             Err(_) => break None,
         }
     };
-    if status.is_some_and(|status| status.success()) && fs::rename(&part, target).is_ok() {
+    if status.is_some_and(|status| status.success()) && fs::rename(&part, output).is_ok() {
         return true;
     }
     let mut detail = String::new();
@@ -367,10 +442,12 @@ fn prune(dir: &PathBuf) {
 /// Ruta del vídeo en caché de un álbum, descargándolo si hace falta.
 fn video_for(album: &str) -> Option<PathBuf> {
     let dir = dir()?;
-    let target = dir.join(format!("{album}.mp4"));
+    // `-bucle`: con el final fundido con el principio. Los de antes (`<id>.mp4`) tenían el corte.
+    let target = dir.join(format!("{album}-bucle.mp4"));
     if target.exists() {
         return Some(target);
     }
+    let _ = fs::remove_file(dir.join(format!("{album}.mp4")));
     let page = get(&format!("https://music.apple.com/us/album/{album}"))?;
     let master = get(&motion_playlist(&page)?)?;
     let variant = pick_variant(&master)?;
@@ -450,6 +527,16 @@ mod tests {
         let playlist = "#EXTM3U\n#EXT-X-MAP:URI=\"P1-.mp4\",BYTERANGE=\"877@0\"\n#EXTINF:4.0,\n#EXT-X-BYTERANGE:12@877\nP1-.mp4\n#EXTINF:4.0,\nP1-.mp4\n";
         assert_eq!(single_file("https://v/a/b.m3u8", playlist).as_deref(), Some("https://v/a/P1-.mp4"));
         assert_eq!(single_file("https://v/a/b.m3u8", "#EXTINF:4,\nseg1.ts\n#EXTINF:4,\nseg2.ts\n"), None);
+    }
+
+    #[test]
+    fn el_bucle_cierra_sobre_fotogramas_seguidos() {
+        // 20 s a 30 fps: empieza en el 31 y acaba en el 30 del original, tras fundir 1 s.
+        let filter = loop_filter(600, 30.0).expect("cabe el fundido");
+        assert!(filter.contains("trim=start_frame=31"));
+        assert!(filter.contains("trim=end_frame=31"));
+        assert!(filter.contains("duration=1.0000:offset=17.9667"));
+        assert_eq!(loop_filter(90, 30.0), None);
     }
 
     #[test]

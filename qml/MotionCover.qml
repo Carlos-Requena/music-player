@@ -11,7 +11,8 @@ Item {
     property url source
     // Lado de la textura del vídeo en píxeles físicos (960 como mucho, el del original).
     property real textureSide: 960
-    property real radius: 18
+    // Lo pone «Sonando» (opción `esquinas`).
+    property real radius: Theme.radiusM
 
     opacity: 0
     Behavior on opacity { NumberAnimation { duration: 500 } }

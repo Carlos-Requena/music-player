@@ -43,6 +43,18 @@ Window {
     // `--index n` sin `--autoplay`: solo coloca la vista (para capturas).
     property bool indexPending: args.indexOf("--index") >= 0
 
+    Connections {
+        id: playIndexOnce
+        target: null
+        function onQueueChanged() {
+            const index = parseInt(win.arg("--play-index"))
+            if (Catalog.queue.length > index) {
+                playIndexOnce.target = null
+                Player.playIndex(index)
+            }
+        }
+    }
+
     function arg(name) {
         const at = args.indexOf(name)
         return at >= 0 && at + 1 < args.length ? args[at + 1] : ""
@@ -59,6 +71,11 @@ Window {
             return
         if (mascotLoader.item && item.kind !== "song")
             mascotLoader.item.browsed()
+        // Una categoría de Explorar se abre como detalle con sus elementos.
+        if (item.kind === "zona") {
+            Library.openZona(JSON.stringify(item.zona))
+            return
+        }
         // Una canción suena y abre la pantalla «Sonando» con su letra y su cola.
         if (item.kind === "song") {
             Player.playItem(JSON.stringify(item))
@@ -72,6 +89,14 @@ Window {
     function openMenu(item, point) {
         if (item && item.kind !== "artist")
             contextMenu.show(item, point.x, point.y)
+    }
+
+    // Menú de la canción que suena (clic derecho en la carátula de «Sonando»): la pista de la cola,
+    // marcada con su índice para que el menú la trate como la actual.
+    function openPlayingMenu(point) {
+        const track = Catalog.queue[Player.index]
+        if (track)
+            openMenu(Object.assign({ queueIndex: Player.index }, track), point)
     }
 
     // Elemento que se precargará si sigue enfocado o bajo el puntero 250 ms (`prefetchTimer`).
@@ -104,6 +129,9 @@ Window {
     }
 
     function inspect(item) {
+        // Una categoría de Explorar no es una caja que se pueda girar.
+        if (item && item.kind === "zona")
+            item = null
         if (item && item.kind !== "song" && item.kind !== "artist")
             Library.openDetail(JSON.stringify(item))
         if (detailOpen || item) {
@@ -137,9 +165,13 @@ Window {
         sectionView.forceActiveFocus()
     }
 
+    // Lo último que se buscó, para la cabecera de los resultados.
+    property string lastQuery: ""
+
     function search(query) {
         if (query.trim() === "")
             return
+        lastQuery = query.trim()
         Library.search(query)
         if (detailOpen)
             closeDetail()
@@ -181,6 +213,17 @@ Window {
         // Depuración: `--play ID [--play-title texto]` reproduce esa canción al arrancar.
         if (arg("--play") !== "")
             Player.playItem(JSON.stringify({ kind: "song", videoId: arg("--play"), title: arg("--play-title"), subtitle: "" }))
+        // Depuración: `--related ID [--related-title texto] [--detail-at y]` abre «Relacionado» de
+        // esa canción (como el clic derecho) y, con `--detail-at`, lo baja a los 5 s.
+        if (arg("--related") !== "") {
+            openRelated({ kind: "song", videoId: arg("--related"), title: arg("--related-title"), subtitle: "" }, "related")
+            if (arg("--detail-at") !== "")
+                detailScroll.start()
+        }
+        // Depuración: `--play-index N` (con `--play`) salta a la pista N en cuanto llega la cola
+        // (probar que la radio trae más canciones al acercarse al final).
+        if (arg("--play-index") !== "")
+            playIndexOnce.target = Player
         settingsOpen = args.indexOf("--settings") >= 0 || args.indexOf("--settings-end") >= 0
             || args.indexOf("--settings-at") >= 0 || args.indexOf("--settings-cat") >= 0
         if (arg("--settings-cat") !== "")
@@ -305,7 +348,7 @@ Window {
         SectionView {
             id: sectionView
             x: win.stageX
-            y: categoryBar.visible ? 84 + categoryBar.height + 8 : 84
+            y: categoryBar.visible ? 84 + categoryBar.height + 8 : searchHeading.visible ? 84 + searchHeading.height + 8 : 84
             width: win.stageWidth
             height: win.height - y - win.barHeight - 2 * Theme.gap
             section: win.section
@@ -416,28 +459,57 @@ Window {
             Behavior on width { NumberAnimation { duration: Theme.animMove; easing.type: Easing.OutCubic } }
         }
 
-        // Estado de la sección cuando aún no hay nada que mostrar.
+        // Cabecera de los resultados de búsqueda. Las secciones no llevan cabecera (la navegación
+        // ya dice dónde estás); la búsqueda sí, porque ninguna pestaña está elegida (ADR-23).
         Text {
+            id: searchHeading
+            visible: win.section === "buscar" && win.lastQuery !== "" && !win.detailOpen
+            x: win.stageX + Theme.margin
+            y: 84
+            width: win.stageWidth - 2 * Theme.margin
+            height: visible ? 36 : 0
+            verticalAlignment: Text.AlignVCenter
+            text: "Resultados de «" + win.lastQuery + "»"
+            color: Theme.text
+            font.pixelSize: Theme.fontHeading
+            font.weight: Font.Bold
+            elide: Text.ElideRight
+        }
+
+        // Velo bajo el detalle: deja ver el modo ambiente pero lo separa del contenido. Cubre toda
+        // la ventana (también tras la navegación), sin el corte recto que quedaba bajo ella.
+        Rectangle {
+            anchors.fill: parent
+            visible: win.detailOpen
+            color: Theme.scrim
+        }
+
+        // Estado de la sección cuando aún no hay nada que mostrar.
+        EmptyState {
+            readonly property bool needsLogin: Catalog.needsAccount(win.section) && !Account.signedIn
             visible: sectionView.zonas.length === 0 && !win.detailOpen
             x: win.stageX + (win.stageWidth - width) / 2
-            y: win.height * 0.4
-            width: Math.min(560, win.stageWidth - 80)
-            horizontalAlignment: Text.AlignHCenter
-            wrapMode: Text.WordWrap
-            text: Catalog.needsAccount(win.section) && !Account.signedIn
-                ? "Inicia sesión con el botón de cuenta (arriba a la derecha) para ver " + Catalog.ownLabel(win.section) + "."
+            y: win.height * 0.36
+            width: Math.min(480, win.stageWidth - 2 * Theme.margin)
+            icon: needsLogin ? Theme.iconAccount : win.section === "buscar" && !Library.searching ? Theme.iconSearch : ""
+            text: needsLogin
+                ? "Inicia sesión para ver " + Catalog.ownLabel(win.section) + "."
                 : win.section === "playlists" && Catalog.categoria !== "" && Catalog.playlists.length > 0
                 ? "«" + Catalog.categoria + "» está vacía. En «Todas», haz clic derecho en una playlist y elige «Añadir a " + Catalog.categoria + "»."
                 : Library.loading || Library.searching ? "Cargando…"
                 : Library.error !== "" ? Library.error
                 : "No hay nada que mostrar aquí."
-            color: Theme.textMuted
-            font.pixelSize: 16
+            action: needsLogin ? "Iniciar sesión" : ""
+            actionIcon: Theme.iconAccount
+            onTriggered: {
+                settingsSheet.category = "cuenta"
+                win.settingsOpen = true
+            }
         }
     }
 
     IconButton {
-        x: win.stageX + 24
+        x: win.stageX + Theme.margin
         y: 20
         icon: Theme.iconSettings
         label: "Opciones de apariencia"
@@ -447,7 +519,7 @@ Window {
 
     SearchField {
         id: searchField
-        x: win.stageX + 76
+        x: win.stageX + Theme.margin + Theme.hit + 8
         y: 20
         width: Math.max(120, Math.min(240, nav.x - x - 16))
         onSubmitted: query => win.search(query)
@@ -546,7 +618,8 @@ Window {
     // Cuenta: abre las opciones; relleno cuando hay sesión.
     IconButton {
         id: accountButton
-        x: win.stageX + win.stageWidth - viewSwitcher.width - 24 - width - 12
+        // Junto al selector de vista; sin él (con un detalle abierto), en su sitio.
+        x: win.stageX + win.stageWidth - Theme.margin - width - (viewSwitcher.visible ? viewSwitcher.width + 12 : 0)
         y: 20
         icon: Theme.iconAccount
         label: Account.signedIn ? "Cuenta: " + Account.name : "Iniciar sesión"
@@ -575,8 +648,10 @@ Window {
 
     ViewSwitcher {
         id: viewSwitcher
-        x: win.stageX + win.stageWidth - width - 24
+        x: win.stageX + win.stageWidth - width - Theme.margin
         y: 16
+        // Con un detalle abierto no cambia nada que se vea: se oculta.
+        visible: !win.detailOpen
         view: win.view
         onPicked: view => win.setView(view)
 

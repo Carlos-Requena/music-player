@@ -5,6 +5,31 @@ son de cuando se escribieron. El estado actual está en su [ficha](../../areas/c
 
 Lo nuevo va arriba: añade una sección `## AAAA-MM-DD · qué se verificó` encima de las anteriores.
 
+## 2026-11-21 · Recomendados en Explorar y categorías como detalle (en `master`)
+
+- **Cambio:** `ytm::recomendados` (filas de canciones del Inicio, reconocidas por su forma),
+  delante de Explorar con las dos fuentes (`with_recomendados`), a la vez que `FEmusic_explore`;
+  si falla, se queda la copia guardada. `Library.openZona` abre una categoría como detalle sin red
+  (`ytm::item_track`, `ytm::all_songs`). Sonda `--probe recomendados`
+  ([ADR-22](../../decisions/ADR-22-explorar-por-categorias-con-recomendados.md)).
+- **Verificado:** `--probe recomendados` sin sesión, siete veces: 11–33 canciones, nunca vacía.
+  El Inicio sin sesión en japonés y en español da la fila con la misma forma («Selecciones
+  rápidas», «Mixes de canciones», 「曲のミックス」). Explorar en la app: Recomendados primera;
+  su detalle con 20 canciones y el artista bien leído; «Aleatorio» desde él con `--autoplay
+  --open --shuffle`: `sonando true`, sin error, cola 20, arranque en 123 ms. `cargo test` (prueba
+  nueva de `item_track`).
+- **No verificado:** con sesión (la fila personalizada y su forma), con la cuenta en japonés;
+  Explorar de ListenBrainz con Recomendados delante (se compiló, no se abrió).
+
+## 2026-11-21 · «Relacionado» y continuación de la radio (en `master`)
+
+- **Cambio:** `ytm::related`, `Library.open_song_related` (`openRelated(item, "related")`),
+  `ytm::queue_page`, `ytm::queue_more` y `panel_tracks`; sondas `--probe related` y `radio`.
+- **Verificado:** `--probe related 3qmkPx8R--Y`: 20 canciones en «También te puede interesar»,
+  «Listas recomendadas» (10), «Artistas similares» (10) y «Toby Fox» (16).
+- **No verificado:** una canción sin pestaña «Relacionado» (debería avisar «No se pudieron cargar
+  los relacionados»); con sesión.
+
 ## 2026-11-18 · Ir al álbum o al artista (rama `feature/artista-y-ecualizador`)
 
 - **Cambio:** `ytm::song_links`, `ytm::album_info`, `header_thumb` y `Library.openRelated` con su

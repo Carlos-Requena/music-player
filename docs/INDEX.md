@@ -33,19 +33,19 @@ Qué leer para cada tarea. Las tablas a partir de [Áreas](#áreas) las escribe
 
 | Área | Qué es | Opciones | ADR |
 |---|---|---|---|
-| [Catálogo de YouTube Music](areas/catalogo.md) | Secciones (Inicio, Explorar, Álbumes, Playlists, Me gusta, Historial), búsqueda, detalle abierto y categorías de playlists, pedidos a InnerTube (Explorar, a ListenBrainz si se elige) y publicados como JSON. | `categoria`, `categorias`, `explorarFuente` | [ADR-04](decisions/ADR-04-json-hacia-qml.md), [ADR-06](decisions/ADR-06-canciones-por-la-pagina-de-la-lista.md), [ADR-09](decisions/ADR-09-cache-de-secciones-en-disco.md), [ADR-19](decisions/ADR-19-explorar-con-listenbrainz.md), [ADR-20](decisions/ADR-20-fuente-de-explorar-a-elegir.md) |
-| [Detalle e inspeccionar](areas/detalle.md) | Detalle de un álbum, playlist o artista con Reproducir y Aleatorio, y el modo inspeccionar que gira la caja, la abre y saca el disco. | — | — |
+| [Catálogo de YouTube Music](areas/catalogo.md) | Secciones (Inicio, Explorar, Álbumes, Playlists, Me gusta, Historial), búsqueda, detalle abierto y categorías de playlists, pedidos a InnerTube (Explorar, a ListenBrainz si se elige) y publicados como JSON. | `categoria`, `categorias`, `explorarFuente` | [ADR-04](decisions/ADR-04-json-hacia-qml.md), [ADR-06](decisions/ADR-06-canciones-por-la-pagina-de-la-lista.md), [ADR-09](decisions/ADR-09-cache-de-secciones-en-disco.md), [ADR-19](decisions/ADR-19-explorar-con-listenbrainz.md), [ADR-20](decisions/ADR-20-fuente-de-explorar-a-elegir.md), [ADR-22](decisions/ADR-22-explorar-por-categorias-con-recomendados.md) |
+| [Detalle e inspeccionar](areas/detalle.md) | Detalle de un álbum, playlist o artista con Reproducir y Aleatorio, y el modo inspeccionar que gira la caja, la abre y saca el disco. | — | [ADR-23](decisions/ADR-23-sistema-de-diseno-medidas-y-piezas-comunes.md) |
 | [Registro de escuchas](areas/historial.md) | Apunta en el historial de YouTube Music lo que suena, con los mismos avisos que manda su reproductor, sin retrasar el arranque. | `historial` | [ADR-12](decisions/ADR-12-historial-con-los-avisos-del-reproductor.md) |
-| [Piezas comunes de la interfaz](areas/interfaz-comun.md) | Vidrio, carátula, icono, botones, deslizador, pestañas y campo de texto que usan todas las pantallas. | — | — |
+| [Piezas comunes de la interfaz](areas/interfaz-comun.md) | Vidrio, carátula, icono, botones, deslizador, pestañas y campo de texto que usan todas las pantallas. | — | [ADR-23](decisions/ADR-23-sistema-de-diseno-medidas-y-piezas-comunes.md) |
 | [Letra sincronizada](areas/letra.md) | Letra de LRCLIB, NetEase y Kugou, a elegir, palabra a palabra con los tiempos reales de cada sílaba, al estilo Better Lyrics, con tres calidades y retraso ajustable por canción. | `letraOrigen`, `letraSinTiempos`, `letraCalidad`, `letraTamano`, `letraFuente`, `letraPeso`, `letraAlineacion`, `letraAnimada`, `retraso:*`, `origen:*` | [ADR-13](decisions/ADR-13-letra-de-lrclib-con-un-solo-gestor.md), [ADR-18](decisions/ADR-18-letra-de-varias-fuentes.md) |
 | [Mascotas](areas/mascotas.md) | Una imagen que cambia de pose según lo que pasa en el reproductor, reacciona unos segundos a lo que haces (pincharla, pasar canción, guardar en una playlist) y puede dar «Me gusta»; carpetas del usuario con PNG por pose. | — | — |
-| [Opciones, skins y aspecto](areas/personalizacion.md) | Preferencias guardadas (vista por sección, skin, opciones genéricas), la hoja de Opciones, los tokens visuales de Theme, el vidrio y el modo ambiente. | `ambiente`, `ambienteMovimiento`, `desenfoque` | [ADR-11](decisions/ADR-11-skins-en-json-y-opciones-genericas.md), [ADR-17](decisions/ADR-17-fondo-fluido-con-sombreador-propio.md) |
+| [Opciones, skins y aspecto](areas/personalizacion.md) | Preferencias guardadas (vista por sección, skin, opciones genéricas), la hoja de Opciones, los tokens visuales de Theme, el vidrio y el modo ambiente. | `ambiente`, `ambienteMovimiento`, `desenfoque`, `esquinas`, `compacto` | [ADR-11](decisions/ADR-11-skins-en-json-y-opciones-genericas.md), [ADR-17](decisions/ADR-17-fondo-fluido-con-sombreador-propio.md), [ADR-23](decisions/ADR-23-sistema-de-diseno-medidas-y-piezas-comunes.md) |
 | [Plugins (Discord, Last.fm y ListenBrainz)](areas/plugins.md) | Discord Rich Presence («Escuchando…»), scrobbling a Last.fm y escuchas en ListenBrainz, alimentados por los eventos del reproductor en un hilo propio. | — | [ADR-15](decisions/ADR-15-plugins-en-un-hilo-propio.md), [ADR-19](decisions/ADR-19-explorar-con-listenbrainz.md) |
-| [Reproducción y cola](areas/reproduccion.md) | Cola, lista temporal, siguiente y anterior, repetición, volumen y estado de lo que suena, con mpv como motor en un proceso aparte. | `barra`, `ecualizador`, `ecualizadorBandas`, `amplificador` | [ADR-02](decisions/ADR-02-mpv-en-proceso-aparte.md) |
+| [Reproducción y cola](areas/reproduccion.md) | Cola, lista temporal, siguiente y anterior, repetición, volumen y estado de lo que suena, con mpv como motor en un proceso aparte. | `barra`, `ecualizador`, `ecualizadorBandas`, `amplificador`, `clic` | [ADR-02](decisions/ADR-02-mpv-en-proceso-aparte.md), [ADR-23](decisions/ADR-23-sistema-de-diseno-medidas-y-piezas-comunes.md) |
 | [Resolución del audio y arranque instantáneo](areas/resolucion.md) | Obtiene la URL de audio de cada pista (vía rápida, yt-dlp residente o yt-dlp) con caché y precarga, para que suene en décimas de segundo. | `calidad`, `ytdlp` | [ADR-03](decisions/ADR-03-via-rapida-y-yt-dlp-de-respaldo.md), [ADR-05](decisions/ADR-05-precarga-de-urls.md), [ADR-08](decisions/ADR-08-yt-dlp-residente.md) |
 | [Sesión de YouTube Music](areas/sesion.md) | Iniciar sesión (ventana propia o cookies del navegador), guardar solo las cookies de youtube.com y firmar las peticiones con SAPISIDHASH. | — | [ADR-07](decisions/ADR-07-inicio-de-sesion-en-proceso-aparte.md) |
-| [Ventana y navegación](areas/ventana.md) | Arranque, ventana principal con escenario, navegación superior, panel de letra y cola, pantalla «Sonando», mini reproductor, búsqueda y menú de clic derecho. | `panel`, `sonando`, `sonandoTitulo`, `caratulaCalidad`, `caratulaAnimada` | [ADR-10](decisions/ADR-10-mini-reproductor-oculta-la-ventana.md), [ADR-21](decisions/ADR-21-caratula-animada-de-apple-music.md) |
-| [Vistas de las secciones](areas/vistas.md) | Muro, Lomos y Cubeta, elegibles por sección, y el selector que las alterna al vuelo. | `caratulas` | [ADR-14](decisions/ADR-14-lomos-con-matrices-propias.md) |
+| [Ventana y navegación](areas/ventana.md) | Arranque, ventana principal con escenario, navegación superior, panel de letra y cola, pantalla «Sonando», mini reproductor, búsqueda y menú de clic derecho. | `panel`, `sonando`, `sonandoTitulo`, `caratulaCalidad`, `caratulaAnimada` | [ADR-10](decisions/ADR-10-mini-reproductor-oculta-la-ventana.md), [ADR-21](decisions/ADR-21-caratula-animada-de-apple-music.md), [ADR-23](decisions/ADR-23-sistema-de-diseno-medidas-y-piezas-comunes.md) |
+| [Vistas de las secciones](areas/vistas.md) | Muro, Lomos y Cubeta, elegibles por sección, y el selector que las alterna al vuelo. | `caratulas`, `brillo` | [ADR-14](decisions/ADR-14-lomos-con-matrices-propias.md), [ADR-22](decisions/ADR-22-explorar-por-categorias-con-recomendados.md), [ADR-23](decisions/ADR-23-sistema-de-diseno-medidas-y-piezas-comunes.md) |
 <!-- /generado -->
 
 ## Archivo → área
@@ -60,11 +60,15 @@ Qué leer para cada tarea. Las tablas a partir de [Áreas](#áreas) las escribe
 | [`qml/Ambient.qml`](../qml/Ambient.qml) | [Opciones, skins y aspecto](areas/personalizacion.md) |
 | [`qml/ArtistHero.qml`](../qml/ArtistHero.qml) | [Detalle e inspeccionar](areas/detalle.md) |
 | [`qml/Catalog.qml`](../qml/Catalog.qml) | [Catálogo de YouTube Music](areas/catalogo.md) |
+| [`qml/CategoriasView.qml`](../qml/CategoriasView.qml) | [Vistas de las secciones](areas/vistas.md) |
 | [`qml/CategoryBar.qml`](../qml/CategoryBar.qml) | [Catálogo de YouTube Music](areas/catalogo.md) |
 | [`qml/ContextMenu.qml`](../qml/ContextMenu.qml) | [Ventana y navegación](areas/ventana.md) |
 | [`qml/Cover.qml`](../qml/Cover.qml) | [Piezas comunes de la interfaz](areas/interfaz-comun.md) |
 | [`qml/CubetaView.qml`](../qml/CubetaView.qml) | [Vistas de las secciones](areas/vistas.md) |
 | [`qml/DetailView.qml`](../qml/DetailView.qml) | [Detalle e inspeccionar](areas/detalle.md) |
+| [`qml/EmptyState.qml`](../qml/EmptyState.qml) | [Piezas comunes de la interfaz](areas/interfaz-comun.md) |
+| [`qml/FocusRing.qml`](../qml/FocusRing.qml) | [Piezas comunes de la interfaz](areas/interfaz-comun.md) |
+| [`qml/FocusedCaption.qml`](../qml/FocusedCaption.qml) | [Piezas comunes de la interfaz](areas/interfaz-comun.md) |
 | [`qml/Glass.qml`](../qml/Glass.qml) | [Piezas comunes de la interfaz](areas/interfaz-comun.md) |
 | [`qml/Icon.qml`](../qml/Icon.qml) | [Piezas comunes de la interfaz](areas/interfaz-comun.md) |
 | [`qml/IconButton.qml`](../qml/IconButton.qml) | [Piezas comunes de la interfaz](areas/interfaz-comun.md) |
@@ -83,14 +87,17 @@ Qué leer para cada tarea. Las tablas a partir de [Áreas](#áreas) las escribe
 | [`qml/PlayerBar.qml`](../qml/PlayerBar.qml) | [Reproducción y cola](areas/reproduccion.md) |
 | [`qml/QueueList.qml`](../qml/QueueList.qml) | [Reproducción y cola](areas/reproduccion.md) |
 | [`qml/SearchField.qml`](../qml/SearchField.qml) | [Ventana y navegación](areas/ventana.md) |
+| [`qml/SectionLabel.qml`](../qml/SectionLabel.qml) | [Piezas comunes de la interfaz](areas/interfaz-comun.md) |
 | [`qml/SectionView.qml`](../qml/SectionView.qml) | [Vistas de las secciones](areas/vistas.md) |
 | [`qml/SettingsSheet.qml`](../qml/SettingsSheet.qml) | [Opciones, skins y aspecto](areas/personalizacion.md) |
 | [`qml/Slider.qml`](../qml/Slider.qml) | [Piezas comunes de la interfaz](areas/interfaz-comun.md) |
-| [`qml/TabStrip.qml`](../qml/TabStrip.qml) | [Piezas comunes de la interfaz](areas/interfaz-comun.md) |
+| [`qml/TabButton.qml`](../qml/TabButton.qml) | [Piezas comunes de la interfaz](areas/interfaz-comun.md) |
+| [`qml/Tabs.qml`](../qml/Tabs.qml) | [Piezas comunes de la interfaz](areas/interfaz-comun.md) |
 | [`qml/TextField.qml`](../qml/TextField.qml) | [Piezas comunes de la interfaz](areas/interfaz-comun.md) |
 | [`qml/Theme.qml`](../qml/Theme.qml) | [Opciones, skins y aspecto](areas/personalizacion.md) |
 | [`qml/TintProbe.qml`](../qml/TintProbe.qml) | [Opciones, skins y aspecto](areas/personalizacion.md) |
 | [`qml/TopNav.qml`](../qml/TopNav.qml) | [Ventana y navegación](areas/ventana.md) |
+| [`qml/TrackRow.qml`](../qml/TrackRow.qml) | [Piezas comunes de la interfaz](areas/interfaz-comun.md) |
 | [`qml/ViewSwitcher.qml`](../qml/ViewSwitcher.qml) | [Vistas de las secciones](areas/vistas.md) |
 | [`skins/grafito.json`](../skins/grafito.json) | [Opciones, skins y aspecto](areas/personalizacion.md) |
 | [`skins/medianoche.json`](../skins/medianoche.json) | [Opciones, skins y aspecto](areas/personalizacion.md) |
@@ -134,15 +141,19 @@ Claves de `AppSettings.opcion`. Vacío es el valor por defecto (el `fallback` de
 | `ambienteMovimiento` | Movimiento del ambiente (apariencia) | [Opciones, skins y aspecto](areas/personalizacion.md) |
 | `amplificador` | — (interna) | [Reproducción y cola](areas/reproduccion.md) |
 | `barra` | Barra de reproducción (apariencia) | [Reproducción y cola](areas/reproduccion.md) |
+| `brillo` | Brillo al pasar el ratón (vistas) | [Vistas de las secciones](areas/vistas.md) |
 | `calidad` | Calidad del audio (reproduccion) | [Resolución del audio y arranque instantáneo](areas/resolucion.md) |
 | `caratulaAnimada` | Carátula animada (apariencia) | [Ventana y navegación](areas/ventana.md) |
 | `caratulaCalidad` | Carátula de «Sonando» (apariencia) | [Ventana y navegación](areas/ventana.md) |
 | `caratulas` | Carátulas del Muro (vistas) | [Vistas de las secciones](areas/vistas.md) |
 | `categoria` | — (interna) | [Catálogo de YouTube Music](areas/catalogo.md) |
 | `categorias` | — (interna) | [Catálogo de YouTube Music](areas/catalogo.md) |
+| `clic` | Clic en una canción (reproduccion) | [Reproducción y cola](areas/reproduccion.md) |
+| `compacto` | — (interna) | [Opciones, skins y aspecto](areas/personalizacion.md) |
 | `desenfoque` | Desenfoque (apariencia) | [Opciones, skins y aspecto](areas/personalizacion.md) |
 | `ecualizador` | — (interna) | [Reproducción y cola](areas/reproduccion.md) |
 | `ecualizadorBandas` | — (interna) | [Reproducción y cola](areas/reproduccion.md) |
+| `esquinas` | Esquinas de las carátulas (apariencia) | [Opciones, skins y aspecto](areas/personalizacion.md) |
 | `explorarFuente` | Fuente de Explorar (vistas) | [Catálogo de YouTube Music](areas/catalogo.md) |
 | `historial` | Registrar en YouTube Music (reproduccion) | [Registro de escuchas](areas/historial.md) |
 | `letraAlineacion` | Alineación de la letra (apariencia) | [Letra sincronizada](areas/letra.md) |
@@ -173,7 +184,7 @@ componentes QML que monta cada archivo. No cuenta las piezas que usa todo (`Them
 | Área | Usa | La usan |
 |---|---|---|
 | [Catálogo de YouTube Music](areas/catalogo.md) | [Opciones, skins y aspecto](areas/personalizacion.md), [Plugins (Discord, Last.fm y ListenBrainz)](areas/plugins.md), [Reproducción y cola](areas/reproduccion.md), [Sesión de YouTube Music](areas/sesion.md) | [Detalle e inspeccionar](areas/detalle.md), [Registro de escuchas](areas/historial.md), [Letra sincronizada](areas/letra.md), [Mascotas](areas/mascotas.md), [Opciones, skins y aspecto](areas/personalizacion.md), [Plugins (Discord, Last.fm y ListenBrainz)](areas/plugins.md), [Reproducción y cola](areas/reproduccion.md), [Resolución del audio y arranque instantáneo](areas/resolucion.md), [Sesión de YouTube Music](areas/sesion.md), [Ventana y navegación](areas/ventana.md), [Vistas de las secciones](areas/vistas.md) |
-| [Detalle e inspeccionar](areas/detalle.md) | [Catálogo de YouTube Music](areas/catalogo.md), [Reproducción y cola](areas/reproduccion.md) | [Ventana y navegación](areas/ventana.md) |
+| [Detalle e inspeccionar](areas/detalle.md) | [Catálogo de YouTube Music](areas/catalogo.md), [Reproducción y cola](areas/reproduccion.md), [Vistas de las secciones](areas/vistas.md) | [Ventana y navegación](areas/ventana.md) |
 | [Registro de escuchas](areas/historial.md) | [Catálogo de YouTube Music](areas/catalogo.md), [Sesión de YouTube Music](areas/sesion.md) | [Opciones, skins y aspecto](areas/personalizacion.md), [Reproducción y cola](areas/reproduccion.md) |
 | [Piezas comunes de la interfaz](areas/interfaz-comun.md) | — | — |
 | [Letra sincronizada](areas/letra.md) | [Catálogo de YouTube Music](areas/catalogo.md), [Opciones, skins y aspecto](areas/personalizacion.md), [Reproducción y cola](areas/reproduccion.md) | [Reproducción y cola](areas/reproduccion.md), [Ventana y navegación](areas/ventana.md) |
@@ -184,5 +195,5 @@ componentes QML que monta cada archivo. No cuenta las piezas que usa todo (`Them
 | [Resolución del audio y arranque instantáneo](areas/resolucion.md) | [Catálogo de YouTube Music](areas/catalogo.md), [Reproducción y cola](areas/reproduccion.md), [Sesión de YouTube Music](areas/sesion.md) | [Opciones, skins y aspecto](areas/personalizacion.md), [Reproducción y cola](areas/reproduccion.md), [Ventana y navegación](areas/ventana.md) |
 | [Sesión de YouTube Music](areas/sesion.md) | [Catálogo de YouTube Music](areas/catalogo.md), [Reproducción y cola](areas/reproduccion.md) | [Catálogo de YouTube Music](areas/catalogo.md), [Registro de escuchas](areas/historial.md), [Opciones, skins y aspecto](areas/personalizacion.md), [Reproducción y cola](areas/reproduccion.md), [Resolución del audio y arranque instantáneo](areas/resolucion.md), [Ventana y navegación](areas/ventana.md) |
 | [Ventana y navegación](areas/ventana.md) | [Catálogo de YouTube Music](areas/catalogo.md), [Detalle e inspeccionar](areas/detalle.md), [Letra sincronizada](areas/letra.md), [Mascotas](areas/mascotas.md), [Opciones, skins y aspecto](areas/personalizacion.md), [Plugins (Discord, Last.fm y ListenBrainz)](areas/plugins.md), [Reproducción y cola](areas/reproduccion.md), [Resolución del audio y arranque instantáneo](areas/resolucion.md), [Sesión de YouTube Music](areas/sesion.md), [Vistas de las secciones](areas/vistas.md) | [Reproducción y cola](areas/reproduccion.md) |
-| [Vistas de las secciones](areas/vistas.md) | [Catálogo de YouTube Music](areas/catalogo.md), [Opciones, skins y aspecto](areas/personalizacion.md), [Reproducción y cola](areas/reproduccion.md) | [Ventana y navegación](areas/ventana.md) |
+| [Vistas de las secciones](areas/vistas.md) | [Catálogo de YouTube Music](areas/catalogo.md), [Opciones, skins y aspecto](areas/personalizacion.md), [Reproducción y cola](areas/reproduccion.md) | [Detalle e inspeccionar](areas/detalle.md), [Ventana y navegación](areas/ventana.md) |
 <!-- /generado -->

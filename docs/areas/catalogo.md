@@ -4,7 +4,7 @@ titulo: Catálogo de YouTube Music
 resumen: Secciones (Inicio, Explorar, Álbumes, Playlists, Me gusta, Historial), búsqueda, detalle abierto y categorías de playlists, pedidos a InnerTube (Explorar, a ListenBrainz si se elige) y publicados como JSON.
 archivos: [src/ytm.rs, src/library.rs, src/listenbrainz.rs, qml/Catalog.qml, qml/CategoryBar.qml]
 opciones: [categoria, categorias, explorarFuente]
-adr: [ADR-04, ADR-06, ADR-09, ADR-19, ADR-20]
+adr: [ADR-04, ADR-06, ADR-09, ADR-19, ADR-20, ADR-22]
 ---
 
 # Catálogo de YouTube Music
@@ -15,6 +15,19 @@ búsqueda y el detalle de un álbum, playlist o artista. Cómo se pinta cada sec
 
 ## Qué hace
 
+- **Explorar empieza por «Recomendados»** (`ytm::recomendados`), con las dos fuentes
+  ([ADR-22](../decisions/ADR-22-explorar-por-categorias-con-recomendados.md)): las filas de
+  canciones del Inicio de YouTube Music («Selecciones rápidas», personalizada con la sesión; 「おすすめ」
+  en la app en japonés). Cada zona de Explorar es una tarjeta ([vistas](vistas.md)) que se abre
+  con `Library.openZona(zona)`: sin red, como un detalle de `kind` "zona"; si todo son canciones,
+  en `tracks` (`ytm::item_track`), y si no, la zona en `zonas` ([detalle](detalle.md)).
+- **Relacionado** (`ytm::related`, pedido con `Library.openRelated(item, "related")`): la
+  pestaña «Relacionado» de YouTube Music para una canción. La página sale de la pestaña con
+  `browseEndpoint` `MPTR…` de la respuesta de `next`; su primera fila de canciones («También te
+  puede interesar») va a `tracks` y el resto («Listas recomendadas», «Artistas similares», «Más
+  de <artista>») a `zonas`. Se abre como un detalle ([detalle](detalle.md)).
+- **Continuación de la radio** (`ytm::queue_page`, `ytm::queue_more`): la cola de una canción
+  trae `nextRadioContinuationData`; con ella se piden las siguientes ([reproduccion](reproduccion.md)).
 - **Sin sesión:** Inicio, Explorar, Álbumes (novedades), «Ánimo y géneros» y búsqueda de
   canciones, álbumes, playlists y artistas.
 - **Explorar sale de ListenBrainz** ([ADR-19](../decisions/ADR-19-explorar-con-listenbrainz.md))
@@ -57,6 +70,11 @@ búsqueda y el detalle de un álbum, playlist o artista. Cómo se pinta cada sec
   (`header_thumb`): fuera de ella hay otras (el carrusel «otras versiones» del artista) y `find`
   recorre las claves en orden alfabético ([TRAMPAS](../TRAMPAS.md#youtube-yt-dlp-y-mpv)).
 
+- **Recomendados se reconoce por su forma, no por su título**: un carrusel en columnas
+  (`numItemsPerColumn`) de filas `musicResponsiveListItemRenderer`; el título cambia con el
+  idioma y la sesión. Va a la vez que `FEmusic_explore` (`thread::scope`) y, si falla, se queda la
+  de la copia guardada para que las tarjetas no se corran bajo el ratón
+  ([ADR-22](../decisions/ADR-22-explorar-por-categorias-con-recomendados.md)).
 - **InnerTube como el cliente web (`WEB_REMIX`)**, recorriendo las respuestas buscando los
   *renderers* por nombre en vez de fijar rutas completas: cambian a menudo.
 - **JSON hacia QML** ([ADR-04](../decisions/ADR-04-json-hacia-qml.md)): cada sección es
@@ -131,6 +149,8 @@ búsqueda y el detalle de un álbum, playlist o artista. Cómo se pinta cada sec
 | Concepto | Símbolo |
 |---|---|
 | Recorrer la respuesta buscando renderers | [`find_all`](../../src/ytm.rs) |
+| Relacionado de una canción | [`related`](../../src/ytm.rs), [`open_song_related`](../../src/library.rs) |
+| Continuación de la radio | [`queue_more`](../../src/ytm.rs), [`panel_tracks`](../../src/ytm.rs) |
 | Una sección por `browseId` | [`browse`](../../src/ytm.rs) |
 | Canciones de un álbum o playlist | [`playlist_tracks`](../../src/ytm.rs) |
 | Álbum y artista de una canción; artista de un álbum | [`song_links`](../../src/ytm.rs), [`album_info`](../../src/ytm.rs), [`open_related`](../../src/library.rs) |
@@ -140,6 +160,8 @@ búsqueda y el detalle de un álbum, playlist o artista. Cómo se pinta cada sec
 | Dar o quitar «Me gusta» | [`like`](../../src/ytm.rs), [`remove_like`](../../src/ytm.rs), [`like`](../../src/library.rs) |
 | Límite de cada zona | [`ZONE_LIMIT`](../../src/library.rs) |
 | Zonas de Explorar y su fuente | [`explorar`](../../src/listenbrainz.rs), [`load_explorar`](../../src/library.rs), [`set_explorar_youtube`](../../src/library.rs) |
+| Recomendados (primera zona de Explorar) | [`recomendados`](../../src/ytm.rs), [`with_recomendados`](../../src/library.rs) |
+| Abrir una categoría de Explorar como detalle | [`open_zona`](../../src/library.rs), [`item_track`](../../src/ytm.rs), [`all_songs`](../../src/ytm.rs) |
 | Historial de escucha | [`history`](../../src/library.rs), [`load_historial`](../../src/library.rs) |
 | Buscar en YouTube Music lo que recomienda ListenBrainz | [`find`](../../src/listenbrainz.rs), [`pick`](../../src/listenbrainz.rs), [`search_one_kind`](../../src/ytm.rs) |
 | Detalle de una lista de ListenBrainz | [`detail`](../../src/listenbrainz.rs) |
@@ -165,12 +187,14 @@ búsqueda y el detalle de un álbum, playlist o artista. Cómo se pinta cada sec
 
 ## Estado actual
 
-- **Última verificación:** 2026-11-18, ir al álbum o al artista desde el menú ([historial](../history/verificacion/catalogo.md)).
+- **Última verificación:** 2026-11-21, Recomendados en Explorar y categorías como detalle ([historial](../history/verificacion/catalogo.md)).
 - **Pruebas:** ninguna en `ytm.rs` ni `library.rs` (dependen de la red); se prueban con
-  `--probe home|explore|explore-youtube|history|albums|playlists|search|album|queue|links`
+  `--probe home|recomendados|explore|explore-youtube|history|albums|playlists|search|album|queue|links|radio|related`
   (`--probe explore <usuario>` para otro usuario de ListenBrainz; `history` necesita sesión). `mod tests` de `src/listenbrainz.rs`: nombres comparables,
-  primer artista del crédito, elección del resultado, MBID y fecha.
-- **Sin verificar:** la sección Historial con una sesión real (que `FEmusic_history` dé sus
+  primer artista del crédito, elección del resultado, MBID y fecha. `mod tests` de `src/ytm.rs`:
+  `item_track` (artista y duración del subtítulo) y `all_songs`.
+- **Sin verificar:** Recomendados con una sesión real (que la fila personalizada tenga la forma que
+  se busca) y con la cuenta en japonés; la sección Historial con una sesión real (que `FEmusic_history` dé sus
   zonas por día con este recorrido); el cambio de fuente de Explorar pulsado en Opciones (sí al
   arrancar con la opción puesta); Explorar con el usuario del propietario (sin escuchas aún en ListenBrainz);
   la calidad de la búsqueda con música japonesa y anime; biblioteca con sesión en Linux; `like/like` y `like/removelike` con una

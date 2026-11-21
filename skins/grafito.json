@@ -11,7 +11,8 @@
     "bordeVidrio": "#1AFFFFFF",
     "control": "#14FFFFFF",
     "controlActivo": "#29FFFFFF",
-    "acento": "#E0E0E0"
+    "acento": "#E0E0E0",
+    "error": "#FF6B6B"
   },
   "radio": 6,
   "ambiente": 0.3

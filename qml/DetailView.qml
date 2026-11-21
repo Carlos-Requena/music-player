@@ -14,12 +14,17 @@ FocusScope {
     onTracksChanged: if (tracks.length) Player.prefetchTracks(JSON.stringify(tracks.slice(0, 6)), 6)
     readonly property var zonas: detail ? (detail.zonas || []) : []
     readonly property bool artist: detail !== null && detail.kind === "artist"
+    // «Relacionado» de una canción: sus canciones parecidas se reproducen como un álbum y debajo
+    // van listas, artistas similares y más del artista.
+    readonly property bool related: detail !== null && detail.kind === "related"
+    // Categoría de Explorar (`Library.openZona`): canciones en la lista o elementos en cuadrícula.
+    readonly property bool zona: detail !== null && detail.kind === "zona"
     readonly property real totalSeconds: tracks.reduce((sum, track) => sum + (track.duration || 0), 0)
     property int current: 0
     // Color dominante de la foto o carátula (la sonda de la ventana).
-    property color tint: "#3A3F4B"
+    property color tint: Theme.neutralTint
     // Margen lateral de las filas: en un artista, la lista va centrada y con un ancho cómodo.
-    readonly property real inset: artist ? Math.max(40, (width - 1000) / 2) : 0
+    readonly property real inset: artist ? Math.max(Theme.margin, (width - 1000) / 2) : 0
 
     signal closed()
     signal inspect()
@@ -54,17 +59,13 @@ FocusScope {
         if (event.key === Qt.Key_S) {
             play(0, true)
             event.accepted = true
-        } else if (event.key === Qt.Key_I && !root.artist) {
+        } else if (event.key === Qt.Key_I && !root.artist && !root.related && !root.zona) {
             root.inspect()
             event.accepted = true
         }
     }
 
-    // Velo sobre el escenario: deja ver el modo ambiente pero separa el detalle del fondo.
-    Rectangle {
-        anchors.fill: parent
-        color: Qt.rgba(0.03, 0.035, 0.05, 0.62)
-    }
+    // El velo que lo separa del escenario está en `Main.qml`: cubre toda la ventana.
 
     // Absorbe clics para que no lleguen a la vista de debajo.
     TapHandler { acceptedButtons: Qt.AllButtons; gesturePolicy: TapHandler.ReleaseWithinBounds }
@@ -75,7 +76,7 @@ FocusScope {
     // lista, que en un artista empieza arriba del todo.
     IconButton {
         z: 2
-        x: 40
+        x: Theme.margin
         y: 20
         icon: Theme.iconBack
         label: "Volver"
@@ -86,7 +87,7 @@ FocusScope {
     Column {
         id: info
         visible: !root.artist
-        x: 40
+        x: Theme.margin
         y: 84
         width: root.coverSide
         spacing: 14
@@ -96,13 +97,14 @@ FocusScope {
             height: root.coverSide
             thumb: root.detail ? root.detail.thumb : ""
             pixels: 544
+            radius: Theme.coverRadius(width)
         }
 
         Text {
             width: parent.width
             text: root.detail ? root.detail.title : ""
             color: Theme.text
-            font.pixelSize: 30
+            font.pixelSize: Theme.fontTitle
             font.weight: Font.Bold
             wrapMode: Text.WordWrap
             maximumLineCount: 3
@@ -121,7 +123,7 @@ FocusScope {
                 return parts.join(" · ")
             }
             color: Theme.textMuted
-            font.pixelSize: 13
+            font.pixelSize: Theme.fontSmall
             wrapMode: Text.WordWrap
         }
 
@@ -144,7 +146,7 @@ FocusScope {
             }
 
             IconButton {
-                visible: !root.artist
+                visible: !root.artist && !root.related && !root.zona
                 icon: Theme.iconInspect
                 label: "Inspeccionar"
                 solid: true
@@ -153,10 +155,33 @@ FocusScope {
         }
     }
 
+    // Categoría de Explorar sin canciones (álbumes, listas): el mismo Muro que Inicio, con el
+    // nombre de la elegida abajo; abrir una la lleva a su detalle.
+    readonly property bool wall: root.zona && root.tracks.length === 0 && root.zonas.length > 0
+
+    Loader {
+        id: wallLoader
+        // Medio margen de más a cada lado: la elegida crece y su aro no se corta.
+        x: list.x - Theme.margin / 2
+        y: 84
+        width: list.width + Theme.margin
+        height: root.height - y
+        active: root.wall
+        focus: active
+        sourceComponent: MuroView {
+            focus: true
+            margin: Theme.margin / 2
+            // Sin el nombre de la zona: ya está a la izquierda.
+            zonas: root.zonas.map(zona => Object.assign({}, zona, { titulo: "" }))
+            onActivated: item => root.opened(item)
+        }
+    }
+
     ListView {
         id: list
-        x: root.artist ? 0 : info.x + info.width + 40
-        width: root.artist ? root.width : root.width - x - 32
+        visible: !root.wall
+        x: root.artist ? 0 : info.x + info.width + Theme.margin
+        width: root.artist ? root.width : root.width - x - Theme.margin
         y: root.artist ? 0 : 84
         height: root.height - y
         clip: true
@@ -180,98 +205,39 @@ FocusScope {
                 }
             }
 
-            Text {
-                x: root.inset + 14
-                visible: root.artist && root.tracks.length > 0
+            SectionLabel {
+                x: root.inset + 8
+                visible: (root.artist || root.related) && root.tracks.length > 0
                 height: visible ? 44 : 0
-                text: "Canciones"
-                color: Theme.textMuted
-                font.pixelSize: 12
-                font.weight: Font.DemiBold
-                font.letterSpacing: 1.7
-                font.capitalization: Font.AllUppercase
+                text: root.related ? "También te puede interesar" : "Canciones"
             }
 
             Text {
-                x: root.inset
+                x: root.inset + 8
                 visible: Library.detalleLoading && root.tracks.length === 0
                 height: visible ? 48 : 0
                 text: "Cargando canciones…"
                 color: Theme.textMuted
-                font.pixelSize: 14
+                font.pixelSize: Theme.fontBase
             }
         }
 
-        delegate: Item {
+        delegate: TrackRow {
             id: row
             required property var modelData
             required property int index
-            readonly property bool playing: Player.queue !== "" && Player.title === modelData.title && Player.artist === modelData.artist
-            readonly property bool focused: index === root.current
 
-            width: list.width
-            height: 52
+            x: root.inset
+            width: list.width - 2 * root.inset
+            number: index + 1
+            title: modelData.title
+            artist: modelData.artist
+            showArtist: root.detail !== null && root.detail.kind !== "album"
+            duration: modelData.duration || 0
+            playing: Player.queue !== "" && Player.title === modelData.title && Player.artist === modelData.artist
+            chosen: index === root.current
 
-            Accessible.role: Accessible.Button
-            Accessible.name: modelData.title + ", " + modelData.artist
             Accessible.onPressAction: root.play(index, false)
-
-            Rectangle {
-                anchors.fill: parent
-                anchors.leftMargin: root.inset
-                anchors.rightMargin: root.inset
-                radius: 10
-                color: row.focused ? Theme.controlActive : (rowHover.hovered ? Theme.control : "transparent")
-            }
-
-            Text {
-                x: root.inset + 14
-                width: 28
-                anchors.verticalCenter: parent.verticalCenter
-                text: row.playing ? "▸" : (row.index + 1)
-                color: row.playing ? Theme.accent : Theme.textMuted
-                font.pixelSize: 13
-                horizontalAlignment: Text.AlignRight
-            }
-
-            Column {
-                x: root.inset + 58
-                anchors.verticalCenter: parent.verticalCenter
-                width: parent.width - 58 - 70 - 2 * root.inset
-                spacing: 1
-
-                Text {
-                    width: parent.width
-                    text: row.modelData.title
-                    color: row.playing ? Theme.accent : Theme.text
-                    font.pixelSize: 15
-                    font.weight: Font.DemiBold
-                    elide: Text.ElideRight
-                }
-
-                Text {
-                    width: parent.width
-                    visible: root.detail && root.detail.kind !== "album"
-                    text: row.modelData.artist
-                    color: Theme.textMuted
-                    font.pixelSize: 12
-                    elide: Text.ElideRight
-                }
-            }
-
-            Text {
-                anchors.right: parent.right
-                anchors.rightMargin: root.inset + 14
-                anchors.verticalCenter: parent.verticalCenter
-                text: row.modelData.duration > 0 ? Theme.mmss(row.modelData.duration) : ""
-                color: Theme.textMuted
-                font.pixelSize: 13
-            }
-
-            HoverHandler {
-                id: rowHover
-                cursorShape: Qt.PointingHandCursor
-            }
 
             // Clic derecho: menú con «Añadir a la lista temporal».
             TapHandler {
@@ -279,20 +245,24 @@ FocusScope {
                 onTapped: eventPoint => row.Window.window.openMenu(row.modelData, eventPoint.scenePosition)
             }
 
+            // Un clic elige o hace sonar según la opción `clic`; el doble, siempre suena.
             TapHandler {
                 onTapped: {
                     root.current = row.index
                     root.forceActiveFocus()
+                    if (Theme.singleClick && tapCount === 1)
+                        root.play(row.index, false)
                 }
-                onDoubleTapped: root.play(row.index, false)
+                onDoubleTapped: if (!Theme.singleClick) root.play(row.index, false)
             }
         }
 
-        // Discografía de un artista: filas de carátulas bajo sus canciones.
+        // Discografía de un artista: filas de carátulas bajo sus canciones. Una categoría de
+        // Explorar sin canciones llena el ancho con una cuadrícula (su nombre ya está a la izquierda).
         footer: Column {
             x: root.inset
             width: list.width - 2 * root.inset
-            topPadding: root.zonas.length ? 28 : 0
+            topPadding: root.zonas.length && !root.zona ? 28 : 0
             bottomPadding: root.artist ? 40 : 0
             spacing: 22
 
@@ -305,18 +275,16 @@ FocusScope {
                     width: parent.width
                     spacing: 10
 
-                    Text {
+                    SectionLabel {
+                        x: 8
+                        visible: !root.zona
                         text: zone.modelData.titulo
-                        color: Theme.textMuted
-                        font.pixelSize: 12
-                        font.weight: Font.DemiBold
-                        font.letterSpacing: 1.7
-                        font.capitalization: Font.AllUppercase
                     }
 
                     Flickable {
+                        visible: !root.zona
                         width: parent.width
-                        height: 190
+                        height: visible ? 190 : 0
                         contentWidth: strip.width
                         clip: true
                         flickableDirection: Flickable.HorizontalFlick
@@ -327,48 +295,69 @@ FocusScope {
                             spacing: 16
 
                             Repeater {
-                                model: zone.modelData.items
-
-                                Column {
-                                    id: card
-                                    required property var modelData
-                                    width: 150
-                                    spacing: 6
-
-                                    Accessible.role: Accessible.Button
-                                    Accessible.name: modelData.title
-
-                                    Cover {
-                                        width: 150
-                                        height: 150
-                                        thumb: card.modelData.thumb
-                                    }
-
-                                    Text {
-                                        width: parent.width
-                                        text: card.modelData.title
-                                        color: Theme.text
-                                        font.pixelSize: 13
-                                        elide: Text.ElideRight
-                                    }
-
-                                    HoverHandler { cursorShape: Qt.PointingHandCursor }
-
-                                    // Clic derecho: menú con «Añadir a la lista temporal».
-                                    TapHandler {
-                                        acceptedButtons: Qt.RightButton
-                                        onTapped: eventPoint => card.Window.window.openMenu(card.modelData, eventPoint.scenePosition)
-                                    }
-
-                                    TapHandler {
-                                        onTapped: root.opened(card.modelData)
-                                    }
-                                }
+                                model: root.zona ? [] : zone.modelData.items
+                                ZoneCard { side: 150 }
                             }
+                        }
+                    }
+
+                    // Cuadrícula de una categoría: tantas columnas de ~170 px como quepan.
+                    Flow {
+                        id: wall
+                        visible: root.zona
+                        width: parent.width
+                        spacing: 18
+                        readonly property int columns: Math.max(1, Math.floor((width + spacing) / (170 + spacing)))
+                        readonly property real side: Math.floor((width - (columns - 1) * spacing) / columns)
+
+                        Repeater {
+                            model: root.zona ? zone.modelData.items : []
+                            ZoneCard { side: wall.side }
                         }
                     }
                 }
             }
+        }
+    }
+
+    // Tarjeta de una zona: carátula y título; clic para abrirla, clic derecho para su menú.
+    component ZoneCard: Column {
+        id: card
+        required property var modelData
+        property real side: 150
+        width: side
+        spacing: 6
+
+        Accessible.role: Accessible.Button
+        Accessible.name: modelData.title
+
+        // Los artistas, siempre en círculo.
+        Cover {
+            width: card.side
+            height: card.side
+            thumb: card.modelData.thumb
+            radius: card.modelData.kind === "artist" ? width / 2 : Theme.coverRadius(width)
+        }
+
+        Text {
+            width: parent.width
+            horizontalAlignment: card.modelData.kind === "artist" ? Text.AlignHCenter : Text.AlignLeft
+            text: card.modelData.title
+            color: Theme.text
+            font.pixelSize: Theme.fontSmall
+            elide: Text.ElideRight
+        }
+
+        HoverHandler { cursorShape: Qt.PointingHandCursor }
+
+        // Clic derecho: menú con «Añadir a la lista temporal».
+        TapHandler {
+            acceptedButtons: Qt.RightButton
+            onTapped: eventPoint => card.Window.window.openMenu(card.modelData, eventPoint.scenePosition)
+        }
+
+        TapHandler {
+            onTapped: root.opened(card.modelData)
         }
     }
 }

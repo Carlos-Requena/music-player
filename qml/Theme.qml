@@ -30,6 +30,8 @@ QtObject {
     readonly property color control: pick("control", "#1AFFFFFF")
     readonly property color controlActive: pick("controlActivo", "#2EFFFFFF")
     readonly property color accent: pick("acento", "#FFB070")
+    // Errores (reproducción, cuenta). El acento queda para «activado» y «suena».
+    readonly property color error: pick("error", "#FF6B6B")
 
     // Opciones de disposición que afectan al aspecto (Opciones › Disposición).
     readonly property int revision: AppSettings.revision
@@ -60,6 +62,15 @@ QtObject {
         return style === "clasica" || style === "compacta" ? style : "islas"
     }
     readonly property int barHeight: barStyle === "clasica" ? 84 : 64
+
+    // Brillo al pasar el ratón por el Muro y las tarjetas de Explorar (opción `brillo`).
+    readonly property bool hoverGlow: { void revision; return AppSettings.opcion("brillo") !== "no" }
+    // Color del brillo: el de la carátula (`TintProbe.tint`), aclarado para que brille también en
+    // las oscuras; blanco si es gris.
+    function glow(tint) {
+        return tint.hslHue < 0 ? Qt.hsla(0, 0, 0.9, 1)
+                               : Qt.hsla(tint.hslHue, Math.max(0.5, tint.hslSaturation), Math.max(0.62, tint.hslLightness), 1)
+    }
 
     readonly property string ambientMode: { void revision; return AppSettings.opcion("ambiente") || "si" }
     readonly property bool ambientOn: ambientMode !== "no"
@@ -106,10 +117,66 @@ QtObject {
     }
 
     readonly property int radius: skin.radio !== undefined ? skin.radio : 20
+    // Borde de los paneles de vidrio pegados a la ventana (barra de reproducción, panel lateral).
     readonly property int gap: 12
     readonly property int hit: 44
     readonly property int animFast: 160
     readonly property int animMove: 320
+
+    // ── Medidas comunes (ADR-23) ─────────────────────────────────────────────────────────
+    // Ningún componente escribe a mano un tamaño de letra, un radio ni un color: los toma de
+    // aquí (lo comprueba `docs.py check`).
+
+    // Tipografía en ocho niveles. La letra de las canciones tiene su propia escala (`lyricsScale`).
+    readonly property int fontDisplay: 40   // nombre de lo enfocado (Muro, Lomos, Cubeta), artista
+    readonly property int fontTitle: 28     // título de una pantalla: detalle, Opciones, Sonando
+    readonly property int fontHeading: 20   // título del panel, tarjetas de Explorar
+    readonly property int fontBody: 15      // título de una fila, nombre de una opción
+    readonly property int fontBase: 14      // botones, pestañas, menú, campos
+    readonly property int fontSmall: 13     // artista, duración, descripciones
+    readonly property int fontLabel: 12     // etiquetas de sección, en mayúsculas
+    readonly property int fontMini: 11      // calidad del audio, atajos de teclado
+    readonly property real labelSpacing: 1.8
+    readonly property real displaySpacing: -0.5
+
+    // Borde del contenido y de los botones sueltos, igual en todas las pantallas.
+    readonly property int margin: 32
+
+    // Esquinas, sacadas del `radio` de la skin: así Grafito (6) y Neón (26) se notan en toda la
+    // app. S: filas, entradas del menú, miniaturas. M: tarjetas, menú, segmentos, campos.
+    // L: paneles de vidrio. Los botones y la navegación son píldoras (`height / 2`).
+    readonly property int radiusS: Math.round(radius * 0.4)
+    readonly property int radiusM: Math.round(radius * 0.7)
+    readonly property int radiusL: radius
+
+    // Carátulas (opción `esquinas`): «redondeadas» (por defecto) o «cuadradas». Las pequeñas
+    // (filas, barra, mini) toman S y las grandes, M. Los artistas van siempre en círculo y los
+    // objetos físicos (cajas de Lomos y Cubeta, Inspeccionar) siempre cuadrados.
+    readonly property bool roundCovers: { void revision; return AppSettings.opcion("esquinas") !== "cuadradas" }
+    function coverRadius(side) {
+        return roundCovers ? (side >= 120 ? radiusM : radiusS) : 0
+    }
+
+    // Clic en una fila de canción (opción `clic`): «doble» (por defecto: un clic la elige y el
+    // doble la hace sonar) o «uno» (un clic la hace sonar). Detalle, cola y temporal.
+    readonly property bool singleClick: { void revision; return AppSettings.opcion("clic") === "uno" }
+
+    // Hoja de Opciones compacta (su interruptor «Compacto»): sin descripciones a la vista.
+    readonly property bool compactSettings: { void revision; return AppSettings.opcion("compacto") === "si" }
+
+    // Velo de lo que tapa el escenario (detalle, Opciones, Inspeccionar) y pozo oscuro de las
+    // pestañas, los segmentos y los campos de texto.
+    readonly property color scrim: Qt.rgba(ground.r, ground.g, ground.b, 0.62)
+    readonly property color well: Qt.rgba(0, 0, 0, 0.3)
+    // Fondo de una carátula mientras carga, y tinte de una carátula de la que aún no hay color.
+    readonly property color placeholder: Qt.tint(ground, Qt.rgba(1, 1, 1, 0.07))
+    readonly property color neutralTint: "#3A3F4B"
+
+    // Fila de canción (`TrackRow`): alto y lado de su miniatura.
+    readonly property int rowHeight: 56
+    readonly property int rowCover: 40
+    // Aro del elemento elegido en una rejilla (Muro): más grueso que el de foco de un control.
+    readonly property int cursorWidth: 3
 
     // Sube cada vez que una ventana vuelve tras ocultarse o minimizarse. Al ocultarla se
     // liberan sus gráficos (window.cpp) y las `Shape` con CurveRenderer no se vuelven a
@@ -158,6 +225,8 @@ QtObject {
     readonly property string iconCubeta: "M4 9h16v11H4z M6 6h12 M8 3h8"
     readonly property string iconMuro: "M4 4h7v7H4z M13 4h7v7h-7z M4 13h7v7H4z M13 13h7v7h-7z"
     readonly property string iconAlbum: "M21 12a9 9 0 1 1-18 0a9 9 0 0 1 18 0z M14 12a2 2 0 1 1-4 0a2 2 0 0 1 4 0z"
+    // Ondas desde un punto: «Relacionado» (lo que se parece a esta canción).
+    readonly property string iconRelated: "M13.5 12a1.5 1.5 0 1 1-3 0a1.5 1.5 0 0 1 3 0z M8.5 15.5a5 5 0 0 1 0-7 M15.5 8.5a5 5 0 0 1 0 7 M5.6 18.4a9 9 0 0 1 0-12.8 M18.4 5.6a9 9 0 0 1 0 12.8"
     readonly property string iconArtist: "M12 3a3 3 0 0 1 3 3v5a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3z M6 11a6 6 0 0 0 12 0 M12 17v4"
 
     function mmss(seconds) {

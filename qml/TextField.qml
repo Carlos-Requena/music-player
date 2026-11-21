@@ -18,8 +18,8 @@ Rectangle {
     }
 
     implicitHeight: Theme.hit
-    radius: 12
-    color: Qt.rgba(0, 0, 0, 0.3)
+    radius: Theme.radiusM
+    color: Theme.well
     border.width: input.activeFocus ? 2 : 1
     border.color: input.activeFocus ? Theme.text : Theme.glassBorder
 
@@ -30,7 +30,7 @@ Rectangle {
         anchors.rightMargin: 14
         verticalAlignment: TextInput.AlignVCenter
         color: Theme.text
-        font.pixelSize: 14
+        font.pixelSize: Theme.fontBase
         clip: true
         selectByMouse: true
         selectionColor: Theme.controlActive

@@ -44,7 +44,8 @@ pub struct Item {
 }
 
 /// Grupo de elementos con título ("Selecciones rápidas", "Novedades"…).
-#[derive(Clone, Debug, Default, Serialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(default)]
 pub struct Zone {
     pub titulo: String,
     pub items: Vec<Item>,
@@ -328,6 +329,79 @@ fn zones(root: &Value) -> Vec<Zone> {
         }
     }
     out
+}
+
+/// Pestaña «Relacionado» de una canción, como en YouTube Music: «También te puede interesar»
+/// (canciones, que pasan a `tracks` para reproducirlas), «Listas recomendadas», «Artistas
+/// similares» y «Más de <artista>» (en `zonas`). La página sale de la pestaña cuyo
+/// `browseEndpoint` empieza por `MPTR` en la respuesta de `next`.
+pub fn related(video_id: &str) -> Result<Detail> {
+    let page = post("next", json!({ "videoId": video_id, "isAudioOnly": true }))?;
+    let mut tabs = Vec::new();
+    find_all(&page, "tabRenderer", &mut tabs);
+    let browse_id = tabs
+        .iter()
+        .filter_map(|tab| tab.pointer("/endpoint/browseEndpoint/browseId").and_then(Value::as_str))
+        .find(|id| id.starts_with("MPTR"))
+        .ok_or_else(|| "YouTube Music no tiene relacionados para esta canción".to_owned())?;
+    let mut zonas = zones(&post("browse", json!({ "browseId": browse_id }))?);
+    let mut detail = Detail { kind: "related".to_owned(), ..Detail::default() };
+    // La primera fila de solo canciones es la lista principal: se reproduce como un álbum.
+    if let Some(at) = zonas.iter().position(|zone| all_songs(&zone.items)) {
+        let songs = zonas.remove(at);
+        detail.subtitle = songs.titulo.clone();
+        detail.tracks = songs.items.into_iter().map(item_track).collect();
+    }
+    detail.zonas = zonas;
+    Ok(detail)
+}
+
+/// Todos los elementos son canciones que se pueden reproducir (y hay alguno).
+pub fn all_songs(items: &[Item]) -> bool {
+    !items.is_empty() && items.iter().all(|item| item.kind == "song" && !item.video_id.is_empty())
+}
+
+/// Pista de la cola a partir de una canción de una zona. El subtítulo es «Canción • Artista •
+/// Álbum • 3:45» o parte de eso: el artista es la primera parte que no es el tipo ni la duración.
+pub fn item_track(item: Item) -> Track {
+    let parts: Vec<&str> = item.subtitle.split(" • ").map(str::trim).filter(|part| !part.is_empty()).collect();
+    let clock = |part: &str| part.contains(':') && part.chars().all(|c| c.is_ascii_digit() || c == ':');
+    Track {
+        artist: parts
+            .iter()
+            .find(|part| !clock(part) && !matches!(**part, "Canción" | "Vídeo" | "Video" | "Song"))
+            .copied()
+            .unwrap_or_default()
+            .to_owned(),
+        duration: parts.iter().rev().find(|part| clock(part)).map_or(0.0, |part| seconds(part)),
+        title: item.title,
+        thumb: item.thumb,
+        video_id: item.video_id,
+    }
+}
+
+/// Título de la zona de `recomendados`.
+pub const RECOMENDADOS: &str = "Recomendados";
+
+/// «Recomendados» de Explorar: las canciones que YouTube Music propone en su Inicio en filas
+/// de canción («Selecciones rápidas», personalizadas con la sesión). Se reconocen por su forma y
+/// no por su título, que cambia con el idioma: un carrusel en columnas (`numItemsPerColumn`) de
+/// filas `musicResponsiveListItemRenderer`. «Vuelve a escucharlo» y las listas van en tarjetas y
+/// no cuentan. Sin repetidas.
+pub fn recomendados() -> Result<Zone> {
+    let home = post("browse", json!({ "browseId": "FEmusic_home" }))?;
+    let mut shelves = Vec::new();
+    find_all(&home, "musicCarouselShelfRenderer", &mut shelves);
+    let mut seen = std::collections::HashSet::new();
+    let items = shelves
+        .iter()
+        .filter(|shelf| shelf.get("numItemsPerColumn").is_some())
+        .flat_map(|shelf| shelf.get("contents").and_then(Value::as_array).into_iter().flatten())
+        .filter(|entry| entry.get("musicResponsiveListItemRenderer").is_some())
+        .filter_map(item)
+        .filter(|item| item.kind == "song" && seen.insert(item.video_id.clone()))
+        .collect();
+    Ok(Zone { titulo: RECOMENDADOS.to_owned(), items })
 }
 
 /// Nombre de la cuenta con sesión; vacío si YouTube no reconoce la sesión.
@@ -765,6 +839,13 @@ fn track_row(row: &Value, album_artist: &str, album_thumb: &str) -> Option<Track
 
 /// Cola de reproducción: la radio de una canción o las pistas de un álbum o playlist.
 pub fn queue(video_id: &str, playlist_id: &str) -> Result<Vec<Track>> {
+    queue_page(video_id, playlist_id).map(|(tracks, _)| tracks)
+}
+
+/// Como `queue`, con la continuación de la radio (`nextRadioContinuationData`) si la hay: con
+/// ella, `queue_more` trae las siguientes canciones, como hace YouTube Music al acercarse al
+/// final de la cola.
+pub fn queue_page(video_id: &str, playlist_id: &str) -> Result<(Vec<Track>, Option<String>)> {
     let mut body = json!({ "isAudioOnly": true, "enablePersistentPlaylistPanel": true });
     if !video_id.is_empty() {
         body["videoId"] = json!(video_id);
@@ -774,15 +855,29 @@ pub fn queue(video_id: &str, playlist_id: &str) -> Result<Vec<Track>> {
     } else {
         body["playlistId"] = json!(playlist_id);
     }
-
     let page = post("next", body)?;
-    // Cada elemento es una pista o un envoltorio con la pista (`primaryRenderer`) y su
-    // versión en vídeo (`counterpart`): solo cuenta la principal, o saldría duplicada.
     let mut panels = Vec::new();
     find_all(&page, "playlistPanelRenderer", &mut panels);
-    let renderers: Vec<&Value> = panels
-        .first()
-        .and_then(|panel| panel.get("contents"))
+    Ok(panels.first().map(|panel| panel_tracks(panel)).unwrap_or_default())
+}
+
+/// Las siguientes canciones de una radio a partir de su continuación, y la continuación nueva.
+pub fn queue_more(continuation: &str) -> Result<(Vec<Track>, Option<String>)> {
+    let page = post(
+        "next",
+        json!({ "continuation": continuation, "isAudioOnly": true, "enablePersistentPlaylistPanel": true }),
+    )?;
+    let mut panels = Vec::new();
+    find_all(&page, "playlistPanelContinuation", &mut panels);
+    Ok(panels.first().map(|panel| panel_tracks(panel)).unwrap_or_default())
+}
+
+/// Pistas de un panel de cola (`playlistPanelRenderer` o su continuación) y su continuación.
+fn panel_tracks(panel: &Value) -> (Vec<Track>, Option<String>) {
+    // Cada elemento es una pista o un envoltorio con la pista (`primaryRenderer`) y su
+    // versión en vídeo (`counterpart`): solo cuenta la principal, o saldría duplicada.
+    let tracks = panel
+        .get("contents")
         .and_then(Value::as_array)
         .into_iter()
         .flatten()
@@ -791,10 +886,6 @@ pub fn queue(video_id: &str, playlist_id: &str) -> Result<Vec<Track>> {
                 entry.pointer("/playlistPanelVideoWrapperRenderer/primaryRenderer/playlistPanelVideoRenderer")
             })
         })
-        .collect();
-
-    Ok(renderers
-        .into_iter()
         .map(|renderer| Track {
             title: text(renderer.get("title")),
             artist: renderer
@@ -808,5 +899,28 @@ pub fn queue(video_id: &str, playlist_id: &str) -> Result<Vec<Track>> {
             duration: seconds(&text(renderer.get("lengthText"))),
         })
         .filter(|track| !track.video_id.is_empty())
-        .collect())
+        .collect();
+    let continuation = panel
+        .pointer("/continuations/0/nextRadioContinuationData/continuation")
+        .and_then(Value::as_str)
+        .map(str::to_owned);
+    (tracks, continuation)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn pista_de_una_cancion_de_zona() {
+        let song = |subtitle: &str| Item { title: "Idol".into(), subtitle: subtitle.into(), video_id: "x".into(), kind: "song".into(), ..Item::default() };
+        let track = item_track(song("Canción • YOASOBI • THE BOOK 2 • 3:33"));
+        assert_eq!((track.artist.as_str(), track.duration), ("YOASOBI", 213.0));
+        // Un año no es una duración, y sin tipo el artista va primero.
+        let track = item_track(song("YOASOBI • 2023"));
+        assert_eq!((track.artist.as_str(), track.duration), ("YOASOBI", 0.0));
+        assert!(all_songs(&[song("")]));
+        assert!(!all_songs(&[]));
+        assert!(!all_songs(&[Item { kind: "album".into(), ..Item::default() }]));
+    }
 }

@@ -5,6 +5,48 @@ son de cuando se escribieron. El estado actual está en su [ficha](../../areas/v
 
 Lo nuevo va arriba: añade una sección `## AAAA-MM-DD · qué se verificó` encima de las anteriores.
 
+## 2026-11-21 · Interfaz unificada: margen común, cabecera de búsqueda, velo y aviso vacío (en `master`)
+
+- **Cambio:** botones de arriba y contenido en `Theme.margin`; selector de vista oculto con un
+  detalle abierto (y el botón de cuenta pasa a su sitio); cabecera «Resultados de «…»»; velo del
+  detalle en `Main.qml` sobre toda la ventana; `EmptyState` con «Iniciar sesión» en las secciones
+  que piden sesión; «Sonando», panel y menú con las medidas comunes y `Tabs`
+  ([ADR-23](../../decisions/ADR-23-sistema-de-diseno-medidas-y-piezas-comunes.md)).
+- **Cómo:** 29 capturas con `--shot` (release, `HOME` de pruebas, `MUSICPLAYER_SILENT=1`, macOS Retina 1440×900, sin sesión), revisadas a ojo, sin errores de QML en la salida: detalle de Recomendados, artista, Relacionado, «Sonando» (Grande y Clásica),
+  panel con letra, cola y temporal vacía, menú contextual (`MUSICPLAYER_DEBUG_CLICK`), mini.
+- **Resultado:** sin la franja clara bajo la navegación en el detalle; ⌄ de «Sonando» y ‹ del
+  detalle en el mismo margen; Me gusta sin sesión con su botón. `estado:` de las pruebas con
+  `--play`: `sonando true`, sin `error`.
+- **No verificado:** el botón «Iniciar sesión» del aviso pulsado de verdad; Linux; Wayland.
+
+## 2026-11-21 · «Relacionado» en el menú y «latido» de la carátula (en `master`)
+
+- **Cambio:** entrada «Relacionado» (`Theme.iconRelated`) en `ContextMenu`; en «Sonando», pulsar
+  la carátula llama a `beat` (rebote y `beatGlow`) en vez de cerrar. Arnés: `--related ID`.
+- **Verificado:** capturas con clics de verdad: el menú de la primera tarjeta de Inicio con la
+  entrada y su icono, y la página que abre; un clic en la carátula de «Sonando» captado a mitad
+  del rebote (más grande) y «Sonando» sigue abierta 1,5 s después.
+- **Clic derecho en la carátula de «Sonando»** (`Main.openPlayingMenu`): late y abre el menú de
+  la canción que suena. Verificado con clics simulados: captura a mitad del latido con el menú
+  («Reproducir», «Ir al álbum», «Ver artista», «Relacionado», «Añadir a la lista temporal») y,
+  pulsando «Relacionado», «Sonando» baja y se abre la página. Los clics simulados fallan a veces
+  (1 de 3 pasadas no llegó a abrir el menú, según lo que tarde en cargar).
+- **No verificado:** el pulso de luz a ojo (la captura iba con una carátula gris); el coste de CPU
+  del latido (450 ms, no continuo); Linux.
+
+## 2026-11-20 · Bucle sin corte en la carátula animada (en `master`)
+
+- **Cambio:** `animada::loop_filter` y `seamless`: al guardar, el último segundo del vídeo se funde
+  con el primero (`xfade`) y se recodifica con libx264 (`-crf 18`); el archivo pasa a
+  `<id>-bucle.mp4` y el de antes se borra.
+- **Verificado:** costura medida con SSIM: el original daba 0,91 entre el último fotograma y el
+  primero (0,99 entre dos seguidos); el bucle, sin pérdida, 0,992; con `-crf 18`, 0,95, igual que
+  los saltos a fotograma clave de en medio (0,96). Descarga y fundido en 2,4 s; 2,8 MB. Captura de
+  «Sonando» después de dar la vuelta. Test de `loop_filter`.
+- **No verificado:** a ojo, en la app, el momento de la vuelta (las capturas son fotos sueltas): si
+  Qt Multimedia deja un salto al reiniciar el bucle, este cambio no lo arregla; VideoToolbox como
+  codificador de reserva; Linux.
+
 ## 2026-11-20 · Carátula animada de Apple Music en «Sonando» (rama `feature/caratula-animada`)
 
 - **Cambio:** `src/animada.rs`, `Player.animada` y `Player.buscarAnimada`, `qml/MotionCover.qml`,

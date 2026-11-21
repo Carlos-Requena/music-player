@@ -25,8 +25,11 @@ Item {
         anchors.fill: parent
         radius: height / 2
         color: root.primary ? Theme.text : (hover.hovered ? Theme.controlActive : Theme.control)
-        border.width: root.activeFocus ? 2 : 0
-        border.color: Theme.accent
+    }
+
+    FocusRing {
+        shown: root.activeFocus
+        corner: height / 2
     }
 
     Row {
@@ -47,7 +50,7 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             text: root.text
             color: root.primary ? Theme.ground : Theme.text
-            font.pixelSize: 14
+            font.pixelSize: Theme.fontBase
             font.weight: Font.DemiBold
         }
     }

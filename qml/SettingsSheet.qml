@@ -36,6 +36,9 @@ Item {
         { cat: "reproduccion", key: "historial", label: "Registrar en YouTube Music",
           hint: "Con sesión, lo que escuchas cuenta como reproducción: entra en tu historial y tus recomendaciones, y suma para el artista. No retrasa el arranque. YouTube puede pausar otro dispositivo que suene a la vez con tu cuenta.",
           fallback: "si", options: [{ id: "si", label: "Activado" }, { id: "no", label: "Desactivado" }] },
+        { cat: "reproduccion", key: "clic", label: "Clic en una canción",
+          hint: "En el Muro, el detalle, la cola y la temporal. Doble clic: un clic elige y el doble abre o hace sonar. Un clic: abre o suena al momento, y el nombre de lo que está bajo el ratón sale abajo.",
+          fallback: "doble", options: [{ id: "doble", label: "Doble clic" }, { id: "uno", label: "Un clic" }] },
         { cat: "reproduccion", key: "ytdlp", label: "yt-dlp residente", hint: "Suena ~1 s antes; ocupa ~120 MB mientras navegas.", fallback: "si",
           options: [{ id: "si", label: "Activado" }, { id: "no", label: "Desactivado" }] },
         { cat: "apariencia", key: "ambiente", label: "Modo ambiente",
@@ -53,6 +56,9 @@ Item {
           fallback: "no", options: [{ id: "no", label: "No" }, { id: "si", label: "Sí" }] },
         { cat: "apariencia", key: "desenfoque", label: "Desenfoque", hint: "Desactivarlo ahorra memoria y batería.", fallback: "si",
           options: [{ id: "si", label: "Activado" }, { id: "no", label: "Desactivado" }] },
+        { cat: "apariencia", key: "esquinas", label: "Esquinas de las carátulas",
+          hint: "Redondeadas: con el radio de la skin. Los artistas van siempre en círculo.",
+          fallback: "redondeadas", options: [{ id: "redondeadas", label: "Redondeadas" }, { id: "cuadradas", label: "Cuadradas" }] },
         { cat: "apariencia", key: "barra", label: "Barra de reproducción",
           hint: "Clásica: la posición bajo los botones. Compacta: más baja, la posición arriba.",
           fallback: "islas", options: [{ id: "islas", label: "Islas" }, { id: "clasica", label: "Clásica" }, { id: "compacta", label: "Compacta" }] },
@@ -83,10 +89,24 @@ Item {
           hint: "ListenBrainz: tus listas semanales y recomendaciones (conecta tu cuenta en Plugins). YouTube Music: novedades, listas de éxitos y ánimos.",
           fallback: "listenbrainz", options: [{ id: "listenbrainz", label: "ListenBrainz" }, { id: "youtube", label: "YouTube Music" }] },
         { cat: "vistas", key: "caratulas", label: "Carátulas del Muro", fallback: "medianas",
-          options: [{ id: "pequenas", label: "Pequeñas" }, { id: "medianas", label: "Medianas" }, { id: "grandes", label: "Grandes" }] }
+          options: [{ id: "pequenas", label: "Pequeñas" }, { id: "medianas", label: "Medianas" }, { id: "grandes", label: "Grandes" }] },
+        { cat: "vistas", key: "brillo", label: "Brillo al pasar el ratón",
+          hint: "Las carátulas del Muro y las tarjetas de Explorar crecen y brillan con el color de su carátula. Con el teclado, la elegida sigue marcada.",
+          fallback: "si", options: [{ id: "si", label: "Activado" }, { id: "no", label: "Desactivado" }] }
     ]
 
     Keys.onEscapePressed: root.closed()
+
+    // Modo compacto (`Theme.compactSettings`): las descripciones no ocupan sitio en las filas; la
+    // de la fila bajo el ratón sale en el pie de la hoja, sin mover nada.
+    readonly property bool compact: Theme.compactSettings
+    property string hint: ""
+    function showHint(text, on) {
+        if (on)
+            hint = text || ""
+        else if (hint === text)
+            hint = ""
+    }
 
     function scrollTo(y) {
         settingsFlick.contentY = Math.max(0, Math.min(y, settingsFlick.contentHeight - settingsFlick.height))
@@ -96,76 +116,20 @@ Item {
         settingsFlick.contentY = Math.max(0, settingsFlick.contentHeight - settingsFlick.height)
     }
 
-    component Segmented: Rectangle {
-        id: seg
+    // Segmentos de un valor (regla de dos: lo elegido, en vidrio claro).
+    component Segmented: Tabs {
         property var options: []
         property string value
-        signal picked(string id)
 
         width: 380
-        height: Theme.hit + 8
-        radius: 14
-        color: Qt.rgba(0, 0, 0, 0.3)
-
-        Row {
-            anchors.fill: parent
-            anchors.margins: 4
-            spacing: 4
-
-            Repeater {
-                model: seg.options
-
-                Item {
-                    id: option
-                    required property var modelData
-                    readonly property bool chosen: modelData.id === seg.value
-
-                    width: (seg.width - 8 - 4 * (seg.options.length - 1)) / seg.options.length
-                    height: Theme.hit
-                    activeFocusOnTab: true
-
-                    Accessible.role: Accessible.RadioButton
-                    Accessible.name: modelData.label
-                    Accessible.checked: chosen
-                    Accessible.onPressAction: seg.picked(modelData.id)
-                    Keys.onReturnPressed: seg.picked(modelData.id)
-
-                    Rectangle {
-                        anchors.fill: parent
-                        radius: 10
-                        color: option.chosen ? Theme.controlActive : (optionHover.hovered ? Theme.control : "transparent")
-                        border.width: option.activeFocus ? 2 : 0
-                        border.color: Theme.text
-                    }
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: option.modelData.label
-                        color: option.chosen ? Theme.text : Theme.textMuted
-                        font.pixelSize: 14
-                        font.weight: option.chosen ? Font.DemiBold : Font.Normal
-                    }
-
-                    HoverHandler {
-                        id: optionHover
-                        cursorShape: Qt.PointingHandCursor
-                    }
-
-                    TapHandler {
-                        onTapped: seg.picked(option.modelData.id)
-                    }
-                }
-            }
-        }
+        tabs: options
+        current: value
+        navigate: false
+        fill: true
+        well: true
     }
 
-    component Heading: Text {
-        color: Theme.textMuted
-        font.pixelSize: 11
-        font.weight: Font.DemiBold
-        font.letterSpacing: 1.8
-        font.capitalization: Font.AllUppercase
-    }
+    component Heading: SectionLabel {}
 
     // Encabezado con dos botones a la derecha: abrir la carpeta del usuario y recargar.
     component FolderHeading: Item {
@@ -180,7 +144,6 @@ Item {
         Heading {
             anchors.verticalCenter: parent.verticalCenter
             text: folderHeading.text
-            font.pixelSize: 12
         }
 
         Row {
@@ -210,7 +173,7 @@ Item {
         y: target.y - 5
         width: target.width + 10
         height: target.height + 10
-        radius: (target.radius || 12) + 5
+        radius: (target.radius || Theme.radiusM) + 5
         color: "transparent"
         border.width: 2
         border.color: Theme.text
@@ -225,15 +188,16 @@ Item {
         property bool hovered: false
 
         readonly property var colors: skin.colores || {}
-        readonly property color ink: colors.textoSecundario || "#BDFFFFFF"
+        // Lo que falte en la skin, como en `Theme.pick`: el valor de Vidrio.
+        readonly property color ink: colors.textoSecundario || "#BDFFFFFF" // fijo: valor de Vidrio
         readonly property real unit: width / 225
         readonly property real round: (skin.radio !== undefined ? skin.radio : 20) * unit
         function tone(alpha) {
             return Qt.tint(color, Qt.rgba(ink.r, ink.g, ink.b, alpha))
         }
 
-        radius: 12
-        color: colors.fondo || "#0A0C11"
+        radius: Theme.radiusM
+        color: colors.fondo || "#0A0C11" // fijo: valor de Vidrio
         border.width: 1
         border.color: hovered ? Theme.textFaint : (colors.bordeVidrio || Theme.glassBorder)
         clip: true
@@ -297,7 +261,7 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        color: Qt.rgba(0.02, 0.03, 0.05, 0.55)
+        color: Theme.scrim
     }
 
     // La rueda no llega al escenario: la lista de opciones la usa si puede desplazarse y, si no
@@ -307,6 +271,14 @@ Item {
         anchors.fill: parent
         acceptedButtons: Qt.NoButton
         onWheel: wheel => wheel.accepted = true
+    }
+
+    // Con Opciones abierta, el ratón no llega a lo de debajo: sin esto el Muro seguía brillando y
+    // cambiando el nombre de abajo, y la navegación iluminaba sus pestañas a través del velo. Lo de
+    // la hoja va encima y sigue reaccionando.
+    HoverHandler {
+        blocking: true
+        cursorShape: Qt.ArrowCursor
     }
 
     // Un toque fuera de la hoja la cierra. Con agarre exclusivo (`ReleaseWithinBounds`) y todos
@@ -331,7 +303,7 @@ Item {
         width: Math.min(980, parent.width - 80)
         // Alto fijo: no da saltos al cambiar de categoría.
         height: Math.min(760, parent.height - 48)
-        radius: 24
+        radius: Theme.radiusL
         tint: Theme.glassStrong
         backdrop: root.backdrop
 
@@ -346,16 +318,31 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 text: "Opciones"
                 color: Theme.text
-                font.pixelSize: 30
+                font.pixelSize: Theme.fontTitle
                 font.weight: Font.Bold
             }
 
-            IconButton {
+            Row {
                 anchors.right: parent.right
-                icon: Theme.iconClose
-                label: "Cerrar"
-                solid: true
-                onClicked: root.closed()
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 12
+
+                // Hoja compacta: sin descripciones a la vista (salen en el pie al pasar el ratón).
+                Segmented {
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 230
+                    options: [{ id: "no", label: "Normal" }, { id: "si", label: "Compacta" }]
+                    value: root.compact ? "si" : "no"
+                    onPicked: id => AppSettings.setOpcion("compacto", id)
+                }
+
+                IconButton {
+                    anchors.verticalCenter: parent.verticalCenter
+                    icon: Theme.iconClose
+                    label: "Cerrar"
+                    solid: true
+                    onClicked: root.closed()
+                }
             }
         }
 
@@ -371,60 +358,14 @@ Item {
             Keys.onUpPressed: root.stepCategory(-1)
             Keys.onDownPressed: root.stepCategory(1)
 
-            Repeater {
-                model: root.categories
-
-                Item {
-                    id: catItem
-                    required property var modelData
-                    readonly property bool chosen: modelData.id === root.category
-
-                    width: sidebar.width
-                    height: Theme.hit
-                    activeFocusOnTab: true
-
-                    Accessible.role: Accessible.PageTab
-                    Accessible.name: modelData.label
-                    Accessible.checked: chosen
-                    Accessible.onPressAction: root.category = modelData.id
-                    Keys.onReturnPressed: root.category = modelData.id
-                    Keys.onSpacePressed: root.category = modelData.id
-
-                    Rectangle {
-                        anchors.fill: parent
-                        radius: 12
-                        color: catItem.chosen ? Theme.controlActive : (catHover.hovered ? Theme.control : "transparent")
-                        border.width: catItem.activeFocus ? 2 : 0
-                        border.color: Theme.text
-                    }
-
-                    Icon {
-                        x: 14
-                        anchors.verticalCenter: parent.verticalCenter
-                        path: catItem.modelData.icon
-                        size: 18
-                        color: catItem.chosen ? Theme.text : Theme.textMuted
-                    }
-
-                    Text {
-                        x: 44
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: catItem.modelData.label
-                        color: catItem.chosen ? Theme.text : Theme.textMuted
-                        font.pixelSize: 15
-                        font.weight: catItem.chosen ? Font.DemiBold : Font.Normal
-                    }
-
-                    HoverHandler {
-                        id: catHover
-                        cursorShape: Qt.PointingHandCursor
-                    }
-
-                    TapHandler {
-                        gesturePolicy: TapHandler.ReleaseWithinBounds
-                        onTapped: root.category = catItem.modelData.id
-                    }
-                }
+            Tabs {
+                width: parent.width
+                vertical: true
+                navigate: true
+                fontSize: Theme.fontBody
+                tabs: root.categories
+                current: root.category
+                onPicked: id => root.category = id
             }
         }
 
@@ -443,7 +384,7 @@ Item {
             x: sidebar.x + sidebar.width + 34
             anchors.top: sidebar.top
             anchors.bottom: parent.bottom
-            anchors.bottomMargin: 24
+            anchors.bottomMargin: root.compact ? 24 + hintBar.height : 24
             width: parent.width - x - 26
             contentWidth: width
             contentHeight: content.implicitHeight + 12
@@ -455,7 +396,7 @@ Item {
             x: 6
             y: 6
             width: settingsFlick.width - 12
-            spacing: 26
+            spacing: root.compact ? 18 : 26
 
             Column {
                 visible: root.category === "cuenta"
@@ -489,7 +430,7 @@ Item {
                             width: parent.width
                             text: Account.signedIn ? Account.name : "Sin sesión"
                             color: Theme.text
-                            font.pixelSize: 17
+                            font.pixelSize: Theme.fontBody
                             font.weight: Font.DemiBold
                             elide: Text.ElideRight
                         }
@@ -502,56 +443,25 @@ Item {
                                   ? "Entra con tu cuenta de Google para ver tu biblioteca, tus playlists y tus «Me gusta»."
                                   : "Usa la sesión de YouTube Music que ya tienes abierta en tu navegador."
                             color: Theme.textMuted
-                            font.pixelSize: 13
+                            font.pixelSize: Theme.fontSmall
                             wrapMode: Text.WordWrap
                         }
                     }
 
-                    Rectangle {
+                    PillButton {
                         id: actionButton
                         anchors.right: parent.right
                         anchors.verticalCenter: parent.verticalCenter
-                        width: actionLabel.implicitWidth + 40
-                        height: Theme.hit
-                        radius: height / 2
-                        color: Account.signedIn ? (actionHover.hovered ? Theme.controlActive : Theme.control) : Theme.text
-                        opacity: Account.busy ? 0.6 : 1
-                        border.width: activeFocus ? 2 : 0
-                        border.color: Theme.accent
-                        activeFocusOnTab: true
-
-                        function act() {
-                            if (Account.busy)
-                                return
+                        text: Account.busy ? "Conectando…" : (Account.signedIn ? "Cerrar sesión" : "Iniciar sesión")
+                        primary: !Account.signedIn
+                        enabled: !Account.busy
+                        onClicked: {
                             if (Account.signedIn)
                                 Account.signOut()
                             else if (accountSection.webLogin)
                                 Account.signInWeb()
                             else
                                 Account.signIn()
-                        }
-
-                        Accessible.role: Accessible.Button
-                        Accessible.name: actionLabel.text
-                        Accessible.onPressAction: act()
-                        Keys.onReturnPressed: act()
-
-                        Text {
-                            id: actionLabel
-                            anchors.centerIn: parent
-                            text: Account.busy ? "Conectando…" : (Account.signedIn ? "Cerrar sesión" : "Iniciar sesión")
-                            color: Account.signedIn ? Theme.text : Theme.ground
-                            font.pixelSize: 14
-                            font.weight: Font.DemiBold
-                        }
-
-                        HoverHandler {
-                            id: actionHover
-                            cursorShape: Qt.PointingHandCursor
-                        }
-
-                        TapHandler {
-                            onTapped: actionButton.act()
                         }
                     }
                 }
@@ -565,7 +475,7 @@ Item {
                         anchors.verticalCenter: parent.verticalCenter
                         text: "Navegador"
                         color: Theme.text
-                        font.pixelSize: 15
+                        font.pixelSize: Theme.fontBody
                         font.weight: Font.DemiBold
                     }
 
@@ -589,8 +499,8 @@ Item {
                              ? "macOS exige «Acceso total al disco» para leer los datos de Safari."
                              : "macOS puede pedir «Acceso total al disco» y permiso para la clave del navegador.")
                           : ""
-                    color: Account.message !== "" && !Account.busy ? Theme.accent : Theme.textMuted
-                    font.pixelSize: 13
+                    color: Account.message !== "" && !Account.busy ? Theme.error : Theme.textMuted
+                    font.pixelSize: Theme.fontSmall
                     wrapMode: Text.WordWrap
                 }
 
@@ -651,7 +561,7 @@ Item {
                             anchors.verticalCenter: parent.verticalCenter
                             text: sectionRow.modelData.label
                             color: Theme.text
-                            font.pixelSize: 15
+                            font.pixelSize: Theme.fontBody
                             font.weight: Font.DemiBold
                         }
 
@@ -665,9 +575,10 @@ Item {
                 }
 
                 Text {
+                    visible: !root.compact
                     text: "También puedes alternar la vista con el selector de arriba a la derecha o con la tecla V."
                     color: Theme.textMuted
-                    font.pixelSize: 13
+                    font.pixelSize: Theme.fontSmall
                 }
             }
 
@@ -687,8 +598,10 @@ Item {
                 }
 
                 Grid {
+                    id: skinGrid
                     width: parent.width
-                    columns: 4
+                    // Compacta: más pequeñas, seis por fila.
+                    columns: root.compact ? 6 : 4
                     columnSpacing: 16
                     rowSpacing: 20
 
@@ -700,7 +613,7 @@ Item {
                             required property var modelData
                             readonly property bool chosen: AppSettings.skin === modelData.id
 
-                            width: (skinSection.width - 3 * 16) / 4
+                            width: (skinSection.width - (skinGrid.columns - 1) * 16) / skinGrid.columns
                             height: preview.height + 10 + skinName.implicitHeight
                             activeFocusOnTab: true
 
@@ -732,7 +645,7 @@ Item {
                                 width: parent.width - 4
                                 text: skinCard.modelData.nombre
                                 color: Theme.text
-                                font.pixelSize: 15
+                                font.pixelSize: Theme.fontBody
                                 font.weight: Font.DemiBold
                                 elide: Text.ElideRight
                             }
@@ -753,7 +666,7 @@ Item {
                 // Descripción de la elegida: «Vidrio: paneles translúcidos…».
                 Text {
                     width: parent.width
-                    visible: text !== ""
+                    visible: text !== "" && !root.compact
                     text: {
                         const skin = skinSection.chosenSkin
                         if (!skin || !skin.descripcion)
@@ -761,7 +674,7 @@ Item {
                         return skin.nombre + ": " + skin.descripcion.charAt(0).toLowerCase() + skin.descripcion.slice(1)
                     }
                     color: Theme.textMuted
-                    font.pixelSize: 14
+                    font.pixelSize: Theme.fontSmall
                     wrapMode: Text.WordWrap
                 }
             }
@@ -776,8 +689,8 @@ Item {
 
                 readonly property var mascots: [{ id: "", nombre: "Ninguna", imagen: "" }]
                     .concat(Catalog.parse(AppSettings.mascotas))
-                readonly property real tileWidth: 104
-                readonly property real tileHeight: 78
+                readonly property real tileWidth: root.compact ? 80 : 104
+                readonly property real tileHeight: root.compact ? 60 : 78
 
                 function openFolder() {
                     Qt.openUrlExternally("file://" + encodeURI(AppSettings.carpetaMascotas()))
@@ -817,7 +730,7 @@ Item {
                                 id: tile
                                 width: parent.width
                                 height: mascotSection.tileHeight
-                                radius: 14
+                                radius: Theme.radiusM
                                 color: mascotHover.hovered ? Theme.controlActive : Theme.control
                                 border.width: 1
                                 border.color: Theme.glassBorder
@@ -849,7 +762,7 @@ Item {
                                 width: parent.width - 4
                                 text: mascotCard.modelData.nombre
                                 color: Theme.text
-                                font.pixelSize: 15
+                                font.pixelSize: Theme.fontBody
                                 font.weight: Font.DemiBold
                                 elide: Text.ElideRight
                             }
@@ -887,10 +800,13 @@ Item {
 
                             Rectangle {
                                 anchors.fill: parent
-                                radius: 14
+                                radius: Theme.radiusM
                                 color: addHover.hovered ? Theme.control : "transparent"
-                                border.width: addMascot.activeFocus ? 2 : 0
-                                border.color: Theme.text
+
+                                FocusRing {
+                                    shown: addMascot.activeFocus
+                                    corner: parent.radius
+                                }
                             }
 
                             Shape {
@@ -907,7 +823,7 @@ Item {
                                         y: 1
                                         width: addTile.width - 2
                                         height: addTile.height - 2
-                                        radius: 13
+                                        radius: Theme.radiusM - 1
                                     }
                                 }
                             }
@@ -927,7 +843,7 @@ Item {
                             x: 4
                             text: "Añadir…"
                             color: Theme.textMuted
-                            font.pixelSize: 15
+                            font.pixelSize: Theme.fontBody
                         }
 
                         HoverHandler {
@@ -946,12 +862,12 @@ Item {
             // Filas de opciones sueltas de la categoría elegida (ver `optionRows`).
             Column {
                 readonly property var rows: root.optionRows.filter(row => row.cat === root.category)
-                readonly property var headings: ({ reproduccion: "Audio", apariencia: "Aspecto", vistas: "Disposición" })
+                readonly property var headings: ({ reproduccion: "Reproducción", apariencia: "Aspecto", vistas: "Disposición" })
 
                 id: optionSection
                 visible: rows.length > 0
                 width: parent.width
-                spacing: 12
+                spacing: root.compact ? 4 : 12
 
                 Heading { text: optionSection.headings[root.category] || "" }
 
@@ -968,7 +884,11 @@ Item {
                         }
 
                         width: parent.width
-                        height: Math.max(Theme.hit + 8, labels.implicitHeight)
+                        height: Math.max(root.compact ? Theme.hit + 4 : Theme.hit + 8, labels.implicitHeight)
+
+                        HoverHandler {
+                            onHoveredChanged: root.showHint(layoutRow.modelData.hint, hovered)
+                        }
 
                         Column {
                             id: labels
@@ -980,17 +900,17 @@ Item {
                                 width: parent.width
                                 text: layoutRow.modelData.label
                                 color: Theme.text
-                                font.pixelSize: 15
+                                font.pixelSize: Theme.fontBody
                                 font.weight: Font.DemiBold
                                 wrapMode: Text.WordWrap
                             }
 
                             Text {
                                 width: parent.width
-                                visible: layoutRow.modelData.hint !== undefined
+                                visible: layoutRow.modelData.hint !== undefined && !root.compact
                                 text: layoutRow.modelData.hint || ""
                                 color: Theme.textMuted
-                                font.pixelSize: 12
+                                font.pixelSize: Theme.fontSmall
                                 wrapMode: Text.WordWrap
                             }
                         }
@@ -1022,7 +942,7 @@ Item {
                     width: pluginSection.width
                     visible: text !== ""
                     color: Theme.textMuted
-                    font.pixelSize: 13
+                    font.pixelSize: Theme.fontSmall
                     wrapMode: Text.WordWrap
                 }
 
@@ -1034,7 +954,11 @@ Item {
                     signal changed(bool on)
 
                     width: pluginSection.width
-                    height: Theme.hit + 8
+                    height: root.compact ? Theme.hit + 4 : Theme.hit + 8
+
+                    HoverHandler {
+                        onHoveredChanged: root.showHint(toggle.hint, hovered)
+                    }
 
                     Column {
                         anchors.verticalCenter: parent.verticalCenter
@@ -1044,16 +968,16 @@ Item {
                         Text {
                             text: toggle.label
                             color: Theme.text
-                            font.pixelSize: 15
+                            font.pixelSize: Theme.fontBody
                             font.weight: Font.DemiBold
                         }
 
                         Text {
                             width: parent.width
-                            visible: toggle.hint !== ""
+                            visible: toggle.hint !== "" && !root.compact
                             text: toggle.hint
                             color: Theme.textMuted
-                            font.pixelSize: 12
+                            font.pixelSize: Theme.fontSmall
                             elide: Text.ElideRight
                         }
                     }
@@ -1332,8 +1256,8 @@ Item {
                     Rectangle {
                         width: parent.width
                         height: 210
-                        radius: 14
-                        color: Qt.rgba(0, 0, 0, 0.3)
+                        radius: Theme.radiusM
+                        color: Theme.well
 
                         // Línea del 0 dB.
                         Rectangle {
@@ -1364,7 +1288,7 @@ Item {
                                         y: 8
                                         text: effects.label(band.gain)
                                         color: band.gain === 0 ? Theme.textMuted : Theme.text
-                                        font.pixelSize: 12
+                                        font.pixelSize: Theme.fontSmall
                                         font.weight: Font.DemiBold
                                     }
 
@@ -1389,7 +1313,7 @@ Item {
                                         anchors.bottomMargin: 10
                                         text: effects.freqs[band.index]
                                         color: Theme.textMuted
-                                        font.pixelSize: 12
+                                        font.pixelSize: Theme.fontSmall
                                     }
                                 }
                             }
@@ -1398,8 +1322,15 @@ Item {
                 }
 
                 Item {
+                    id: boostRow
                     width: parent.width
-                    height: Theme.hit + 8
+                    height: root.compact ? Theme.hit + 4 : Theme.hit + 8
+
+                    readonly property string hint: "Sube el volumen por encima del 100 % para pistas flojas (hasta +12 dB)."
+
+                    HoverHandler {
+                        onHoveredChanged: root.showHint(boostRow.hint, hovered)
+                    }
 
                     Column {
                         anchors.verticalCenter: parent.verticalCenter
@@ -1409,15 +1340,16 @@ Item {
                         Text {
                             text: "Amplificador de volumen"
                             color: Theme.text
-                            font.pixelSize: 15
+                            font.pixelSize: Theme.fontBody
                             font.weight: Font.DemiBold
                         }
 
                         Text {
                             width: parent.width
-                            text: "Sube el volumen por encima del 100 % para pistas flojas (hasta +12 dB)."
+                            visible: !root.compact
+                            text: boostRow.hint
                             color: Theme.textMuted
-                            font.pixelSize: 12
+                            font.pixelSize: Theme.fontSmall
                             wrapMode: Text.WordWrap
                         }
                     }
@@ -1442,12 +1374,30 @@ Item {
                         horizontalAlignment: Text.AlignRight
                         text: effects.boost === 0 ? "No" : "+" + effects.label(effects.boost).replace("+", "") + " dB"
                         color: effects.boost === 0 ? Theme.textMuted : Theme.text
-                        font.pixelSize: 14
+                        font.pixelSize: Theme.fontBase
                         font.weight: Font.DemiBold
                     }
                 }
             }
         }
+        }
+
+        // Pie de la hoja compacta: la descripción de la opción bajo el ratón.
+        Text {
+            id: hintBar
+            visible: root.compact
+            x: settingsFlick.x + 6
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: 18
+            width: settingsFlick.width - 12
+            height: root.compact ? 36 : 0
+            verticalAlignment: Text.AlignVCenter
+            text: root.hint !== "" ? root.hint : "Pasa el ratón por una opción para ver qué hace."
+            color: root.hint !== "" ? Theme.textMuted : Theme.textFaint
+            font.pixelSize: Theme.fontSmall
+            wrapMode: Text.WordWrap
+            maximumLineCount: 2
+            elide: Text.ElideRight
         }
     }
 }
