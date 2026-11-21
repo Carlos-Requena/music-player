@@ -34,37 +34,33 @@ QtObject {
     readonly property color error: pick("error", "#FF6B6B")
 
     // Opciones de disposición que afectan al aspecto (Opciones › Disposición).
-    readonly property int revision: AppSettings.revision
-    readonly property bool blur: { void revision; return AppSettings.opcion("desenfoque") !== "no" }
+    readonly property bool blur: AppSettings.opcion("desenfoque", AppSettings.revision) !== "no"
     // Letra: tamaño (factor), familia y grosor, de Opciones › Letra.
     readonly property real lyricsScale: {
-        void revision
-        const size = AppSettings.opcion("letraTamano")
+        const size = AppSettings.opcion("letraTamano", AppSettings.revision)
         return size === "pequena" ? 0.8 : size === "grande" ? 1.25 : size === "enorme" ? 1.5 : 1
     }
     readonly property string lyricsFamily: {
-        void revision
-        const family = AppSettings.opcion("letraFuente")
+        const family = AppSettings.opcion("letraFuente", AppSettings.revision)
         if (family === "serif")
             return Qt.platform.os === "osx" ? "Georgia" : "serif"
         if (family === "mono")
             return Qt.platform.os === "osx" ? "Menlo" : "monospace"
         return Qt.application.font.family
     }
-    readonly property int lyricsWeight: { void revision; return AppSettings.opcion("letraPeso") === "normal" ? Font.Medium : Font.Bold }
+    readonly property int lyricsWeight: AppSettings.opcion("letraPeso", AppSettings.revision) === "normal" ? Font.Medium : Font.Bold
 
     // Estilo de la barra de reproducción (Opciones › Apariencia): «islas» (tres piezas
     // sueltas), «clasica» (una barra, la posición bajo los botones) o «compacta» (más baja, la
     // posición como una línea arriba). La usan `PlayerBar` y el alto que reserva `Main`.
     readonly property string barStyle: {
-        void revision
-        const style = AppSettings.opcion("barra")
+        const style = AppSettings.opcion("barra", AppSettings.revision)
         return style === "clasica" || style === "compacta" ? style : "islas"
     }
     readonly property int barHeight: barStyle === "clasica" ? 84 : 64
 
     // Brillo al pasar el ratón por el Muro y las tarjetas de Explorar (opción `brillo`).
-    readonly property bool hoverGlow: { void revision; return AppSettings.opcion("brillo") !== "no" }
+    readonly property bool hoverGlow: AppSettings.opcion("brillo", AppSettings.revision) !== "no"
     // Color del brillo: el de la carátula (`TintProbe.tint`), aclarado para que brille también en
     // las oscuras; blanco si es gris.
     function glow(tint) {
@@ -72,7 +68,7 @@ QtObject {
                                : Qt.hsla(tint.hslHue, Math.max(0.5, tint.hslSaturation), Math.max(0.62, tint.hslLightness), 1)
     }
 
-    readonly property string ambientMode: { void revision; return AppSettings.opcion("ambiente") || "si" }
+    readonly property string ambientMode: AppSettings.opcion("ambiente", AppSettings.revision) || "si"
     readonly property bool ambientOn: ambientMode !== "no"
     // «Suave»: un solo color (el del elemento enfocado) y menos intensidad. Se ve mejor en
     // pantallas que muestran con escalones los degradados de varios colores.
@@ -86,7 +82,7 @@ QtObject {
     readonly property bool ambientFluid: ambientMode === "fluido"
     // Movimiento del ambiente (opción `ambienteMovimiento`): «no» (por defecto), «sonando» (solo
     // en la pantalla «Sonando») o «siempre». Ver `Ambient.drifting`.
-    readonly property string ambientMotion: { void revision; return AppSettings.opcion("ambienteMovimiento") || "no" }
+    readonly property string ambientMotion: AppSettings.opcion("ambienteMovimiento", AppSettings.revision) || "no"
     readonly property real ambient: ambientOn
         ? (skin.ambiente !== undefined ? skin.ambiente : 1) * (ambientMode === "tenue" ? 0.3 : ambientSingle ? 0.7 : 1)
         : 0
@@ -152,17 +148,17 @@ QtObject {
     // Carátulas (opción `esquinas`): «redondeadas» (por defecto) o «cuadradas». Las pequeñas
     // (filas, barra, mini) toman S y las grandes, M. Los artistas van siempre en círculo y los
     // objetos físicos (cajas de Lomos y Cubeta, Inspeccionar) siempre cuadrados.
-    readonly property bool roundCovers: { void revision; return AppSettings.opcion("esquinas") !== "cuadradas" }
+    readonly property bool roundCovers: AppSettings.opcion("esquinas", AppSettings.revision) !== "cuadradas"
     function coverRadius(side) {
         return roundCovers ? (side >= 120 ? radiusM : radiusS) : 0
     }
 
     // Clic en una fila de canción (opción `clic`): «doble» (por defecto: un clic la elige y el
     // doble la hace sonar) o «uno» (un clic la hace sonar). Detalle, cola y temporal.
-    readonly property bool singleClick: { void revision; return AppSettings.opcion("clic") === "uno" }
+    readonly property bool singleClick: AppSettings.opcion("clic", AppSettings.revision) === "uno"
 
     // Hoja de Opciones compacta (su interruptor «Compacto»): sin descripciones a la vista.
-    readonly property bool compactSettings: { void revision; return AppSettings.opcion("compacto") === "si" }
+    readonly property bool compactSettings: AppSettings.opcion("compacto", AppSettings.revision) === "si"
 
     // Velo de lo que tapa el escenario (detalle, Opciones, Inspeccionar) y pozo oscuro de las
     // pestañas, los segmentos y los campos de texto.

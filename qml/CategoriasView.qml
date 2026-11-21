@@ -30,8 +30,7 @@ FocusScope {
 
     // Opciones › Carátulas del Muro, con tarjetas más grandes que las carátulas del Muro.
     readonly property int cols: {
-        void AppSettings.revision
-        const size = AppSettings.opcion("caratulas")
+        const size = AppSettings.opcion("caratulas", AppSettings.revision)
         return size === "pequenas" ? 5 : size === "grandes" ? 3 : 4
     }
     readonly property real margin: Theme.margin

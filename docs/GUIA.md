@@ -586,10 +586,10 @@ Ejemplo: una opción «Mostrar segundos en la barra» (sí/no).
    Con eso ya aparece la fila y se guarda sola (en `settings.json`, vía
    `AppSettings.setOpcion`). No hace falta tocar Rust. Compruébalo con
    `--shot /tmp/o.png --settings-cat vistas`.
-2. Léela donde la uses. El `void AppSettings.revision` hace que el binding se recalcule
-   cuando cambie cualquier opción:
+2. Léela donde la uses. El segundo argumento, `AppSettings.revision`, hace que el binding se
+   recalcule cuando cambie cualquier opción (Rust no lo usa: está para que QML lo lea):
    ```qml
-   readonly property bool segundos: { void AppSettings.revision; return AppSettings.opcion("segundos") !== "no" }
+   readonly property bool segundos: AppSettings.opcion("segundos", AppSettings.revision) !== "no"
    ```
    Si la van a usar varios archivos, ponla en `Theme.qml`.
 

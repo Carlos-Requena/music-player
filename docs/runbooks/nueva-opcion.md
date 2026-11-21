@@ -11,11 +11,11 @@ una nueva no toca Rust salvo que Rust tenga que reaccionar a ella. Explicado con
 2. **La fila**, en `optionRows` de `qml/SettingsSheet.qml`, con su categoría (`cat`:
    `reproduccion`, `apariencia` o `vistas`), `label`, `hint` si hace falta, `fallback` (el valor por
    defecto) y `options`.
-3. **Leerla** donde se use, con `void AppSettings.revision` delante para que el enlace se
-   actualice:
+3. **Leerla** donde se use, pasando `AppSettings.revision` como segundo argumento para que el
+   enlace se actualice al cambiarla (sin él, QML da error: el argumento es obligatorio):
 
    ```qml
-   readonly property bool segundos: { void AppSettings.revision; return AppSettings.opcion("segundos") !== "no" }
+   readonly property bool segundos: AppSettings.opcion("segundos", AppSettings.revision) !== "no"
    ```
 
    Vacío es el valor por defecto. Si la usan varios archivos, en `Theme.qml`.

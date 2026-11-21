@@ -31,12 +31,11 @@ FocusScope {
     //   conjunto va centrado: el margen exterior es el mismo a los dos lados.
     // - «clasica»: carátula con su título debajo, con el borde derecho algo pasado el centro, y
     //   la letra o la cola anchas, del borde de arriba a la barra.
-    readonly property bool big: { void AppSettings.revision; return AppSettings.opcion("sonando") !== "clasica" }
+    readonly property bool big: AppSettings.opcion("sonando", AppSettings.revision) !== "clasica"
     // Título y artista bajo la carátula (opción `sonandoTitulo`): «auto» (por defecto) los pone
     // solo en la Clásica; «si» y «no», en las dos disposiciones.
     readonly property bool showTitle: {
-        void AppSettings.revision
-        const mode = AppSettings.opcion("sonandoTitulo")
+        const mode = AppSettings.opcion("sonandoTitulo", AppSettings.revision)
         return mode === "si" ? true : mode === "no" ? false : !big
     }
     // Alto que ocupa el título bajo la carátula (en «grande», se le quita a la carátula).
@@ -75,7 +74,7 @@ FocusScope {
     // agranda: si el original es menor, llega el original. Los vídeos (i.ytimg.com) no tienen
     // carátula cuadrada: en vez de su miniatura pequeña (con bandas negras), su fotograma a
     // 1280×720 (`hq720`); si no lo tiene, se queda la miniatura de debajo.
-    readonly property bool maxCover: { void AppSettings.revision; return AppSettings.opcion("caratulaCalidad") !== "alta" }
+    readonly property bool maxCover: AppSettings.opcion("caratulaCalidad", AppSettings.revision) !== "alta"
     readonly property real dpr: Screen.devicePixelRatio > 0 ? Screen.devicePixelRatio : 1
     readonly property int bigPixels: maxCover
         ? Math.max(1200, Math.min(2400, Math.ceil(root.art * dpr / 400) * 400))
@@ -90,7 +89,7 @@ FocusScope {
     // Carátula animada de Apple Music (opción `caratulaAnimada`, desactivada por defecto): con la
     // pantalla a la vista se pide la de lo que suena (`Player.buscarAnimada`, que no repite una
     // pista ya pedida) y, si llega, un vídeo en bucle tapa la carátula fija.
-    readonly property bool animated: { void AppSettings.revision; return AppSettings.opcion("caratulaAnimada") === "si" }
+    readonly property bool animated: AppSettings.opcion("caratulaAnimada", AppSettings.revision) === "si"
     readonly property bool wantsAnimated: animated && root.visible && Player.title !== ""
     onWantsAnimatedChanged: if (wantsAnimated) Player.buscarAnimada()
     Connections {

@@ -624,11 +624,12 @@ Las opciones de disposición son un \emph{mapa de texto a texto}
 fila en \archivo{SettingsSheet.qml}. Vacío significa «valor por defecto». Es la ADR-11.
 
 La contrapartida: como cualquier opción puede cambiar, QML necesita un modo de enterarse. Cada
-\cod{set_opcion} sube \cod{revision}, y los enlaces escriben \cod{void AppSettings.revision}
-antes de leer la opción:
+\cod{set_opcion} sube \cod{revision}, y los enlaces la pasan como segundo argumento al leer la
+opción. Rust no la usa: está para que QML la lea y vuelva a evaluar el enlace cuando cambie.
+Un \cod{void AppSettings.revision} suelto no vale: el compilador de QML lo descarta.
 
 \begin{qml}
-readonly property bool blur: { void AppSettings.revision; return AppSettings.opcion("desenfoque") !== "no" }
+readonly property bool blur: AppSettings.opcion("desenfoque", AppSettings.revision) !== "no"
 \end{qml}
 
 \subsection{Guardar sin bloquear ni corromper}

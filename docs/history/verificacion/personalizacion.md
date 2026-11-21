@@ -5,6 +5,23 @@ son de cuando se escribieron. El estado actual está en su [ficha](../../areas/p
 
 Lo nuevo va arriba: añade una sección `## AAAA-MM-DD · qué se verificó` encima de las anteriores.
 
+## 2026-11-21 · Las opciones se aplican sin reiniciar (rama `fix/opciones`)
+
+- **Fallo:** `clic`, `barra`, `esquinas`, `compacto` y el resto de opciones leídas en `Theme.qml`
+  solo cambiaban al reiniciar. El compilador de QML descartaba el `void revision` de cada enlace
+  (en el C++ generado, `singleClick` no leía la revisión), así que no se volvía a evaluar.
+- **Cambio:** `AppSettings.opcion(clave, revision)` y `vista(seccion, revision)` piden la revisión
+  como argumento (Rust no la usa); los 31 enlaces con `void` pasan `AppSettings.revision`. Se quita
+  `Theme.revision`. Argumentos de depuración `--set clave valor` y `--set-vista vista` en
+  `Main.qml`, con una línea `opciones:` en la salida de `--shot`.
+- **Cómo:** release, `HOME` de pruebas, `MUSICPLAYER_SILENT=1`. En `master` (con el `--set` añadido
+  y una lectura a los 0,5 s): tras `--set clic uno` y `--set barra compacta`, los valores seguían en
+  `doble` e `islas` hasta la ejecución siguiente; `panel` sí cambiaba. Con el arreglo, cada
+  `--set` (clic, barra, esquinas, panel, compacto) y `--set-vista lomos` se aplica en la misma
+  ejecución. Capturas: Muro con esquinas cuadradas y Opciones en «Compacta» al momento.
+- **No verificado:** pulsar las opciones con el ratón de verdad (el `--set` llama a la misma
+  `setOpcion`); Linux; las demás opciones una por una (el cambio es el mismo en todas).
+
 ## 2026-11-21 · Sin «hover» bajo Opciones (en `master`)
 
 - **Cambio:** `HoverHandler { blocking: true }` en la capa de `SettingsSheet.qml`.

@@ -38,8 +38,12 @@ pub mod qobject {
         type AppSettings = super::AppSettingsRust;
 
         /// Valor de una opción de disposición ("" si no se ha elegido).
+        ///
+        /// `revision` no se usa: se pide para que cada vinculación de QML lea
+        /// `AppSettings.revision` y se recalcule al cambiar una opción. Un `void AppSettings.revision`
+        /// suelto no sirve: el compilador de QML lo descarta (ver TRAMPAS).
         #[qinvokable]
-        fn opcion(self: &AppSettings, clave: &QString) -> QString;
+        fn opcion(self: &AppSettings, clave: &QString, revision: i32) -> QString;
 
         /// Cambia una opción de disposición y guarda.
         #[qinvokable]
@@ -65,9 +69,10 @@ pub mod qobject {
         #[qinvokable]
         fn carpeta_skins(self: &AppSettings) -> QString;
 
-        /// Devuelve la vista ("muro", "lomos" o "cubeta") de una sección.
+        /// Devuelve la vista ("muro", "lomos" o "cubeta") de una sección. `revision`, como en
+        /// `opcion`.
         #[qinvokable]
-        fn vista(self: &AppSettings, seccion: &QString) -> QString;
+        fn vista(self: &AppSettings, seccion: &QString, revision: i32) -> QString;
 
         /// Cambia la vista de una sección y guarda las preferencias.
         #[qinvokable]
@@ -354,7 +359,7 @@ impl Default for AppSettingsRust {
 }
 
 impl qobject::AppSettings {
-    fn vista(&self, seccion: &QString) -> QString {
+    fn vista(&self, seccion: &QString, _revision: i32) -> QString {
         let seccion = seccion.to_string();
         let chosen = self.vistas.get(&seccion).map(String::as_str).or_else(|| {
             DEFAULT_VIEWS.iter().find(|(name, _)| *name == seccion).map(|(_, view)| *view)
@@ -369,7 +374,7 @@ impl qobject::AppSettings {
         self.save();
     }
 
-    fn opcion(&self, clave: &QString) -> QString {
+    fn opcion(&self, clave: &QString, _revision: i32) -> QString {
         QString::from(self.opciones.get(&clave.to_string()).map(String::as_str).unwrap_or(""))
     }
 

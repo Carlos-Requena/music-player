@@ -20,6 +20,11 @@ que toque **antes** de cambiar algo ahí. Una trampa nueva se añade en su secci
 - **Un menú que cambia de entradas al abrirse** tiene aún el alto anterior al colocarlo, y
   `Qt.callLater` no siempre basta: recoloca en `onHeightChanged` (`ContextMenu.anchorPoint`).
 
+- **`void prop` no crea dependencia en el QML compilado:** el compilador de QML (qmlcachegen)
+  descarta una lectura cuyo valor no se usa, así que `{ void AppSettings.revision; return
+  AppSettings.opcion("clic") }` no se volvía a evaluar y las opciones solo se aplicaban al
+  reiniciar. La dependencia tiene que ser un valor usado: `AppSettings.opcion("clic",
+  AppSettings.revision)`. Se ve en el C++ generado (`target/release/build/musicplayer-*/out/qmlcachegen/`).
 - **`font.pixelSize` es entero:** `12.5` hace fallar la carga del componente entero.
 - **`cargo build` no comprueba el QML:** quitar una propiedad que otro archivo escucha
   (`onTituloChanged` en Lomos) compila sin avisos y la ventana no carga («Type LomosView

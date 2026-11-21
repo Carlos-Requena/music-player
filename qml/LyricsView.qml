@@ -49,7 +49,7 @@ Item {
     property bool showTiming: true
     // Cada renglón centrado en la zona de la letra (opción `letraAlineacion`, por defecto) o
     // pegado a la izquierda.
-    readonly property bool centered: { void AppSettings.revision; return AppSettings.opcion("letraAlineacion") !== "izquierda" }
+    readonly property bool centered: AppSettings.opcion("letraAlineacion", AppSettings.revision) !== "izquierda"
     // Altura (0 arriba, 1 abajo) donde queda la línea que suena: centrada también en vertical
     // (lo pidió el propietario) o, a la izquierda, al 37 % como Better Lyrics.
     property real anchorRatio: centered ? 0.5 : 0.37
@@ -57,7 +57,7 @@ Item {
     readonly property var lines: Catalog.lyrics
 
     // Líneas sin tiempo por palabra: entera de golpe (por defecto) o barrido estimado.
-    readonly property bool estimate: { void AppSettings.revision; return AppSettings.opcion("letraSinTiempos") === "estimado" }
+    readonly property bool estimate: AppSettings.opcion("letraSinTiempos", AppSettings.revision) === "estimado"
     // Japonés, chino y coreano: no separan las palabras con espacios y se puede partir el
     // renglón entre dos caracteres cualesquiera.
     readonly property var cjk: /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uac00-\ud7af\uff66-\uff9f]/
@@ -115,11 +115,10 @@ Item {
     }
     // Modo de la letra (ver arriba). La opción vieja «letraAnimada: ligera» equivale a «bajo».
     readonly property string mode: {
-        void AppSettings.revision
-        const chosen = AppSettings.opcion("letraCalidad")
+        const chosen = AppSettings.opcion("letraCalidad", AppSettings.revision)
         if (chosen === "calidad" || chosen === "bajo")
             return chosen
-        return chosen === "" && AppSettings.opcion("letraAnimada") === "ligera" ? "bajo" : "equilibrado"
+        return chosen === "" && AppSettings.opcion("letraAnimada", AppSettings.revision) === "ligera" ? "bajo" : "equilibrado"
     }
     readonly property bool quality: mode === "calidad"
     readonly property bool low: mode === "bajo"

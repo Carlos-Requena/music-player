@@ -11,7 +11,7 @@ Window {
     // El historial cambia al escuchar: se vuelve a pedir cada vez que se abre su sección.
     onSectionChanged: if (section === "historial") Library.loadHistorial()
     // Fuente de Explorar (ListenBrainz o YouTube Music): al cambiarla se vuelve a cargar.
-    readonly property string explorarFuente: { void AppSettings.revision; return AppSettings.opcion("explorarFuente") }
+    readonly property string explorarFuente: AppSettings.opcion("explorarFuente", AppSettings.revision)
     onExplorarFuenteChanged: Library.load()
     property bool settingsOpen: false
     property bool inspecting: false
@@ -26,14 +26,13 @@ Window {
     readonly property bool showPanel: lyricsOn && width >= 1280
     readonly property real panelWidth: 344
     // Opciones › Disposición: el panel de letra a la derecha (por defecto) o a la izquierda.
-    readonly property bool panelLeft: { void AppSettings.revision; return AppSettings.opcion("panel") === "izquierda" }
+    readonly property bool panelLeft: AppSettings.opcion("panel", AppSettings.revision) === "izquierda"
     readonly property real panelX: panelLeft ? Theme.gap : width - panelWidth - Theme.gap
     readonly property real stageX: showPanel && panelLeft ? panelWidth + 2 * Theme.gap : 0
     readonly property real stageWidth: showPanel ? width - panelWidth - 2 * Theme.gap : width
     readonly property real barHeight: Theme.barHeight
     readonly property string view: {
-        void AppSettings.revision
-        return AppSettings.vista(section)
+        return AppSettings.vista(section, AppSettings.revision)
     }
 
     // Depuración: `--shot ruta.png [--delay ms] [--section id] [--index n] [--search texto]
@@ -261,6 +260,21 @@ Window {
         onTriggered: win.args.indexOf("--mini") >= 0 ? win.restoreFromMini() : win.showNormal()
     }
 
+    // Depuración: `--set clave valor` cambia esa opción al segundo de arrancar, como en Opciones
+    // (comprobar que se aplica sin reiniciar). `--set-vista vista` hace lo mismo con la vista de
+    // la sección.
+    Timer {
+        interval: 1000
+        running: win.arg("--set") !== "" || win.arg("--set-vista") !== ""
+        onTriggered: {
+            const at = win.args.indexOf("--set")
+            if (at >= 0 && at + 2 < win.args.length)
+                AppSettings.setOpcion(win.args[at + 1], win.args[at + 2])
+            if (win.arg("--set-vista") !== "")
+                AppSettings.setVista(win.section, win.arg("--set-vista"))
+        }
+    }
+
     Timer {
         interval: win.arg("--delay") !== "" ? parseInt(win.arg("--delay")) : 1500
         running: win.arg("--shot") !== ""
@@ -268,6 +282,8 @@ Window {
             console.log("estado:", Player.title, "|", Player.artist, "| pos", Player.position.toFixed(1),
                         "| dur", Player.duration, "| cargando", Player.loading, "| sonando", Player.playing,
                         "| error", Player.error, "| tinte", playingProbe.tint, "| letra", Catalog.lyrics.length, "| cola", Catalog.parse(Player.queue).length, "| calidad", Player.calidad)
+            console.log("opciones: clic", Theme.singleClick ? "uno" : "doble", "| esquinas", Theme.roundCovers ? "redondeadas" : "cuadradas",
+                        "| barra", Theme.barStyle, "| vista", win.view, "| panel", win.panelLeft ? "izquierda" : "derecha")
             const target = miniPlayer.visible ? miniPlayer.contentItem : win.contentItem
             target.grabToImage(result => {
                 result.saveToFile(win.arg("--shot"))

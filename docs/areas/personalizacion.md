@@ -18,7 +18,10 @@ Vistas y Plugins. Cómo crear una skin o una mascota, para quien usa la app: [RE
   `<config>/musicplayer/skins/` (archivo JSON o carpeta con imagen de fondo). Cambiar de skin no
   necesita reiniciar.
 - **Opciones de disposición** genéricas (`AppSettings.opcion`/`setOpcion`), guardadas en
-  `<config>/musicplayer/settings.json`. Las de cada área están en el `opciones:` de su ficha; la
+  `<config>/musicplayer/settings.json`. Se aplican al momento, sin reiniciar: `setOpcion` y
+  `setVista` suben `AppSettings.revision`, y `opcion(clave, revision)` y `vista(seccion, revision)`
+  piden esa revisión como argumento para que cada enlace de QML dependa de ella (un `void`
+  suelto lo descarta el compilador de QML, ver [TRAMPAS](../TRAMPAS.md#qt-quick-y-qml)). Las de cada área están en el `opciones:` de su ficha; la
   tabla completa, en [INDEX](../INDEX.md#opciones).
 - **Modo ambiente** (`ambiente`): focos de color suaves, uno teñido por lo enfocado y otro por lo
   que suena. Vivo (por defecto), Suave y Tenue (un solo foco), **Plano** y No. **Plano**, por
@@ -163,8 +166,9 @@ Estas medidas se tomaron quitando a mano la condición de que suene música (You
 
 ## Estado actual
 
-- **Última verificación:** 2026-11-21, medidas comunes, color `error`, opciones `esquinas` y `compacto` ([historial](../history/verificacion/personalizacion.md)).
-- **Pruebas:** `preview_image` y `skins_list` en `cargo test`; capturas con `--settings-cat`.
+- **Última verificación:** 2026-11-21, las opciones se aplican sin reiniciar ([historial](../history/verificacion/personalizacion.md)).
+- **Pruebas:** `preview_image` y `skins_list` en `cargo test`; capturas con `--settings-cat`;
+  `--set clave valor` cambia una opción en marcha y la línea `opciones:` dice si se aplicó.
 - **Sin verificar:** que «Fluido» fluya bien a la vista (la CPU confirma que se redibuja, pero cada
   prueba sacaba otra canción y no se compararon dos fotogramas de la misma carátula); el fundido
   entre carátulas; «Fluido» en Linux (OpenGL/Vulkan) y en Windows; la deriva con música sonando de verdad (YouTube pedía sesión); en Linux;

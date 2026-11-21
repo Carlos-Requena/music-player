@@ -30,10 +30,10 @@ es el procedimiento vigente; esta guía lo explica con ejemplos.
   options: [{ id: "si", label: "Sí" }, { id: "no", label: "No" }] },
 \end{qml}
   Con eso la fila aparece y se guarda sola en \cod{settings.json}.
-  \item \textbf{Leerla.} Donde la uses, con \cod{void AppSettings.revision} delante: sin eso,
-  el enlace no se vuelve a evaluar al cambiar la opción.
+  \item \textbf{Leerla.} Donde la uses, con \cod{AppSettings.revision} como segundo argumento:
+  así el enlace se vuelve a evaluar al cambiar la opción.
 \begin{qml}
-readonly property bool segundos: { void AppSettings.revision; return AppSettings.opcion("segundos") !== "no" }
+readonly property bool segundos: AppSettings.opcion("segundos", AppSettings.revision) !== "no"
 \end{qml}
   Si la leen varios archivos, ponla en \archivo{Theme.qml}.
   \item \textbf{Documentarla.} Añade la clave al \cod{opciones:} de la ficha de su área y

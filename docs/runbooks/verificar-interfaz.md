@@ -49,6 +49,8 @@ HOME="$PRUEBA" MUSICPLAYER_SILENT=1 ./target/release/musicplayer \
 | `--settings-at y` | Abre las opciones desplazadas `y` píxeles |
 | `--minimize ms` | Minimiza la ventana tras ese tiempo; con `--hide` la oculta y con `--mini` abre el mini reproductor (la captura toma entonces el mini) |
 | `--restore ms` | (con `--minimize`) vuelve a la ventana grande tras ese tiempo; con `--mini`, como el botón del mini |
+| `--set clave valor` | Cambia esa opción al segundo de arrancar, como en Opciones; la línea `opciones:` de la salida dice si se aplicó sin reiniciar |
+| `--set-vista vista` | Lo mismo con la vista de la sección (`muro`, `lomos`, `cubeta`) |
 | `--now` | Arranca con la pantalla «Sonando» abierta |
 | `--tab id` | Abre esa pestaña del panel (`letra`, `cola`, `temporal`) |
 | `--temporal` | (con `--autoplay`) añade el elemento enfocado a la lista temporal y abre el menú sobre él |

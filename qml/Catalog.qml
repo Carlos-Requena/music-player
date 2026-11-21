@@ -40,8 +40,7 @@ QtObject {
     // las opciones (`retraso:<videoId>`). Positivo: la letra va más tarde.
     readonly property string currentVideoId: Player.index >= 0 && Player.index < queue.length ? queue[Player.index].videoId : ""
     readonly property real lyricsDelay: {
-        void AppSettings.revision
-        const stored = currentVideoId !== "" ? AppSettings.opcion("retraso:" + currentVideoId) : ""
+        const stored = currentVideoId !== "" ? AppSettings.opcion("retraso:" + currentVideoId, AppSettings.revision) : ""
         return stored !== "" ? parseFloat(stored) : 0
     }
     // Momento de la letra: la posición de la canción corregida con el retraso.
@@ -71,8 +70,8 @@ QtObject {
     function chooseLyrics() {
         const sources = lyricsSources
         let best = sources.length ? sources[0] : null
-        const wanted = [currentVideoId !== "" ? AppSettings.opcion("origen:" + currentVideoId) : "",
-                        AppSettings.opcion("letraOrigen")]
+        const wanted = [currentVideoId !== "" ? AppSettings.opcion("origen:" + currentVideoId, AppSettings.revision) : "",
+                        AppSettings.opcion("letraOrigen", AppSettings.revision)]
         search: for (const id of wanted)
             for (const source of sources)
                 if (id !== "" && source.id === id) {
@@ -117,14 +116,13 @@ QtObject {
     // Se analiza desde el texto guardado (`categoriasJson`) y no desde `AppSettings.revision`:
     // una propiedad de texto solo avisa si cambia, y cualquier otra opción (el retraso de la letra,
     // por ejemplo) ya no reconstruye la sección de Playlists.
-    readonly property string categoriasJson: { void AppSettings.revision; return AppSettings.opcion("categorias") }
+    readonly property string categoriasJson: AppSettings.opcion("categorias", AppSettings.revision)
     readonly property var categorias: {
         const list = parse(categoriasJson)
         return Array.isArray(list) ? list : []
     }
     readonly property string categoria: {
-        void AppSettings.revision
-        const name = AppSettings.opcion("categoria")
+        const name = AppSettings.opcion("categoria", AppSettings.revision)
         return categorias.some(c => c.nombre === name) ? name : ""
     }
 

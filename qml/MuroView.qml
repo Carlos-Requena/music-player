@@ -9,8 +9,7 @@ FocusScope {
     property var zonas: []
     // Opciones › Disposición › Carátulas del Muro.
     property int cols: {
-        void AppSettings.revision
-        const size = AppSettings.opcion("caratulas")
+        const size = AppSettings.opcion("caratulas", AppSettings.revision)
         return size === "pequenas" ? 8 : size === "grandes" ? 4 : 6
     }
     property int row: 0

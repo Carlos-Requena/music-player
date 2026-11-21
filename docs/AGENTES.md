@@ -110,7 +110,7 @@ Cada archivo de `src/`, `qml/`, `skins/` y `login/src/` pertenece a **una sola**
   `EmptyState`, foco con `FocusRing` ([interfaz-comun](areas/interfaz-comun.md)). `docs.py check`
   rechaza un tamaño de letra, un radio o un color escritos a mano en `qml/`.
 - **Opciones nuevas:** `AppSettings.opcion("clave")` (vacío = valor por defecto) y `setOpcion`,
-  leídas con `void AppSettings.revision` delante; su fila en `optionRows` de `SettingsSheet.qml`
+  leídas con `AppSettings.revision` como segundo argumento; su fila en `optionRows` de `SettingsSheet.qml`
   y la clave en el `opciones:` de la ficha de su área
   ([runbooks/nueva-opcion.md](runbooks/nueva-opcion.md)).
 - **Accesibilidad:** botones con 44 px de área como mínimo, `Accessible.name` en los de solo

@@ -550,8 +550,7 @@ Item {
 
                         // `revision` cambia con cada elección: hace que la fila se actualice.
                         readonly property string value: {
-                            void AppSettings.revision
-                            return AppSettings.vista(modelData.id)
+                            return AppSettings.vista(modelData.id, AppSettings.revision)
                         }
 
                         width: parent.width
@@ -878,8 +877,7 @@ Item {
                         id: layoutRow
                         required property var modelData
                         readonly property string value: {
-                            void AppSettings.revision
-                            const chosen = AppSettings.opcion(modelData.key)
+                            const chosen = AppSettings.opcion(modelData.key, AppSettings.revision)
                             return chosen !== "" ? chosen : modelData.fallback
                         }
 
@@ -1177,21 +1175,18 @@ Item {
                         { id: "electronica", label: "Electrónica", gains: [5, 4, 1, 0, -2, 1, 0, 2, 4, 5] }
                     ]
                     readonly property bool eqOn: {
-                        void AppSettings.revision
-                        return AppSettings.opcion("ecualizador") === "si"
+                        return AppSettings.opcion("ecualizador", AppSettings.revision) === "si"
                     }
                     // Ganancias guardadas (dB); se editan en `gains` y se guardan sin prisa.
                     readonly property var stored: {
-                        void AppSettings.revision
-                        const raw = AppSettings.opcion("ecualizadorBandas")
+                        const raw = AppSettings.opcion("ecualizadorBandas", AppSettings.revision)
                         const out = raw === "" ? [] : raw.split(",").map(v => Number(v) || 0)
                         while (out.length < 10)
                             out.push(0)
                         return out
                     }
                     readonly property real storedBoost: {
-                        void AppSettings.revision
-                        return Number(AppSettings.opcion("amplificador")) || 0
+                        return Number(AppSettings.opcion("amplificador", AppSettings.revision)) || 0
                     }
                     property var gains: stored
                     property real boost: storedBoost
