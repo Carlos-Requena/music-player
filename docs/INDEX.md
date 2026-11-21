@@ -34,7 +34,7 @@ Qué leer para cada tarea. Las tablas a partir de [Áreas](#áreas) las escribe
 | Área | Qué es | Opciones | ADR |
 |---|---|---|---|
 | [Catálogo de YouTube Music](areas/catalogo.md) | Secciones (Inicio, Explorar, Álbumes, Playlists, Me gusta, Historial), búsqueda, detalle abierto y categorías de playlists, pedidos a InnerTube (Explorar, a ListenBrainz si se elige) y publicados como JSON. | `categoria`, `categorias`, `explorarFuente` | [ADR-04](decisions/ADR-04-json-hacia-qml.md), [ADR-06](decisions/ADR-06-canciones-por-la-pagina-de-la-lista.md), [ADR-09](decisions/ADR-09-cache-de-secciones-en-disco.md), [ADR-19](decisions/ADR-19-explorar-con-listenbrainz.md), [ADR-20](decisions/ADR-20-fuente-de-explorar-a-elegir.md), [ADR-22](decisions/ADR-22-explorar-por-categorias-con-recomendados.md) |
-| [Detalle e inspeccionar](areas/detalle.md) | Detalle de un álbum, playlist o artista con Reproducir y Aleatorio, y el modo inspeccionar que gira la caja, la abre y saca el disco. | `fichas` | [ADR-23](decisions/ADR-23-sistema-de-diseno-medidas-y-piezas-comunes.md) |
+| [Detalle e inspeccionar](areas/detalle.md) | Detalle de un álbum, playlist o artista con Reproducir y Aleatorio, y el modo inspeccionar que gira la caja, la abre y saca el disco. | `fichasAlbum`, `fichasPlaylist` | [ADR-23](decisions/ADR-23-sistema-de-diseno-medidas-y-piezas-comunes.md) |
 | [Registro de escuchas](areas/historial.md) | Apunta en el historial de YouTube Music lo que suena, con los mismos avisos que manda su reproductor, sin retrasar el arranque. | `historial` | [ADR-12](decisions/ADR-12-historial-con-los-avisos-del-reproductor.md) |
 | [Piezas comunes de la interfaz](areas/interfaz-comun.md) | Vidrio, carátula, icono, botones, deslizador, pestañas y campo de texto que usan todas las pantallas. | — | [ADR-23](decisions/ADR-23-sistema-de-diseno-medidas-y-piezas-comunes.md) |
 | [Letra sincronizada](areas/letra.md) | Letra de LRCLIB, NetEase y Kugou, a elegir, palabra a palabra con los tiempos reales de cada sílaba, al estilo Better Lyrics, con tres calidades y retraso ajustable por canción. | `letraOrigen`, `letraSinTiempos`, `letraCalidad`, `letraTamano`, `letraFuente`, `letraPeso`, `letraAlineacion`, `letraAnimada`, `retraso:*`, `origen:*` | [ADR-13](decisions/ADR-13-letra-de-lrclib-con-un-solo-gestor.md), [ADR-18](decisions/ADR-18-letra-de-varias-fuentes.md) |
@@ -157,7 +157,8 @@ Claves de `AppSettings.opcion`. Vacío es el valor por defecto (el `fallback` de
 | `ecualizadorBandas` | — (interna) | [Reproducción y cola](areas/reproduccion.md) |
 | `esquinas` | Esquinas de las carátulas (apariencia) | [Opciones, skins y aspecto](areas/personalizacion.md) |
 | `explorarFuente` | Fuente de Explorar (vistas) | [Catálogo de YouTube Music](areas/catalogo.md) |
-| `fichas` | Canciones de álbumes y playlists (vistas) | [Detalle e inspeccionar](areas/detalle.md) |
+| `fichasAlbum` | Canciones de un álbum (vistas) | [Detalle e inspeccionar](areas/detalle.md) |
+| `fichasPlaylist` | Canciones de una playlist (vistas) | [Detalle e inspeccionar](areas/detalle.md) |
 | `historial` | Registrar en YouTube Music (reproduccion) | [Registro de escuchas](areas/historial.md) |
 | `letraAlineacion` | Alineación de la letra (apariencia) | [Letra sincronizada](areas/letra.md) |
 | `letraAnimada` | — (interna) | [Letra sincronizada](areas/letra.md) |

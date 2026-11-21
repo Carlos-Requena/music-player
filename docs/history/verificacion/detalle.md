@@ -5,6 +5,21 @@ son de cuando se escribieron. El estado actual está en su [ficha](../../areas/d
 
 Lo nuevo va arriba: añade una sección `## AAAA-MM-DD · qué se verificó` encima de las anteriores.
 
+## 2026-11-21 · Halo sin recortar; `fichasAlbum` y `fichasPlaylist` (en `master`)
+
+- **Fallo:** el halo de una ficha bajo el ratón se cortaba en la fila de arriba y en los extremos
+  (la lista recorta y solo dejaba ~13 px).
+- **Cambio:** `glowRoom` (36 px) alrededor de la cuadrícula; junto a la carátula la lista empieza
+  36 px antes y llega al borde. La opción `fichas` se separa en `fichasAlbum` (número por defecto) y
+  `fichasPlaylist` (carátula por defecto), por petición del propietario.
+- **Cómo:** `--shot` (release, `HOME` de pruebas) con el ratón simulado (`wheel` de 0 muescas)
+  sobre la ficha 7 (arriba a la derecha) y la 22 (abajo a la izquierda) de la playlist «UN VERANO
+  SIN TI»; el álbum «Un Verano Sin Ti» abierto desde la discografía de Bad Bunny; Explorar con
+  álbumes y con canciones.
+- **Resultado:** halos enteros; el álbum, con números; la playlist, con carátulas; el Muro de
+  Explorar donde estaba.
+- **No verificado:** el ratón de verdad; Linux.
+
 ## 2026-11-21 · Canciones en cuadrícula y opción `fichas` (en `master`)
 
 - **Cambio:** la lista de canciones del detalle pasa a ser una cuadrícula de fichas pequeñas

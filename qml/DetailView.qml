@@ -23,9 +23,12 @@ FocusScope {
     property int current: 0
     // Color dominante de la foto o carátula (la sonda de la ventana).
     property color tint: Theme.neutralTint
-    // Margen lateral de la cuadrícula: en un artista, el de la ventana; en lo demás, el hueco
-    // para que la ficha elegida crezca sin que se corte su aro.
-    readonly property real inset: artist ? Theme.margin : Math.ceil(tileTarget * 0.03) + Theme.cursorWidth + 6
+    // Hueco alrededor de la cuadrícula para el halo de la ficha bajo el ratón (`SongTile`: desenfoque
+    // de 28 px) y el aro de la elegida: la lista recorta lo que sale de ella.
+    readonly property real glowRoom: 36
+    // Margen lateral de la cuadrícula, dentro de la lista: el hueco del halo (en un artista, al
+    // menos el margen de la ventana).
+    readonly property real inset: Math.max(glowRoom, artist ? Theme.margin : 0)
 
     // Cuadrícula de fichas pequeñas (`SongTile`): tantas columnas de ~110 px como quepan.
     readonly property real tileTarget: 110
@@ -40,9 +43,17 @@ FocusScope {
         return out
     }
     // Álbum o playlist: número de pista en la ficha, en grande sobre su color o en la esquina de
-    // la carátula (opción `fichas`). Un artista, «Relacionado» o una categoría no llevan número.
-    readonly property bool numbered: !artist && !related && !zona
-    readonly property bool numberOnly: numbered && AppSettings.opcion("fichas", AppSettings.revision) !== "caratula"
+    // la carátula. Cada uno con su opción: un álbum, con el número en grande por defecto (todas sus
+    // carátulas son la misma, `fichasAlbum`); una playlist, con carátula (`fichasPlaylist`). Un
+    // artista, «Relacionado» o una categoría no llevan número.
+    readonly property bool numbered: detail !== null && !artist && !related && !zona
+    readonly property bool numberOnly: {
+        if (!numbered)
+            return false
+        if (detail.kind === "album")
+            return AppSettings.opcion("fichasAlbum", AppSettings.revision) !== "caratula"
+        return AppSettings.opcion("fichasPlaylist", AppSettings.revision) === "numero"
+    }
 
     signal closed()
     signal inspect()
@@ -182,9 +193,9 @@ FocusScope {
     Loader {
         id: wallLoader
         // Medio margen de más a cada lado: la elegida crece y su aro no se corta.
-        x: list.x - Theme.margin / 2
+        x: info.x + info.width + Theme.margin / 2
         y: 84
-        width: list.width + Theme.margin
+        width: root.width - x - Theme.margin / 2
         height: root.height - y
         active: root.wall
         focus: active
@@ -200,9 +211,12 @@ FocusScope {
     ListView {
         id: list
         visible: !root.wall
-        x: root.artist ? 0 : info.x + info.width + Theme.margin
-        width: root.artist ? root.width : root.width - x - Theme.margin
-        y: root.artist ? 0 : 84
+        // Junto a la carátula, la lista empieza antes y llega al borde: su margen interior
+        // (`inset`, `glowRoom` arriba) deja las fichas donde iban y el halo no se corta.
+        x: root.artist ? 0 : info.x + info.width + Theme.margin - root.glowRoom
+        width: root.artist ? root.width : root.width - x
+        y: root.artist ? 0 : 84 - root.glowRoom
+        bottomMargin: root.glowRoom
         height: root.height - y
         clip: true
         boundsBehavior: Flickable.StopAtBounds
@@ -259,8 +273,8 @@ FocusScope {
             Row {
                 id: tiles
                 x: root.inset
-                // Hueco arriba en la primera fila: la elegida crece y su aro no debe cortarse.
-                y: tileRow.index === 0 ? 10 : 0
+                // Hueco arriba en la primera fila de un álbum (sin cabecera encima): el halo y el aro.
+                y: tileRow.index === 0 && !root.artist ? root.glowRoom : 0
                 spacing: root.tileGap
 
                 Repeater {
