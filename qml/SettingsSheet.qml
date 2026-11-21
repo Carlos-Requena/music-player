@@ -90,6 +90,9 @@ Item {
           fallback: "listenbrainz", options: [{ id: "listenbrainz", label: "ListenBrainz" }, { id: "youtube", label: "YouTube Music" }] },
         { cat: "vistas", key: "caratulas", label: "Carátulas del Muro", fallback: "medianas",
           options: [{ id: "pequenas", label: "Pequeñas" }, { id: "medianas", label: "Medianas" }, { id: "grandes", label: "Grandes" }] },
+        { cat: "vistas", key: "fichas", label: "Canciones de álbumes y playlists",
+          hint: "Número: el número de pista en grande sobre el color de la carátula. Carátula: la de cada canción, con su número en una esquina.",
+          fallback: "numero", options: [{ id: "numero", label: "Número" }, { id: "caratula", label: "Carátula" }] },
         { cat: "vistas", key: "brillo", label: "Brillo al pasar el ratón",
           hint: "Las carátulas del Muro y las tarjetas de Explorar crecen y brillan con el color de su carátula. Con el teclado, la elegida sigue marcada.",
           fallback: "si", options: [{ id: "si", label: "Activado" }, { id: "no", label: "Desactivado" }] }
@@ -390,6 +393,8 @@ Item {
             contentHeight: content.implicitHeight + 12
             clip: true
             boundsBehavior: Flickable.StopAtBounds
+
+            WheelScroll { view: settingsFlick }
 
         Column {
             id: content

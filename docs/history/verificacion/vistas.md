@@ -5,6 +5,17 @@ son de cuando se escribieron. El estado actual está en su [ficha](../../areas/v
 
 Lo nuevo va arriba: añade una sección `## AAAA-MM-DD · qué se verificó` encima de las anteriores.
 
+## 2026-11-21 · Fila de arriba sin recortar en una categoría de Explorar, y rueda (en `master`)
+
+- **Fallo:** en una categoría de Explorar con álbumes (el Muro sin etiqueta encima), la carátula
+  elegida de la primera fila crecía y su aro se cortaba con el borde de arriba.
+- **Cambio:** `topMargin` de `MuroView` con el hueco de crecer si la primera fila no lleva
+  etiqueta. `WheelScroll` en el Muro y en `CategoriasView` (120 px por muesca).
+- **Cómo:** `--shot` (release, `HOME` de pruebas, `explorarFuente` = `youtube`) con `--section
+  explorar --index 1 --autoplay --open`: «Álbumes y singles nuevos» con la primera elegida.
+- **Resultado:** el aro se ve entero.
+- **No verificado:** el ratón de verdad; Linux.
+
 ## 2026-11-21 · Opción `clic` en el Muro (en `master`)
 
 - **Cambio:** con «Un clic», un clic en el Muro abre o hace sonar, y el nombre de abajo sigue a la

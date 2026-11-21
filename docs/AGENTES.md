@@ -299,6 +299,12 @@ añadas más casos, y actualiza la lista.
   [reproduccion](areas/reproduccion.md), [vistas](areas/vistas.md)).
 - **Categoría de Explorar con álbumes**: se recorre igual que Inicio, con el Muro
   ([detalle](areas/detalle.md)).
+- **Canciones del detalle en cuadrícula**: fichas pequeñas con el título debajo, como el Muro; en
+  un artista bajo su cabecera «Órbita», y en álbumes y playlists con la carátula y su información a
+  la izquierda. En álbumes y playlists, número sobre color o carátula con número, a elegir en
+  Opciones (`fichas`) ([detalle](areas/detalle.md)).
+- **Rueda del ratón de PC**: baja lo mismo que en el Mac (120 px por muesca)
+  ([interfaz-comun](areas/interfaz-comun.md)).
 - **Opciones compactas**: un segmento «Normal / Compacta» junto a la × quita las descripciones de
   las filas (salen en el pie al pasar el ratón) ([personalizacion](areas/personalizacion.md)).
 - **Iniciar sesión con una ventana propia** (WebKit del sistema en macOS, Qt WebEngine opcional en

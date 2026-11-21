@@ -161,6 +161,7 @@ Estas medidas se tomaron quitando a mano la condición de que suene música (You
   mientras suena.
 - **[plugins](plugins.md)** (`Plugins`): la pestaña Plugins.
 - **[catalogo](catalogo.md)** (`Catalog`): secciones en «Vista de cada sección».
+- **[interfaz-comun](interfaz-comun.md)** (`WheelScroll`, `Tabs`, botones): la rueda y los controles de la hoja de Opciones.
 - **La usan:** todas (por `Theme` y `AppSettings`); [mascotas](mascotas.md) lee la elegida con
   `Theme.mascotImage`.
 

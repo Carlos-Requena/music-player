@@ -2,7 +2,7 @@
 area: interfaz-comun
 titulo: Piezas comunes de la interfaz
 resumen: Vidrio, carátula, icono, botones, deslizador, pestañas y campo de texto que usan todas las pantallas.
-archivos: [qml/Glass.qml, qml/Cover.qml, qml/Icon.qml, qml/IconButton.qml, qml/PillButton.qml, qml/Slider.qml, qml/TextField.qml, qml/Tabs.qml, qml/TabButton.qml, qml/FocusRing.qml, qml/TrackRow.qml, qml/SectionLabel.qml, qml/FocusedCaption.qml, qml/EmptyState.qml]
+archivos: [qml/Glass.qml, qml/Cover.qml, qml/Icon.qml, qml/IconButton.qml, qml/PillButton.qml, qml/Slider.qml, qml/TextField.qml, qml/Tabs.qml, qml/TabButton.qml, qml/FocusRing.qml, qml/TrackRow.qml, qml/SongTile.qml, qml/WheelScroll.qml, qml/SectionLabel.qml, qml/FocusedCaption.qml, qml/EmptyState.qml]
 opciones: []
 adr: [ADR-23]
 ---
@@ -27,6 +27,8 @@ esta ficha), no se copia con otro nombre.
 | `TabButton` | Una pestaña o un segmento; la agrupa `Tabs` y `CategoryBar` la usa suelta (con renombrar y clic derecho) |
 | `FocusRing` | Aro de foco del teclado: 2 px del color del texto, separado 3 px del control |
 | `TrackRow` | Fila de canción (número o miniatura, título, artista, duración, «suena», elegida, arrastrándose): detalle, cola y temporal. Solo dibuja; los gestos los pone quien la usa |
+| `SongTile` | Ficha de canción de la cuadrícula del detalle: carátula pequeña (o el número en grande sobre `tint`, `numberOnly`) con el título debajo, número en la esquina, «suena», elegida (aro) y brillo al pasar el ratón. Solo dibuja, como `TrackRow` |
+| `WheelScroll` | Rueda del ratón con muescas para una vista vertical (`view`): 120 px por muesca, animado y acumulando las seguidas; el trackpad y la rueda fina de macOS (`pixelDelta`) siguen con la vista. `behaviorAnimates` si la vista ya anima `contentY` |
 | `SectionLabel` | Etiqueta de sección en mayúsculas espaciadas |
 | `FocusedCaption` | Nombre y subtítulo del elemento enfocado (Muro, Lomos, Cubeta) |
 | `EmptyState` | Aviso de algo vacío: icono, frase y botón opcional (secciones sin sesión, búsqueda, temporal) |
@@ -86,6 +88,8 @@ esta ficha), no se copia con otro nombre.
 | `qml/TabButton.qml` | Una pestaña |
 | `qml/FocusRing.qml` | Aro de foco |
 | `qml/TrackRow.qml` | Fila de canción |
+| `qml/SongTile.qml` | Ficha de canción |
+| `qml/WheelScroll.qml` | Rueda del ratón con muescas |
 | `qml/SectionLabel.qml` | Etiqueta de sección |
 | `qml/FocusedCaption.qml` | Título de lo enfocado |
 | `qml/EmptyState.qml` | Aviso de vacío |
@@ -93,14 +97,16 @@ esta ficha), no se copia con otro nombre.
 
 ## Dependencias
 
-- No usa otras áreas (solo `Theme`).
+- **[personalizacion](personalizacion.md)** (`Theme`): colores, medidas y la opción `brillo` (`Theme.hoverGlow`, en `SongTile`).
 - **La usan:** todas las que tienen interfaz.
 
 ## Estado actual
 
-- **Última verificación:** 2026-11-21, piezas comunes nuevas y regla de dos ([historial](../history/verificacion/interfaz-comun.md)).
+- **Última verificación:** 2026-11-21, `SongTile` y `WheelScroll` ([historial](../history/verificacion/interfaz-comun.md)).
 - **Pruebas:** ninguna automática.
 - **Sin verificar:** el sombreador de `Cover` en Linux (OpenGL y Vulkan) y en una pantalla sin
   Retina; el foco de teclado (`FocusRing`) en las pestañas con el teclado de verdad (las capturas no
-  dejan la ventana activa); la opción `clic` con el ratón de verdad (sin clics simulados).
+  dejan la ventana activa); la opción `clic` con el ratón de verdad (sin clics simulados); `WheelScroll` con una rueda de
+  verdad en Linux y Windows (la simulada manda muescas de 120 sin `pixelDelta`, como un ratón de
+  PC) y con un ratón de rueda en macOS.
 - **Historial:** [docs/history/verificacion/interfaz-comun.md](../history/verificacion/interfaz-comun.md).

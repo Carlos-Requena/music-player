@@ -5,6 +5,22 @@ son de cuando se escribieron. El estado actual está en su [ficha](../../areas/d
 
 Lo nuevo va arriba: añade una sección `## AAAA-MM-DD · qué se verificó` encima de las anteriores.
 
+## 2026-11-21 · Canciones en cuadrícula y opción `fichas` (en `master`)
+
+- **Cambio:** la lista de canciones del detalle pasa a ser una cuadrícula de fichas pequeñas
+  (`SongTile`, ~110 px, título debajo) en filas de una `ListView`. El artista la tiene bajo
+  «Órbita», a todo el ancho; álbumes y playlists, a la derecha de su carátula. Opción `fichas`:
+  número en grande sobre el color de la carátula (por defecto) o carátula con el número en la
+  esquina. Flechas izquierda y derecha. La rueda con `WheelScroll`.
+- **Cómo:** `--shot` (release, `HOME` de pruebas, `MUSICPLAYER_SILENT=1`): Bad Bunny por
+  `--search … --autoplay --open` (arriba, y con 3 muescas de rueda simulada: baja 360 px); su
+  playlist «UN VERANO SIN TI» abierta con un clic simulado en los dos modos de `fichas`; un
+  single de Inicio (Lomos, `--index 8`); categorías de Explorar con canciones y con álbumes.
+- **Resultado:** 12 columnas en el artista y 7 junto a la carátula (1440 px); números del 1 al 23
+  sobre el color de la carátula, o carátulas con el número; sin avisos de QML.
+- **No verificado:** teclado y ratón de verdad; ventana estrecha; Linux; un álbum de verdad con
+  muchas pistas.
+
 ## 2026-11-21 · Categoría de Explorar con el Muro de Inicio (en `master`)
 
 - **Cambio:** una categoría de Explorar con álbumes o listas se recorre con `MuroView` (un clic

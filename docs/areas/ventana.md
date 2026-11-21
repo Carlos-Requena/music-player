@@ -220,6 +220,7 @@ También el arranque del proceso y los argumentos de depuración (`--probe`, `--
   ventana.
 - **[sesion](sesion.md)** (`Account`, `login_window`): la cuenta y la ventana de macOS.
 - **[plugins](plugins.md)** (`Plugins`): arranque de los plugins.
+- **[interfaz-comun](interfaz-comun.md)** (`WheelScroll`, botones, `Tabs`): la rueda del panel de la temporal y los controles de la ventana.
 - **La usan:** ninguna (es la raíz).
 
 ## Estado actual

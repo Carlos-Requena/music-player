@@ -11,6 +11,8 @@ import app.musicplayer
 ListView {
     id: root
 
+    WheelScroll { view: root }
+
     readonly property int rowHeight: Theme.rowHeight
     // Al cambiar de pista: true = la que suena arriba del todo; false = basta con que se vea.
     property bool followTop: false

@@ -96,7 +96,9 @@ FocusScope {
         anchors.bottomMargin: info.height
         // Una lista vertical pone cada fila en x = 0: el margen va en la lista.
         leftMargin: root.margin
-        topMargin: 12
+        // Sin etiqueta encima de la primera fila (una categoría de Explorar abierta), la carátula
+        // elegida crece hacia arriba: se reserva el hueco para que su aro no se corte.
+        topMargin: root.rows.length && root.rows[0].titulo === "" ? Math.ceil(root.tile * 0.06) + Theme.cursorWidth + 8 : 12
         bottomMargin: 48
         spacing: 20
         clip: true
@@ -105,6 +107,8 @@ FocusScope {
         model: root.rows
 
         Behavior on contentY { NumberAnimation { duration: Theme.animMove; easing.type: Easing.OutCubic } }
+
+        WheelScroll { view: flick; behaviorAnimates: true }
 
         delegate: Column {
             id: rowItem

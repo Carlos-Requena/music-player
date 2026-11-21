@@ -5,6 +5,16 @@ son de cuando se escribieron. El estado actual está en su [ficha](../../areas/i
 
 Lo nuevo va arriba: añade una sección `## AAAA-MM-DD · qué se verificó` encima de las anteriores.
 
+## 2026-11-21 · `SongTile` y `WheelScroll` (en `master`)
+
+- **Cambio:** `SongTile`, la ficha de canción de la cuadrícula del detalle, y `WheelScroll`, que
+  baja 120 px por muesca de rueda (Qt movía muy poco las listas con un ratón de PC). Va en el
+  detalle, el Muro, Explorar, Opciones, la cola y la temporal; Lomos y Cubeta tienen la suya.
+- **Cómo:** release; rueda simulada (`MUSICPLAYER_DEBUG_CLICK` con `wheel`, muescas de 120 sin
+  `pixelDelta`): 3 muescas bajan el detalle de un artista 360 px y 40 llegan al final.
+- **No verificado:** una rueda de verdad en Linux o Windows; el trackpad (no debería cambiar: con
+  `pixelDelta` se deja a la vista).
+
 ## 2026-11-21 · Piezas comunes nuevas, regla de dos y esquinas con sombreador (en `master`)
 
 - **Cambio:** `Tabs`, `TabButton`, `FocusRing`, `TrackRow`, `SectionLabel`, `FocusedCaption` y

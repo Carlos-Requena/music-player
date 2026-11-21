@@ -32,6 +32,11 @@ Muro de cualquier sección, la carátula bajo el ratón crece un 4,5 %, pierde e
 con el color de su carátula (halo, borde y reflejo); en Explorar, igual en las tarjetas.
 Desactivado, el ratón no cambia nada. Lo elegido con el teclado lleva siempre el aro blanco
 (`Theme.cursorWidth`), en el Muro y en Explorar: el brillo es del ratón y el aro, del teclado.
+Sin etiqueta encima de la primera fila (una categoría de Explorar abierta), el Muro reserva arriba
+el hueco que crece la elegida, para que su aro no se corte (`topMargin` de `MuroView`).
+
+**La rueda del ratón** baja 120 px por muesca en el Muro y en Explorar (`WheelScroll`,
+[interfaz-comun](interfaz-comun.md)); el trackpad sigue igual.
 
 **Explorar en Muro va por categorías** (`CategoriasView`,
 [ADR-22](../decisions/ADR-22-explorar-por-categorias-con-recomendados.md)): una tarjeta por zona
@@ -148,11 +153,12 @@ ventana lo precarga si el puntero se queda 250 ms.
 - **[personalizacion](personalizacion.md)** (`AppSettings`, `TintProbe`): vista elegida, opción
   `caratulas` y color del halo.
 - El menú de clic derecho de las tarjetas lo abre `Main.openMenu` ([ventana](ventana.md)).
+- **[interfaz-comun](interfaz-comun.md)** (`WheelScroll`, `Cover`, `SectionLabel`): la rueda del Muro y de Explorar y las carátulas.
 - **La usan:** [ventana](ventana.md) (`Main.qml` monta `SectionView`).
 
 ## Estado actual
 
-- **Última verificación:** 2026-11-21, interfaz unificada: sin cabecera, esquinas, aro del teclado en Explorar ([historial](../history/verificacion/vistas.md)).
+- **Última verificación:** 2026-11-21, fila de arriba sin recortar en una categoría de Explorar y rueda ([historial](../history/verificacion/vistas.md)).
 - **Pruebas:** ninguna automática; capturas con `--section` e `--index`
   ([verificar-interfaz](../runbooks/verificar-interfaz.md)).
 - **Sin verificar:** el brillo del foco del teclado en las capturas (sale solo si la ventana de

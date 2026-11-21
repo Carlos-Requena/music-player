@@ -147,6 +147,8 @@ Glass {
             boundsBehavior: Flickable.StopAtBounds
             model: Catalog.temporal
 
+            WheelScroll { view: temporalList }
+
             // Elegida con un clic (opción `clic` en «doble»).
             property int chosen: -1
 

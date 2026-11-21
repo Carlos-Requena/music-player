@@ -25,6 +25,9 @@ que toque **antes** de cambiar algo ahí. Una trampa nueva se añade en su secci
   AppSettings.opcion("clic") }` no se volvía a evaluar y las opciones solo se aplicaban al
   reiniciar. La dependencia tiene que ser un valor usado: `AppSettings.opcion("clic",
   AppSettings.revision)`. Se ve en el C++ generado (`target/release/build/musicplayer-*/out/qmlcachegen/`).
+- **La rueda del ratón apenas mueve una lista en Windows y Linux:** Qt convierte cada muesca
+  (`angleDelta` 120, sin `pixelDelta`) en un empujón corto. Se baja a mano un número de píxeles
+  por muesca con `WheelScroll`; el trackpad y macOS traen `pixelDelta` y se dejan a la vista.
 - **`font.pixelSize` es entero:** `12.5` hace fallar la carga del componente entero.
 - **`cargo build` no comprueba el QML:** quitar una propiedad que otro archivo escucha
   (`onTituloChanged` en Lomos) compila sin avisos y la ventana no carga («Type LomosView

@@ -170,6 +170,7 @@ Stderr escribe `arranque de pista: N ms` en cada una.
 - **[plugins](plugins.md)** (`plugins::emit`, `plugins::media_enabled`): repartir lo que pasa.
 - **[sesion](sesion.md)** (`account::cookies_copy`): cookies para el gancho de yt-dlp de mpv.
 - El menú de clic derecho de las filas de la cola lo abre `Main.openMenu` ([ventana](ventana.md)).
+- **[interfaz-comun](interfaz-comun.md)** (`WheelScroll`, `TrackRow`): la rueda y las filas de la cola y la temporal.
 - **La usan:** [ventana](ventana.md), [vistas](vistas.md), [detalle](detalle.md),
   [letra](letra.md), [catalogo](catalogo.md).
 

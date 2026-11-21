@@ -39,6 +39,8 @@ const QML_FILES: &[&str] = &[
     "qml/TabButton.qml",
     "qml/FocusRing.qml",
     "qml/TrackRow.qml",
+    "qml/SongTile.qml",
+    "qml/WheelScroll.qml",
     "qml/SectionLabel.qml",
     "qml/FocusedCaption.qml",
     "qml/EmptyState.qml",

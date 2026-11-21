@@ -82,6 +82,8 @@ FocusScope {
         contentWidth: width
         contentHeight: grid.height
         clip: true
+
+        WheelScroll { view: flick; behaviorAnimates: true }
         boundsBehavior: Flickable.StopAtBounds
 
         Behavior on contentY { NumberAnimation { duration: Theme.animMove; easing.type: Easing.OutCubic } }

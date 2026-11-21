@@ -3,7 +3,7 @@ area: detalle
 titulo: Detalle e inspeccionar
 resumen: Detalle de un álbum, playlist o artista con Reproducir y Aleatorio, y el modo inspeccionar que gira la caja, la abre y saca el disco.
 archivos: [qml/DetailView.qml, qml/ArtistHero.qml, qml/InspectView.qml]
-opciones: []
+opciones: [fichas]
 adr: [ADR-23]
 ---
 
@@ -21,7 +21,17 @@ Elegir un álbum, playlist o artista abre su detalle; `I` lo inspecciona.
   anillo de rayas del color de la foto (`tint`, la sonda de la ventana) y sus tres canciones más
   escuchadas en tarjetas de vidrio alrededor, con su botón de reproducir; debajo, el nombre, los
   oyentes, Reproducir y Aleatorio. Al bajar, la lista de canciones (centrada, hasta 1000 px) y la
-  discografía. Un álbum o playlist sigue con la carátula a la izquierda y la lista a la derecha.
+  discografía. Un álbum o playlist sigue con la carátula y su información a la izquierda y las
+  canciones a la derecha.
+- **Canciones en cuadrícula** (`SongTile`), como el Muro de Inicio pero con fichas pequeñas (~110
+  px, tantas columnas como quepan) y el título debajo, por petición del propietario: en un
+  artista, bajo la cabecera «Órbita», a todo el ancho; en un álbum, playlist, «Relacionado» o
+  categoría, a la derecha de la carátula. La elegida lleva el aro blanco y crece un poco; bajo el
+  ratón, el brillo del Muro (opción `brillo`). Flechas en las cuatro direcciones.
+- **Fichas de álbumes y playlists** (`fichas`), a elegir por el propietario: «Número» (por
+  defecto: el número de pista en grande sobre el color de la carátula, porque en un álbum todas las
+  carátulas son la misma) o «Carátula» (la carátula de cada canción con el número en una esquina).
+  Un artista, «Relacionado» y una categoría van siempre con carátula y sin número.
 - **Relacionado** (`DetailView.related`, `kind` "related"): como un álbum, con la carátula de la
   canción, el título «Relacionado» y «Como «<canción>» · <artista>»; las canciones parecidas bajo
   «También te puede interesar», con Reproducir y Aleatorio, y debajo los carruseles de listas,
@@ -34,9 +44,8 @@ Elegir un álbum, playlist o artista abre su detalle; `I` lo inspecciona.
   contraportada con las canciones, pliegue de la tapa para ver el libreto y la bandeja, y el disco,
   que sale y gira mientras suena. Se sale con Esc o con el botón «Volver» de arriba a la
   izquierda, en el mismo sitio que en el detalle y en «Sonando».
-- **Filas de canción** con `TrackRow` ([interfaz-comun](interfaz-comun.md)): número, título,
-  artista y duración; la que suena, con el título en acento y ▸; la elegida, en vidrio claro. Qué
-  hace un clic lo decide la opción `clic` ([reproduccion](reproduccion.md)); el doble clic e Intro
+- **Fichas de canción** con `SongTile` ([interfaz-comun](interfaz-comun.md)): la que suena, con
+  el título en acento y ▸; la elegida, con el aro. Qué hace un clic lo decide la opción `clic` ([reproduccion](reproduccion.md)); el doble clic e Intro
   siempre la hacen sonar. En la discografía y en las cuadrículas de una categoría, los artistas
   van en círculo y lo demás con las esquinas de la opción `esquinas`.
 - **Categoría de Explorar con álbumes o listas** (sin canciones): se recorre con el mismo Muro que
@@ -50,8 +59,10 @@ Elegir un álbum, playlist o artista abre su detalle; `I` lo inspecciona.
   (sin textura ni animación) y solo existe con un artista (`Loader` en la cabecera de la lista).
   Las rayas no tienen por qué ser todas del mismo largo: ondulan alrededor del círculo (`rays`).
 - **Cabecera y canciones en la misma `ListView`**: así la rueda baja de la cabecera a la lista
-  sin dos zonas de desplazamiento. El margen de las filas va dentro del delegado (`inset`), no en
-  la `x` del delegado ([TRAMPAS](../TRAMPAS.md#qt-quick-y-qml)).
+  sin dos zonas de desplazamiento. Cada elemento de la lista es una fila de fichas
+  (`tileRows`, de `columns` en `columns`): solo existen las filas a la vista y unas pocas más.
+  El margen va dentro del delegado (`inset`), no en la `x` del delegado
+  ([TRAMPAS](../TRAMPAS.md#qt-quick-y-qml)).
 
 - **Medidas comunes** ([ADR-23](../decisions/ADR-23-sistema-de-diseno-medidas-y-piezas-comunes.md)):
   el título de un álbum es `Theme.fontTitle`; el nombre del artista, `fontDisplay`; las etiquetas
@@ -84,7 +95,9 @@ Elegir un álbum, playlist o artista abre su detalle; `I` lo inspecciona.
 | Tarjeta de las tiras y de la cuadrícula de una categoría | [`ZoneCard`](../../qml/DetailView.qml), [`wall`](../../qml/DetailView.qml) |
 | Medidas de la cabecera del artista | [`photo`](../../qml/ArtistHero.qml), [`ringOuter`](../../qml/ArtistHero.qml) |
 | Rayas del anillo y su color | [`rays`](../../qml/ArtistHero.qml), [`shade`](../../qml/ArtistHero.qml) |
-| Margen de las filas de un artista | [`inset`](../../qml/DetailView.qml) |
+| Margen de la cuadrícula | [`inset`](../../qml/DetailView.qml) |
+| Columnas, lado de la ficha y filas | [`columns`](../../qml/DetailView.qml), [`tileSide`](../../qml/DetailView.qml), [`tileRows`](../../qml/DetailView.qml) |
+| Número o carátula (opción `fichas`) | [`numbered`](../../qml/DetailView.qml), [`numberOnly`](../../qml/DetailView.qml) |
 | Bajar el detalle en pruebas (`--detail-at`) | [`scrollTo`](../../qml/DetailView.qml) |
 | Girar la caja | [`turn`](../../qml/InspectView.qml) |
 | Abrir la tapa | [`toggleOpen`](../../qml/InspectView.qml) |
@@ -97,14 +110,18 @@ Elegir un álbum, playlist o artista abre su detalle; `I` lo inspecciona.
 - **[reproduccion](reproduccion.md)** (`Player.playTracks`, `Player.prefetchTracks`): reproducir y
   precargar.
 - **[vistas](vistas.md)** (`MuroView`): la cuadrícula de una categoría de Explorar con álbumes.
+- **[personalizacion](personalizacion.md)** (`AppSettings.opcion`): la opción `fichas`.
+- **[interfaz-comun](interfaz-comun.md)** (`SongTile`, `WheelScroll`, `Cover`, botones): las fichas de canción, la rueda y las piezas de la cabecera.
 - **La usan:** [ventana](ventana.md).
 
 ## Estado actual
 
-- **Última verificación:** 2026-11-21, interfaz unificada: `TrackRow`, opción `clic` y «Volver» de Inspeccionar ([historial](../history/verificacion/detalle.md)).
+- **Última verificación:** 2026-11-21, canciones en cuadrícula y opción `fichas` ([historial](../history/verificacion/detalle.md)).
 - **Pruebas:** capturas con `--autoplay --open`, `--related ID`, `--shuffle`, `--detail-at y` e `--inspect flip|open|disc`
   ([verificar-interfaz](../runbooks/verificar-interfaz.md)).
-- **Sin verificar:** la cuadrícula de una categoría con la rueda de verdad y en una ventana
+- **Sin verificar:** la cuadrícula de canciones con el teclado de verdad y en una ventana
+  estrecha; un álbum de verdad con muchas pistas (se probó con una playlist del artista y con
+  singles); la cuadrícula de una categoría con la rueda de verdad y en una ventana
   estrecha; la cabecera del artista en una ventana estrecha (1120 px) y en Linux; bajar
   con la rueda o el trackpad de verdad (la rueda simulada solo mueve la primera muesca); un artista
   con menos de tres canciones.

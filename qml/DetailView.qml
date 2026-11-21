@@ -23,8 +23,26 @@ FocusScope {
     property int current: 0
     // Color dominante de la foto o carátula (la sonda de la ventana).
     property color tint: Theme.neutralTint
-    // Margen lateral de las filas: en un artista, la lista va centrada y con un ancho cómodo.
-    readonly property real inset: artist ? Math.max(Theme.margin, (width - 1000) / 2) : 0
+    // Margen lateral de la cuadrícula: en un artista, el de la ventana; en lo demás, el hueco
+    // para que la ficha elegida crezca sin que se corte su aro.
+    readonly property real inset: artist ? Theme.margin : Math.ceil(tileTarget * 0.03) + Theme.cursorWidth + 6
+
+    // Cuadrícula de fichas pequeñas (`SongTile`): tantas columnas de ~110 px como quepan.
+    readonly property real tileTarget: 110
+    readonly property real tileGap: 16
+    readonly property int columns: Math.max(1, Math.floor((list.width - 2 * inset + tileGap) / (tileTarget + tileGap)))
+    readonly property real tileSide: Math.floor((list.width - 2 * inset - (columns - 1) * tileGap) / columns)
+    // Filas de `columns` canciones, con el índice de la primera de cada una.
+    readonly property var tileRows: {
+        const out = []
+        for (let i = 0; i < tracks.length; i += columns)
+            out.push({ first: i, items: tracks.slice(i, i + columns) })
+        return out
+    }
+    // Álbum o playlist: número de pista en la ficha, en grande sobre su color o en la esquina de
+    // la carátula (opción `fichas`). Un artista, «Relacionado» o una categoría no llevan número.
+    readonly property bool numbered: !artist && !related && !zona
+    readonly property bool numberOnly: numbered && AppSettings.opcion("fichas", AppSettings.revision) !== "caratula"
 
     signal closed()
     signal inspect()
@@ -51,8 +69,10 @@ FocusScope {
     }
 
     Keys.onEscapePressed: root.closed()
-    Keys.onUpPressed: step(-1)
-    Keys.onDownPressed: step(1)
+    Keys.onUpPressed: step(-columns)
+    Keys.onDownPressed: step(columns)
+    Keys.onLeftPressed: step(-1)
+    Keys.onRightPressed: step(1)
     Keys.onReturnPressed: play(current, false)
     Keys.onEnterPressed: play(current, false)
     Keys.onPressed: event => {
@@ -186,8 +206,13 @@ FocusScope {
         height: root.height - y
         clip: true
         boundsBehavior: Flickable.StopAtBounds
-        model: root.tracks
-        currentIndex: root.current
+        // Una fila de fichas por elemento: solo existen las filas a la vista y unas pocas más.
+        model: root.tileRows
+        currentIndex: Math.floor(root.current / root.columns)
+        spacing: 18
+        cacheBuffer: Math.max(0, Math.round(root.tileSide * 3))
+
+        WheelScroll { view: list }
 
         header: Column {
             width: list.width
@@ -222,38 +247,62 @@ FocusScope {
             }
         }
 
-        delegate: TrackRow {
-            id: row
+        // La lista pone cada delegado en x = 0: el margen va dentro, en la `Row` (TRAMPAS).
+        delegate: Item {
+            id: tileRow
             required property var modelData
             required property int index
 
-            x: root.inset
-            width: list.width - 2 * root.inset
-            number: index + 1
-            title: modelData.title
-            artist: modelData.artist
-            showArtist: root.detail !== null && root.detail.kind !== "album"
-            duration: modelData.duration || 0
-            playing: Player.queue !== "" && Player.title === modelData.title && Player.artist === modelData.artist
-            chosen: index === root.current
+            width: list.width
+            height: tiles.y + tiles.height
 
-            Accessible.onPressAction: root.play(index, false)
+            Row {
+                id: tiles
+                x: root.inset
+                // Hueco arriba en la primera fila: la elegida crece y su aro no debe cortarse.
+                y: tileRow.index === 0 ? 10 : 0
+                spacing: root.tileGap
 
-            // Clic derecho: menú con «Añadir a la lista temporal».
-            TapHandler {
-                acceptedButtons: Qt.RightButton
-                onTapped: eventPoint => row.Window.window.openMenu(row.modelData, eventPoint.scenePosition)
-            }
+                Repeater {
+                    model: tileRow.modelData.items
 
-            // Un clic elige o hace sonar según la opción `clic`; el doble, siempre suena.
-            TapHandler {
-                onTapped: {
-                    root.current = row.index
-                    root.forceActiveFocus()
-                    if (Theme.singleClick && tapCount === 1)
-                        root.play(row.index, false)
+                    SongTile {
+                        id: tile
+                        required property var modelData
+                        required property int index
+                        readonly property int track: tileRow.modelData.first + index
+
+                        side: root.tileSide
+                        title: modelData.title
+                        artist: modelData.artist
+                        thumb: modelData.thumb || ""
+                        number: root.numbered ? track + 1 : 0
+                        numberOnly: root.numberOnly
+                        tint: root.tint
+                        playing: Player.queue !== "" && Player.title === modelData.title && Player.artist === modelData.artist
+                        chosen: track === root.current
+
+                        Accessible.onPressAction: root.play(track, false)
+
+                        // Clic derecho: menú con «Añadir a la lista temporal».
+                        TapHandler {
+                            acceptedButtons: Qt.RightButton
+                            onTapped: eventPoint => tile.Window.window.openMenu(tile.modelData, eventPoint.scenePosition)
+                        }
+
+                        // Un clic elige o hace sonar según la opción `clic`; el doble, siempre suena.
+                        TapHandler {
+                            gesturePolicy: TapHandler.ReleaseWithinBounds
+                            onTapped: {
+                                root.current = tile.track
+                                root.forceActiveFocus()
+                                if (Theme.singleClick && tapCount === 1)
+                                    root.play(tile.track, false)
+                            }
+                            onDoubleTapped: if (!Theme.singleClick) root.play(tile.track, false)
+                        }
+                    }
                 }
-                onDoubleTapped: if (!Theme.singleClick) root.play(row.index, false)
             }
         }
 
