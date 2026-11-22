@@ -11,7 +11,7 @@ use std::{
     fs,
     io::{BufRead, BufReader, Write},
     path::PathBuf,
-    process::{Child, ChildStdin, Command, Stdio},
+    process::{Child, ChildStdin, Stdio},
     sync::{
         atomic::{AtomicBool, Ordering},
         mpsc, Arc, LazyLock, Mutex,
@@ -51,6 +51,11 @@ static WAITERS: LazyLock<Mutex<HashMap<String, Vec<mpsc::Sender<Reply>>>>> = Laz
 
 /// Intérprete de Python del yt-dlp instalado, leído de su línea `#!`.
 fn interpreter(path: &str) -> Option<Vec<String>> {
+    // En Windows yt-dlp es un `.exe` empaquetado, sin Python a la vista: no hay residente y
+    // cada pista que no resuelve la vía rápida lanza yt-dlp entero.
+    if cfg!(windows) {
+        return None;
+    }
     let script = fs::canonicalize(which("yt-dlp", path)?).ok()?;
     let head = fs::read(&script).ok()?;
     let first = head.split(|&byte| byte == b'\n').next()?;
@@ -88,7 +93,7 @@ fn spawn() -> Option<Daemon> {
     let path = search_path();
     let mut command_line = interpreter(&path)?;
     let program = command_line.remove(0);
-    let mut child = Command::new(program)
+    let mut child = crate::audio::command(program)
         .args(command_line)
         .arg("-I")
         .arg("-c")

@@ -26,7 +26,7 @@ Cómo encajan las piezas. El detalle de cada una (reglas, mecanismo, medidas) es
                                              ▼
                               proceso mpv (--idle, sin vídeo)
 
-Procesos de un momento: musicplayer --login (macOS) · musicplayer-login (Linux)
+Procesos de un momento: musicplayer --login (macOS) · musicplayer-login (Linux, Windows)
 ```
 
 | Área | Qué parte del dibujo |
@@ -41,7 +41,9 @@ Procesos de un momento: musicplayer --login (macOS) · musicplayer-login (Linux)
 
 Las decisiones que dan forma al dibujo: [ADR-01](decisions/ADR-01-qt-qml-y-rust.md) (Qt/QML y
 Rust), [ADR-02](decisions/ADR-02-mpv-en-proceso-aparte.md) (mpv aparte),
-[ADR-07](decisions/ADR-07-inicio-de-sesion-en-proceso-aparte.md) (inicio de sesión aparte).
+[ADR-07](decisions/ADR-07-inicio-de-sesion-en-proceso-aparte.md) (inicio de sesión aparte),
+[ADR-24](decisions/ADR-24-version-de-windows.md) (Windows: tuberías con nombre en vez de sockets,
+WebView2 e instalador).
 
 ## Hilos
 
@@ -109,6 +111,6 @@ memoria que muestra el Monitor de Actividad), 2026-11-13:
 | `<config>/musicplayer/skins/`, `mascotas/` | Skins y mascotas del usuario | [personalizacion](areas/personalizacion.md), [mascotas](areas/mascotas.md) |
 | `<caché>/musicplayer/` | Copia de cada sección y búsquedas de ListenBrainz en YouTube (`listenbrainz-youtube.json`) | [catalogo](areas/catalogo.md) |
 
-`<config>` es `~/Library/Application Support` en macOS y `~/.config` en Linux; `<caché>`,
-`~/Library/Caches` y `~/.cache`. **Son datos del propietario**: no se tocan en pruebas
+`<config>` es `~/Library/Application Support` en macOS, `~/.config` en Linux y `%APPDATA%` en
+Windows; `<caché>`, `~/Library/Caches`, `~/.cache` y `%LOCALAPPDATA%`. **Son datos del propietario**: no se tocan en pruebas
 ([AGENTES §7](AGENTES.md#7-norma-los-datos-del-propietario-no-se-tocan)).

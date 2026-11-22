@@ -173,7 +173,7 @@ También el arranque del proceso y los argumentos de depuración (`--probe`, `--
 | Archivo | Contenido |
 |---|---|
 | `src/main.rs` | Arranque de Qt, `--probe` y `--login` |
-| `src/window.cpp` | C++: liberar gráficos de ventanas ocultas, red y proxy |
+| `src/window.cpp` | C++: liberar gráficos de ventanas ocultas, red y proxy, HWND de la ventana principal |
 | `qml/Main.qml` | Ventana: escenario, navegación, panel, barra, opciones, argumentos de depuración |
 | `qml/TopNav.qml` | Pestañas de la navegación |
 | `qml/SearchField.qml` | Campo de búsqueda |
@@ -191,6 +191,7 @@ También el arranque del proceso y los argumentos de depuración (`--probe`, `--
 | Sondas sin ventana | [`probe`](../../src/main.rs) |
 | Liberar gráficos al ocultar | [`musicplayer_tune_windows`](../../src/window.cpp) |
 | Proxy y red | [`musicplayer_configure_network`](../../src/window.cpp) |
+| Manejador nativo de la ventana principal (controles multimedia de Windows) | [`musicplayer_main_window`](../../src/window.cpp) |
 | Abrir el menú | [`openMenu`](../../qml/Main.qml) |
 | Argumentos de depuración | [`arg`](../../qml/Main.qml) |
 | Título bajo la carátula | [`showTitle`](../../qml/NowPlayingView.qml), [`titleSpace`](../../qml/NowPlayingView.qml) |

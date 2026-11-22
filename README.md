@@ -1,6 +1,6 @@
 # Reproductor de música
 
-Cliente de escritorio ligero para YouTube Music en macOS y Linux (CachyOS), hecho con
+Cliente de escritorio ligero para YouTube Music en macOS, Linux (CachyOS) y Windows, hecho con
 **Qt 6 / QML** para la interfaz y **Rust** para el núcleo. El audio lo reproduce **mpv** y las
 URLs de audio las obtiene **yt-dlp**. No usa Electron ni un navegador embebido.
 
@@ -229,11 +229,16 @@ brew install rust qtbase qtdeclarative qtmultimedia qtshadertools mpv yt-dlp den
 sudo pacman -S rust qt6-base qt6-declarative qt6-multimedia qt6-shadertools mpv yt-dlp deno ffmpeg
 ```
 
-> La compilación y las pruebas se han hecho en macOS. Linux no se ha probado todavía.
+### Windows
+
+Un instalador `.exe` que lleva dentro Qt, mpv, yt-dlp y deno: se crea con
+`scripts\crear-instalador-windows.ps1` (lo que necesita, en [COMPILAR.md](COMPILAR.md#windows)).
+
+> La compilación y las pruebas se han hecho en macOS. Linux y Windows no se han probado todavía.
 
 ## Compilar e instalar
 
-Guía completa para macOS y CachyOS, con scripts que crean la app o la entrada del menú:
+Guía completa para macOS, CachyOS y Windows, con scripts que crean la app, la entrada del menú o el instalador:
 **[COMPILAR.md](COMPILAR.md)**. Para probar rápido:
 
 ```bash
@@ -285,7 +290,7 @@ Las opciones se guardan en `~/Library/Application Support/musicplayer/settings.j
 
 - [docs/GUIA.md](docs/GUIA.md): **guía para aprender el proyecto desde cero** (Rust y QML
   explicados con su propio código, recorrido de un clic, recetas y ejercicios).
-- [COMPILAR.md](COMPILAR.md): compilar e instalar en macOS y CachyOS.
+- [COMPILAR.md](COMPILAR.md): compilar e instalar en macOS, CachyOS y Windows.
 - [docs/AGENTES.md](docs/AGENTES.md): **normas para colaboradores y agentes** (comandos,
   convenciones, cómo verificar, cómo documentar).
 - [docs/INDEX.md](docs/INDEX.md): qué leer para cada tarea; una ficha por área del programa en

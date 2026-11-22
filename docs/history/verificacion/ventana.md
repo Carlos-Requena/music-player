@@ -5,6 +5,12 @@ son de cuando se escribieron. El estado actual está en su [ficha](../../areas/v
 
 Lo nuevo va arriba: añade una sección `## AAAA-MM-DD · qué se verificó` encima de las anteriores.
 
+## 2026-11-22 · HWND de la ventana principal para los controles de Windows
+
+- **Cómo:** `cargo build --release` sin avisos en macOS (M4 Pro); captura `--settings --settings-cat cuenta`.
+- **Resultado:** la ventana se ve igual que antes en macOS.
+- **No verificado:** `musicplayer_main_window` en Windows y la ventana en Windows (vidrio, DPI, rueda).
+
 ## 2026-11-21 · Interfaz unificada: margen común, cabecera de búsqueda, velo y aviso vacío (en `master`)
 
 - **Cambio:** botones de arriba y contenido en `Theme.margin`; selector de vista oculto con un

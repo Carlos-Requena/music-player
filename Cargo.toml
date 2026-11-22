@@ -5,8 +5,8 @@ edition = "2021"
 description = "Cliente de escritorio ligero para YouTube Music (Qt 6 / QML + Rust)"
 
 [workspace]
-# `login`: ventana de inicio de sesión de Linux, en un binario aparte para que el reproductor
-# no cargue Qt WebEngine (un Chromium entero) en memoria.
+# `login`: ventana de inicio de sesión de Linux (Qt WebEngine) y Windows (WebView2), en un
+# binario aparte para que el reproductor no cargue un motor web en memoria.
 members = ["login"]
 default-members = [".", "login"]
 
@@ -23,6 +23,10 @@ serde_json = "1"
 sha1 = "0.10"
 souvlaki = { version = "0.9", default-features = false, features = ["use_zbus"] }
 ureq = { version = "3", features = ["json"] }
+
+# Windows: tuberías con nombre para mpv y Discord, y el «job» que cierra a los hijos.
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_Security", "Win32_Storage_FileSystem", "Win32_System_IO", "Win32_System_JobObjects", "Win32_System_Threading"] }
 
 [build-dependencies]
 cc = "1"

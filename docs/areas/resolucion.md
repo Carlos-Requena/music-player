@@ -4,7 +4,7 @@ titulo: Resolución del audio y arranque instantáneo
 resumen: Obtiene la URL de audio de cada pista (vía rápida, yt-dlp residente o yt-dlp) con caché y precarga, para que suene en décimas de segundo.
 archivos: [src/stream.rs, src/resolver.rs, src/daemon.rs, src/ytdlp_daemon.py]
 opciones: [calidad, ytdlp]
-adr: [ADR-03, ADR-05, ADR-08]
+adr: [ADR-03, ADR-05, ADR-08, ADR-24]
 ---
 
 # Resolución del audio y arranque instantáneo
@@ -59,7 +59,8 @@ hasta 10 min antes de su `expire=`.
 
 El residente (`ytdlp_daemon.py`) se lanza con el intérprete de la línea `#!` del `yt-dlp`
 instalado; si yt-dlp es un binario autónomo, `daemon::resolve` devuelve `None` y se usa un proceso
-por petición. Se cierra solo tras un minuto sin uso.
+por petición. Se cierra solo tras un minuto sin uso. En Windows no se intenta: el `yt-dlp.exe` del
+instalador es autónomo ([ADR-24](../decisions/ADR-24-version-de-windows.md)).
 
 ## Medidas
 
@@ -108,8 +109,9 @@ La vía rápida sirve unas 9 de cada 10 pistas.
 
 ## Estado actual
 
-- **Última verificación:** 2026-11-17, el clic no espera a las precargas ([historial](../history/verificacion/resolucion.md)).
+- **Última verificación:** 2026-11-22, sin yt-dlp residente en Windows: solo compilado en macOS ([historial](../history/verificacion/resolucion.md)).
 - **Pruebas:** `mod tests` de `src/stream.rs` (elección del mejor audio). El resto, con
   `--probe fast`, `--probe resolve` y `--probe playable` ([verificar-reproduccion](../runbooks/verificar-reproduccion.md)).
-- **Sin verificar:** Premium 256 kbps con una cuenta Premium real en Linux.
+- **Sin verificar:** Premium 256 kbps con una cuenta Premium real en Linux; los tiempos de la vía
+  rápida y de yt-dlp en Windows.
 - **Historial:** [docs/history/verificacion/resolucion.md](../history/verificacion/resolucion.md).

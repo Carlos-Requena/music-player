@@ -1,13 +1,12 @@
 //! Discord Rich Presence: muestra «Escuchando…» en el perfil de Discord.
 //!
-//! Habla con el cliente de Discord por su socket IPC local (sin dependencias): cada mensaje
+//! Habla con el cliente de Discord por su socket IPC local (en Windows, la tubería con nombre
+//! `\\.\pipe\discord-ipc-N`), sin dependencias: cada mensaje
 //! es `[opcode u32 LE][longitud u32 LE][JSON]`. Hace falta el «Application ID» de una
 //! aplicación creada por el usuario en discord.com/developers (es gratis y público).
 
 use std::{
-    env,
     io::{Read, Write},
-    os::unix::net::UnixStream,
     path::PathBuf,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
@@ -15,6 +14,27 @@ use std::{
 use serde_json::{json, Value};
 
 use super::Track;
+
+#[cfg(unix)]
+type UnixStream = std::os::unix::net::UnixStream;
+#[cfg(windows)]
+type UnixStream = crate::tuberia::Tuberia;
+
+/// Conecta con Discord y pone un límite de 3 s a cada lectura y escritura.
+#[cfg(unix)]
+fn open(path: PathBuf) -> Option<UnixStream> {
+    let stream = UnixStream::connect(path).ok()?;
+    let _ = stream.set_read_timeout(Some(Duration::from_secs(3)));
+    let _ = stream.set_write_timeout(Some(Duration::from_secs(3)));
+    Some(stream)
+}
+
+#[cfg(windows)]
+fn open(path: PathBuf) -> Option<UnixStream> {
+    let mut stream = UnixStream::open(&path).ok()?;
+    stream.set_timeout(Some(Duration::from_secs(3)));
+    Some(stream)
+}
 
 const HANDSHAKE: u32 = 0;
 const FRAME: u32 = 1;
@@ -24,11 +44,18 @@ pub struct Discord {
     stream: Option<UnixStream>,
 }
 
+/// Tuberías de Discord en Windows: una por cliente abierto (Discord, PTB, Canary…).
+#[cfg(windows)]
+fn candidates() -> Vec<PathBuf> {
+    (0..10).map(|n| PathBuf::from(format!(r"\\.\pipe\discord-ipc-{n}"))).collect()
+}
+
 /// Rutas posibles del socket de Discord (nativo, Flatpak, Snap, Vesktop).
+#[cfg(unix)]
 fn candidates() -> Vec<PathBuf> {
     let mut dirs: Vec<PathBuf> = ["XDG_RUNTIME_DIR", "TMPDIR", "TMP", "TEMP"]
         .iter()
-        .filter_map(|key| env::var_os(key).map(PathBuf::from))
+        .filter_map(|key| std::env::var_os(key).map(PathBuf::from))
         .collect();
     dirs.push(PathBuf::from("/tmp"));
     let mut out = Vec::new();
@@ -112,12 +139,7 @@ impl Discord {
         if self.client_id.trim().is_empty() {
             return Err("Falta el Application ID de Discord.".to_owned());
         }
-        let mut stream = candidates()
-            .into_iter()
-            .find_map(|path| UnixStream::connect(path).ok())
-            .ok_or("Discord no está abierto.")?;
-        let _ = stream.set_read_timeout(Some(Duration::from_secs(3)));
-        let _ = stream.set_write_timeout(Some(Duration::from_secs(3)));
+        let mut stream = candidates().into_iter().find_map(open).ok_or("Discord no está abierto.")?;
         stream
             .write_all(&frame(HANDSHAKE, &json!({ "v": 1, "client_id": self.client_id.trim() })))
             .map_err(|error| format!("Discord: {error}"))?;
@@ -164,8 +186,9 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
     fn habla_con_un_discord_simulado() {
-        use std::os::unix::net::UnixListener;
+        use std::{env, os::unix::net::UnixListener};
         let dir = env::temp_dir().join(format!("discord-prueba-{}", std::process::id()));
         let _ = std::fs::create_dir_all(&dir);
         let socket = dir.join("discord-ipc-0");

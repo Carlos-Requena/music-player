@@ -227,8 +227,17 @@ pub fn emit(event: Event) {
 }
 
 fn open_browser(url: &str) {
-    let opener = if cfg!(target_os = "macos") { "open" } else { "xdg-open" };
-    let _ = Command::new(opener).arg(url).spawn();
+    let mut command = if cfg!(target_os = "macos") {
+        Command::new("open")
+    } else if cfg!(windows) {
+        // Sin `cmd /c start`: cmd trocearía la URL por sus `&`.
+        let mut command = Command::new("rundll32");
+        command.arg("url.dll,FileProtocolHandler");
+        command
+    } else {
+        Command::new("xdg-open")
+    };
+    let _ = command.arg(url).spawn();
 }
 
 /// Hilo de Discord, Last.fm y ListenBrainz.

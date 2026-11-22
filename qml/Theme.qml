@@ -43,9 +43,9 @@ QtObject {
     readonly property string lyricsFamily: {
         const family = AppSettings.opcion("letraFuente", AppSettings.revision)
         if (family === "serif")
-            return Qt.platform.os === "osx" ? "Georgia" : "serif"
+            return Qt.platform.os === "osx" || Qt.platform.os === "windows" ? "Georgia" : "serif"
         if (family === "mono")
-            return Qt.platform.os === "osx" ? "Menlo" : "monospace"
+            return Qt.platform.os === "osx" ? "Menlo" : Qt.platform.os === "windows" ? "Consolas" : "monospace"
         return Qt.application.font.family
     }
     readonly property int lyricsWeight: AppSettings.opcion("letraPeso", AppSettings.revision) === "normal" ? Font.Medium : Font.Bold

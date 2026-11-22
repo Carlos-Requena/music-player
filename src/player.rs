@@ -594,10 +594,27 @@ impl qobject::Player {
         if self.media.is_some() {
             return;
         }
+        // Windows: los controles van atados a la ventana principal (su HWND).
+        #[cfg(windows)]
+        let hwnd = {
+            extern "C" {
+                /// `src/window.cpp`: manejador nativo de la ventana principal.
+                fn musicplayer_main_window() -> *mut std::ffi::c_void;
+            }
+            // SAFETY: función C++ sin argumentos; se llama en el hilo de Qt.
+            let window = unsafe { musicplayer_main_window() };
+            if window.is_null() {
+                eprintln!("controles multimedia: aún no hay ventana principal");
+                return;
+            }
+            Some(window)
+        };
+        #[cfg(not(windows))]
+        let hwnd = None;
         let config = souvlaki::PlatformConfig {
             display_name: "Reproductor de música",
             dbus_name: "musicplayer",
-            hwnd: None,
+            hwnd,
         };
         let Ok(mut controls) = souvlaki::MediaControls::new(config) else {
             eprintln!("no se pudieron crear los controles multimedia del sistema");

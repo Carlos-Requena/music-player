@@ -8,7 +8,7 @@ está en el documento que toca, y la sección 2 dice cuál.
 
 ## 1. Qué es
 
-Cliente de YouTube Music para macOS y Linux (CachyOS): interfaz **Qt 6 / QML**, núcleo **Rust**
+Cliente de YouTube Music para macOS, Linux (CachyOS) y Windows: interfaz **Qt 6 / QML**, núcleo **Rust**
 unido a QML con **cxx-qt 0.10**, audio con **mpv** (proceso aparte, por IPC) y URLs de audio con
 la vía rápida de `/player` o **yt-dlp**. Sin Electron ni navegador embebido.
 
@@ -49,7 +49,7 @@ scripts/shaders.sh              # recompila shaders/*.frag a .qsb (necesita qsb)
 - **Probar sin ventana** (`--probe`), **capturas** (`--shot`) y **clics simulados**: los
   argumentos completos están en [runbooks/verificar-interfaz.md](runbooks/verificar-interfaz.md)
   y [runbooks/verificar-reproduccion.md](runbooks/verificar-reproduccion.md).
-- **Compilar e instalar** para usarla (app de macOS, CachyOS): [COMPILAR.md](../COMPILAR.md).
+- **Compilar e instalar** para usarla (app de macOS, CachyOS, instalador de Windows): [COMPILAR.md](../COMPILAR.md).
 
 ---
 
@@ -307,9 +307,12 @@ añadas más casos, y actualiza la lista.
   ([interfaz-comun](areas/interfaz-comun.md)).
 - **Opciones compactas**: un segmento «Normal / Compacta» junto a la × quita las descripciones de
   las filas (salen en el pie al pasar el ratón) ([personalizacion](areas/personalizacion.md)).
-- **Iniciar sesión con una ventana propia** (WebKit del sistema en macOS, Qt WebEngine opcional en
-  Linux) y, como alternativa, importar del navegador; sin disfrazar el agente de usuario
-  ([sesion](areas/sesion.md)).
+- **Iniciar sesión con una ventana propia** (WebKit del sistema en macOS, WebView2 en Windows, Qt
+  WebEngine opcional en Linux) y, como alternativa, importar del navegador; sin disfrazar el agente
+  de usuario ([sesion](areas/sesion.md)).
+- **Windows con instalador `.exe`** (Inno Setup, por usuario, con mpv, yt-dlp y deno dentro), del
+  mismo código que macOS y Linux ([ADR-24](decisions/ADR-24-version-de-windows.md),
+  [COMPILAR](../COMPILAR.md#windows)).
 
 ---
 

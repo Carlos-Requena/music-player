@@ -1,13 +1,20 @@
-//! `musicplayer-login`: ventana de inicio de sesión de YouTube Music para Linux.
+//! `musicplayer-login`: ventana de inicio de sesión de YouTube Music para Linux (Qt WebEngine,
+//! `login_linux.cpp`) y Windows (WebView2, `login_windows.rs`).
 //!
-//! - `musicplayer-login --check`: sale con 0 si se compiló con Qt WebEngine, 3 si no.
+//! - `musicplayer-login --check`: sale con 0 si hay ventana (Windows siempre; Linux si se
+//!   compiló con Qt WebEngine), 3 si no.
 //! - `musicplayer-login <archivo>`: abre la ventana; al volver a YouTube Music con la sesión
 //!   iniciada escribe las cookies de youtube.com en `<archivo>` (formato Netscape, permisos 600)
 //!   y sale con 0. Si el usuario cierra la ventana, sale con 1.
 //!
-//! El reproductor (`account.rs`) lo lanza como proceso aparte: así no carga Qt WebEngine.
+//! El reproductor (`account.rs`) lo lanza como proceso aparte: así no carga ningún motor web.
+
+#![cfg_attr(windows, windows_subsystem = "windows")]
 
 use std::process::exit;
+
+#[cfg(windows)]
+mod login_windows;
 
 #[cfg(webengine)]
 extern "C" {
@@ -21,8 +28,11 @@ fn main() {
         exit(2);
     };
     if argument == "--check" {
-        exit(if cfg!(webengine) { 0 } else { 3 });
+        exit(if cfg!(any(webengine, windows)) { 0 } else { 3 });
     }
+
+    #[cfg(windows)]
+    exit(login_windows::run(argument));
 
     #[cfg(webengine)]
     {
@@ -31,7 +41,7 @@ fn main() {
         exit(unsafe { musicplayer_login_linux(path.as_ptr()) });
     }
 
-    #[cfg(not(webengine))]
+    #[cfg(not(any(webengine, windows)))]
     {
         eprintln!("esta compilación no incluye la ventana de inicio de sesión (falta qt6-webengine)");
         exit(3);

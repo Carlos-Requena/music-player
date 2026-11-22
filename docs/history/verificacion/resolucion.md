@@ -5,6 +5,12 @@ son de cuando se escribieron. El estado actual está en su [ficha](../../areas/r
 
 Lo nuevo va arriba: añade una sección `## AAAA-MM-DD · qué se verificó` encima de las anteriores.
 
+## 2026-11-22 · sin yt-dlp residente en Windows
+
+- **Cómo:** `cargo build --release` y `cargo test` en macOS (M4 Pro); prueba `--autoplay` como en [reproduccion](reproduccion.md).
+- **Resultado:** sin cambios en macOS (`sonando true`, sin error).
+- **No verificado:** tiempos de la vía rápida y de yt-dlp en Windows.
+
 ## 2026-11-17 · El clic no espera a las precargas (rama `perf/letra`)
 
 - **Cambio:** `resolve` (clic, pasar de pista) no cuenta en `MAX_WORKERS` y reintenta; las

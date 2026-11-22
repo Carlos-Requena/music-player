@@ -133,6 +133,27 @@ que toque **antes** de cambiar algo ahí. Una trampa nueva se añade en su secci
   puede no ser seguro») porque contradice `Sec-CH-UA`.
 - **Sockets Unix** admiten ~104 bytes de ruta: en pruebas de Discord usa una ruta relativa corta.
 
+## Windows
+
+- **Una tubería con nombre abierta en modo síncrono se atasca:** Windows pone en fila las
+  operaciones de un mismo manejador, y la lectura que espera los eventos de mpv bloquea cada orden
+  hasta que llega un evento. Se abre «overlapped» y cada operación espera solo a sí misma
+  (`tuberia::Tuberia`).
+- **Cada proceso auxiliar abre una ventana de consola** si lo lanza una app gráfica: lánzalos con
+  `audio::command` (`CREATE_NO_WINDOW`), nunca con `Command::new` a secas.
+- **Sin señales, los hijos quedan huérfanos** al cerrar la app a la fuerza: el «job» con
+  `KILL_ON_JOB_CLOSE` de `tuberia::kill_children_on_exit` los cierra con ella.
+- **souvlaki entra en pánico sin HWND** en Windows (`expect`): `Player.apply_media_controls` pide
+  antes la ventana principal y, si no hay, no crea los controles.
+- **WebView2 se ve borroso** si el proceso no se declara consciente del DPI por monitor antes de
+  crear la ventana (`SetProcessDpiAwarenessContext`): Windows lo dibuja a 96 ppp y lo amplía.
+- **PowerShell 5.1 lee los `.ps1` sin BOM como ANSI:** las tildes salen mal. Guarda
+  `scripts/crear-instalador-windows.ps1` en UTF-8 **con BOM**.
+- **`cargo check --target x86_64-pc-windows-msvc` desde macOS** necesita el Rust de rustup (el de
+  Homebrew no trae ese destino): `PATH=$HOME/.cargo/bin:$PATH cargo check -p musicplayer-login
+  --target x86_64-pc-windows-msvc`. El reproductor entero no se puede comprobar así: su `build.rs`
+  compila C++ contra Qt.
+
 ## Medir
 
 - **Mide siempre en release.** Depuración cambia memoria y tiempos.

@@ -2,9 +2,9 @@
 area: sesion
 titulo: Sesión de YouTube Music
 resumen: Iniciar sesión (ventana propia o cookies del navegador), guardar solo las cookies de youtube.com y firmar las peticiones con SAPISIDHASH.
-archivos: [src/account.rs, src/login_mac.mm, login/src/main.rs, login/src/login_linux.cpp]
+archivos: [src/account.rs, src/login_mac.mm, login/src/main.rs, login/src/login_linux.cpp, login/src/login_windows.rs]
 opciones: []
-adr: [ADR-07]
+adr: [ADR-07, ADR-24]
 ---
 
 # Sesión de YouTube Music
@@ -14,10 +14,12 @@ Premium y registro de escuchas.
 
 ## Qué hace
 
-- **Ventana de inicio de sesión** (macOS siempre; Linux si se compiló con Qt WebEngine): abre la
+- **Ventana de inicio de sesión** (macOS y Windows siempre; Linux si se compiló con Qt WebEngine): abre la
   página de Google y, al volver a YouTube Music con `SAPISID`, guarda las cookies.
-- **Importar del navegador** (Linux, y alternativa en macOS): `yt-dlp --cookies-from-browser`.
-  En macOS exige «Acceso total al disco» (la app lo detecta y abre los ajustes de privacidad).
+- **Importar del navegador** (alternativa): `yt-dlp --cookies-from-browser`.
+  En macOS exige «Acceso total al disco» (la app lo detecta y abre los ajustes de privacidad). En
+  Windows, Chrome, Edge y Brave cifran sus cookies de forma que yt-dlp no siempre puede leerlas:
+  Firefox va primero en la lista y la interfaz lo avisa.
 - **Comprobar al arrancar** (`Account.verify`): si YouTube ya no reconoce la sesión, la borra y
   avisa. Al iniciar o cerrar sesión se reinicia mpv y se recarga la biblioteca.
 
@@ -29,7 +31,12 @@ Premium y registro de escuchas.
   `Sec-CH-UA` que el motor envía siempre y Google lo bloquea («este navegador puede no ser
   seguro»). En macOS sí se pone la `applicationNameForUserAgent` de Safari: sin ella Google lo
   trata como navegador embebido.
-- **Solo las cookies de `youtube.com`**, en `cookies.txt` con permisos 600.
+- **Solo las cookies de `youtube.com`**, en `cookies.txt` con permisos 600 (en Windows,
+  `%APPDATA%\musicplayer`, que ya solo puede leer el usuario).
+- **Windows: WebView2**, elegido por el propietario
+  ([ADR-24](../decisions/ADR-24-version-de-windows.md)): ya viene con Windows y no añade nada al
+  instalador. Nitidez: el proceso se declara consciente del DPI por monitor antes de crear la
+  ventana; sin eso Windows la dibuja a 96 ppp y la amplía, borrosa.
 - **yt-dlp y mpv reciben una copia** (`cookies_copy`): yt-dlp reescribe el archivo de `--cookies`
   al terminar ([TRAMPAS](../TRAMPAS.md#youtube-yt-dlp-y-mpv)).
 - **Las cookies solo se mandan a hosts `*.youtube.com`.**
@@ -62,14 +69,26 @@ cambia la inicial.
 un perfil privado), con el mismo protocolo. `login/build.rs` solo lo compila si encuentra
 `qt6-webengine`; si no, responde 3 a `--check` y la app ofrece importar del navegador.
 
+### Windows
+
+`Account.signInWeb` lanza `musicplayer-login.exe <temporal>` (el mismo crate `login/`,
+`login/src/login_windows.rs` con `webview2-com`), junto al ejecutable. Abre una ventana Win32 con
+WebView2 en modo InPrivate (las cookies no tocan el disco; `%LOCALAPPDATA%\musicplayer\webview2`
+solo guarda la caché del motor). Al terminar de cargar `music.youtube.com`, pregunta a la página
+por `ytcfg LOGGED_IN` y, si hay sesión, pide al gestor de cookies las de
+`https://music.youtube.com`, se queda con las de youtube.com y sale con 0; cerrar la ventana, 1;
+sin WebView2, 2. No copia las cookies de `.google.com` como macOS: Chromium no pierde las de la
+cadena de redirecciones. `MUSICPLAYER_LOGIN_URL` cambia la página inicial.
+
 ## Archivos
 
 | Archivo | Contenido |
 |---|---|
 | `src/account.rs` | Singleton `Account`: iniciar, comprobar y cerrar sesión, leer cookies, firmar |
 | `src/login_mac.mm` | Ventana de macOS (WKWebView), compilada con `cc` desde `build.rs` |
-| `login/src/main.rs` | Binario `musicplayer-login` de Linux |
+| `login/src/main.rs` | Binario `musicplayer-login` de Linux y Windows |
 | `login/src/login_linux.cpp` | La ventana de Qt WebEngine |
+| `login/src/login_windows.rs` | La ventana de WebView2 (Windows) |
 
 ### Dónde está cada cosa
 
@@ -94,8 +113,9 @@ un perfil privado), con el mismo protocolo. `login/build.rs` solo lo compila si 
 
 ## Estado actual
 
-- **Última verificación:** sin registrar.
+- **Última verificación:** 2026-11-22, ventana de Windows: solo `cargo check` y `clippy` para Windows desde macOS ([historial](../history/verificacion/sesion.md)).
 - **Pruebas:** `mod tests` de `src/account.rs` (solo cookies de youtube.com, bloqueo de Safari,
   sin `SAPISID` no hay sesión, formato de la firma).
-- **Sin verificar:** la ventana de Linux con Wayland.
+- **Sin verificar:** la ventana de Linux con Wayland; **la de Windows entera** (que Google acepte
+  WebView2, la nitidez a 125–150 %, las cookies guardadas); importar del navegador en Windows.
 - **Historial:** [docs/history/verificacion/sesion.md](../history/verificacion/sesion.md).

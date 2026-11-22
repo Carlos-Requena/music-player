@@ -412,13 +412,19 @@ Item {
                 width: parent.width
                 spacing: 12
 
+                // Windows: Firefox primero; Chrome, Edge y Brave cifran sus cookies de forma que
+                // yt-dlp no siempre puede leerlas.
                 readonly property var browsers: Qt.platform.os === "osx"
                     ? [{ id: "chrome", label: "Chrome" }, { id: "safari", label: "Safari" }, { id: "firefox", label: "Firefox" },
                        { id: "brave", label: "Brave" }, { id: "edge", label: "Edge" }]
+                    : Qt.platform.os === "windows"
+                    ? [{ id: "firefox", label: "Firefox" }, { id: "chrome", label: "Chrome" }, { id: "edge", label: "Edge" },
+                       { id: "brave", label: "Brave" }]
                     : [{ id: "chrome", label: "Chrome" }, { id: "chromium", label: "Chromium" }, { id: "firefox", label: "Firefox" },
                        { id: "brave", label: "Brave" }, { id: "vivaldi", label: "Vivaldi" }]
 
-                // Ventana propia de inicio de sesión (macOS, y Linux con qt6-webengine); importar
+                // Ventana propia de inicio de sesión (macOS, Windows con WebView2 y Linux con
+                // qt6-webengine); importar
                 // del navegador queda como alternativa (en macOS exige «Acceso total al disco»).
                 readonly property bool webLogin: Account.webLogin
                 property bool importing: !webLogin
@@ -500,8 +506,12 @@ Item {
                     visible: text !== ""
                     width: parent.width
                     text: Account.message !== "" ? Account.message
+                        : !Account.signedIn && !accountSection.webLogin && Qt.platform.os === "windows"
+                          ? "Para iniciar sesión en una ventana, vuelve a instalar el reproductor: falta musicplayer-login.exe."
                         : !Account.signedIn && !accountSection.webLogin && Qt.platform.os !== "osx"
                           ? "Para iniciar sesión en una ventana, instala qt6-webengine y vuelve a instalar el reproductor (scripts/instalar-linux.sh)."
+                        : !Account.signedIn && Qt.platform.os === "windows" && accountSection.importing && Account.browser !== "firefox"
+                          ? "En Windows, Chrome, Edge y Brave suelen impedir que se lean sus cookies: si falla, usa Firefox o la ventana de inicio de sesión."
                         : !Account.signedIn && Qt.platform.os === "osx" && accountSection.importing
                           ? (Account.browser === "safari"
                              ? "macOS exige «Acceso total al disco» para leer los datos de Safari."
@@ -998,7 +1008,9 @@ Item {
 
                 Toggle {
                     label: "Controles del sistema"
-                    hint: Qt.platform.os === "osx" ? "Teclas multimedia y Centro de control." : "Teclas multimedia y MPRIS (panel del escritorio)."
+                    hint: Qt.platform.os === "osx" ? "Teclas multimedia y Centro de control."
+                        : Qt.platform.os === "windows" ? "Teclas multimedia y el control multimedia de Windows."
+                        : "Teclas multimedia y MPRIS (panel del escritorio)."
                     on: Plugins.mediaOn
                     onChanged: on => Plugins.setMedia(on)
                 }

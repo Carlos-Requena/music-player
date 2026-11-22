@@ -129,6 +129,17 @@ static void scheduleDebugClicks(QQuickWindow *window)
     }
 }
 
+// Manejador nativo de la ventana principal (el HWND en Windows), que piden los controles
+// multimedia del sistema. `winId()` crea la ventana nativa si aún no existe. Nulo si no hay.
+extern "C" void *musicplayer_main_window()
+{
+    for (QWindow *window : QGuiApplication::topLevelWindows()) {
+        if (qobject_cast<QQuickWindow *>(window) && window->title() != QString())
+            return reinterpret_cast<void *>(window->winId());
+    }
+    return nullptr;
+}
+
 // Se llama desde Rust tras cargar la interfaz (y cada vez que se crea una ventana nueva).
 extern "C" void musicplayer_tune_windows()
 {

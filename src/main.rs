@@ -1,3 +1,6 @@
+// Windows: sin ventana de consola detrás de la app (en depuración se deja, para ver stderr).
+#![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
+
 mod account;
 mod animada;
 mod audio;
@@ -11,6 +14,8 @@ mod plugins;
 mod resolver;
 mod settings;
 mod stream;
+#[cfg(windows)]
+mod tuberia;
 mod ytm;
 
 use cxx_qt_lib::{QGuiApplication, QQmlApplicationEngine, QUrl};
@@ -267,6 +272,8 @@ extern "C" {
 }
 
 fn main() {
+    #[cfg(windows)]
+    tuberia::kill_children_on_exit();
     let args: Vec<String> = std::env::args().collect();
     // `--login <archivo>`: proceso aparte que solo muestra la ventana de inicio de sesión
     // (lo lanza `Account.signInWeb`). No arranca Qt.

@@ -5,6 +5,12 @@ son de cuando se escribieron. El estado actual está en su [ficha](../../areas/p
 
 Lo nuevo va arriba: añade una sección `## AAAA-MM-DD · qué se verificó` encima de las anteriores.
 
+## 2026-11-22 · Discord por tubería con nombre en Windows
+
+- **Cómo:** `cargo build --release` sin avisos y `cargo test` en verde en macOS (M4 Pro); `PATH=$HOME/.cargo/bin:$PATH cargo check --target x86_64-pc-windows-msvc` de `src/plugins/discord.rs` con piezas de relleno.
+- **Resultado:** compila sin avisos para Windows; las pruebas de Discord siguen en verde en macOS (la del Discord simulado queda solo para Unix).
+- **No verificado:** Discord en Windows.
+
 ## 2026-11-17 · Plugin de ListenBrainz (rama `feature/explorar-listenbrainz`)
 
 - **Cambio:** `src/plugins/listenbrainz.rs` (envío de escuchas con token), su fila en Opciones ›

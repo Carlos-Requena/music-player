@@ -1,17 +1,24 @@
-//! Motor de audio: un proceso `mpv` sin vídeo controlado por su socket IPC JSON.
+//! Motor de audio: un proceso `mpv` sin vídeo controlado por su socket IPC JSON (en Windows,
+//! una tubería con nombre: `tuberia.rs`).
 //!
 //! mpv resuelve las URL de YouTube con su gancho de `yt-dlp`, así que aquí basta
 //! con pedirle que cargue `https://www.youtube.com/watch?v=…`.
 
 use std::{
-    env, fs,
+    env,
+    ffi::OsStr,
     io::{self, BufRead, BufReader, Write},
-    os::unix::net::UnixStream,
     path::{Path, PathBuf},
     process::{Child, Command, Stdio},
     thread,
     time::{Duration, Instant},
 };
+
+/// Conexión con mpv: socket Unix o, en Windows, tubería con nombre.
+#[cfg(unix)]
+type Ipc = std::os::unix::net::UnixStream;
+#[cfg(windows)]
+type Ipc = crate::tuberia::Tuberia;
 
 use serde_json::{json, Value};
 
@@ -86,28 +93,56 @@ pub fn effects() -> String {
 }
 
 /// Rutas donde suelen vivir mpv y yt-dlp y que una app gráfica no hereda en su PATH.
+#[cfg(not(windows))]
 const EXTRA_PATHS: &[&str] = &["/opt/homebrew/bin", "/usr/local/bin"];
+#[cfg(windows)]
+const EXTRA_PATHS: &[&str] = &[];
 
+/// El PATH del sistema con `EXTRA_PATHS` y, en Windows, la carpeta del ejecutable delante: el
+/// instalador deja allí mpv, yt-dlp, deno y ffmpeg.
 pub fn search_path() -> String {
-    let mut path = env::var("PATH").unwrap_or_default();
-    for extra in EXTRA_PATHS {
-        if !path.split(':').any(|dir| dir == *extra) {
-            path.push(':');
-            path.push_str(extra);
+    let mut dirs: Vec<PathBuf> = env::var_os("PATH").map(|path| env::split_paths(&path).collect()).unwrap_or_default();
+    if cfg!(windows) {
+        if let Some(dir) = env::current_exe().ok().and_then(|exe| exe.parent().map(Path::to_path_buf)) {
+            dirs.retain(|other| *other != dir);
+            dirs.insert(0, dir);
         }
     }
-    path
+    for extra in EXTRA_PATHS.iter().map(PathBuf::from) {
+        if !dirs.contains(&extra) {
+            dirs.push(extra);
+        }
+    }
+    env::join_paths(dirs).map(|path| path.to_string_lossy().into_owned()).unwrap_or_default()
 }
 
+/// Ruta de `program` en `path` (en Windows, con `.exe` si no lleva extensión).
 pub fn which(program: &str, path: &str) -> Option<PathBuf> {
-    path.split(':')
-        .map(|dir| Path::new(dir).join(program))
-        .find(|candidate| candidate.is_file())
+    let name = if cfg!(windows) && Path::new(program).extension().is_none() {
+        format!("{program}.exe")
+    } else {
+        program.to_owned()
+    };
+    env::split_paths(path).map(|dir| dir.join(&name)).find(|candidate| candidate.is_file())
+}
+
+/// `Command::new` para los procesos auxiliares (mpv, yt-dlp, ffmpeg…). En Windows, sin la
+/// ventana de consola que abriría cada uno al lanzarlo desde una app gráfica.
+pub fn command(program: impl AsRef<OsStr>) -> Command {
+    #[allow(unused_mut)]
+    let mut command = Command::new(program);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+    command
 }
 
 pub struct Mpv {
     child: Child,
-    socket: UnixStream,
+    socket: Ipc,
     socket_path: PathBuf,
 }
 
@@ -117,15 +152,10 @@ impl Mpv {
         let path = search_path();
         let mpv = which("mpv", &path)
             .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "no se encuentra mpv"))?;
-        // Los sockets Unix admiten rutas de ~104 bytes: con una carpeta temporal larga se usa /tmp.
-        let name = format!("musicplayer-mpv-{}.sock", std::process::id());
-        let mut socket_path = env::temp_dir().join(&name);
-        if socket_path.as_os_str().len() > 100 {
-            socket_path = PathBuf::from("/tmp").join(&name);
-        }
-        let _ = fs::remove_file(&socket_path);
+        let socket_path = socket_path();
+        remove_socket(&socket_path);
 
-        let mut command = Command::new(mpv);
+        let mut command = command(mpv);
         command
             .arg("--idle=yes")
             .arg("--no-video")
@@ -165,7 +195,7 @@ impl Mpv {
                 return Err(error);
             }
         };
-        let reader = socket.try_clone()?;
+        let reader = clone_socket(&socket)?;
         thread::spawn(move || read_events(reader, on_event));
 
         let mut mpv = Self { child, socket, socket_path };
@@ -219,15 +249,56 @@ impl Drop for Mpv {
     fn drop(&mut self) {
         let _ = self.child.kill();
         let _ = self.child.wait();
-        let _ = fs::remove_file(&self.socket_path);
+        remove_socket(&self.socket_path);
     }
 }
 
+/// Dónde escucha mpv. Los sockets Unix admiten rutas de ~104 bytes: con una carpeta temporal
+/// larga se usa /tmp. En Windows es una tubería con nombre, que no deja nada en disco.
+fn socket_path() -> PathBuf {
+    let name = format!("musicplayer-mpv-{}", std::process::id());
+    if cfg!(windows) {
+        return PathBuf::from(format!(r"\\.\pipe\{name}"));
+    }
+    let name = format!("{name}.sock");
+    let socket_path = env::temp_dir().join(&name);
+    if socket_path.as_os_str().len() > 100 {
+        return PathBuf::from("/tmp").join(&name);
+    }
+    socket_path
+}
+
+fn remove_socket(path: &Path) {
+    if cfg!(unix) {
+        let _ = std::fs::remove_file(path);
+    }
+}
+
+#[cfg(unix)]
+fn open_socket(path: &Path) -> io::Result<Ipc> {
+    Ipc::connect(path)
+}
+
+#[cfg(windows)]
+fn open_socket(path: &Path) -> io::Result<Ipc> {
+    Ipc::open(path)
+}
+
+#[cfg(unix)]
+fn clone_socket(socket: &Ipc) -> io::Result<Ipc> {
+    socket.try_clone()
+}
+
+#[cfg(windows)]
+fn clone_socket(socket: &Ipc) -> io::Result<Ipc> {
+    Ok(socket.clone())
+}
+
 /// mpv crea el socket poco después de arrancar; se reintenta hasta `timeout`.
-fn connect(path: &Path, timeout: Duration) -> io::Result<UnixStream> {
+fn connect(path: &Path, timeout: Duration) -> io::Result<Ipc> {
     let deadline = Instant::now() + timeout;
     loop {
-        match UnixStream::connect(path) {
+        match open_socket(path) {
             Ok(socket) => return Ok(socket),
             Err(error) if Instant::now() >= deadline => return Err(error),
             Err(_) => thread::sleep(Duration::from_millis(50)),
@@ -254,7 +325,7 @@ struct Message<'a> {
     text: Option<String>,
 }
 
-fn read_events(socket: UnixStream, on_event: impl Fn(Event)) {
+fn read_events(socket: Ipc, on_event: impl Fn(Event)) {
     let mut last_position = f64::MIN;
     let mut last_bitrate = f64::MIN;
     let mut reader = BufReader::new(socket);

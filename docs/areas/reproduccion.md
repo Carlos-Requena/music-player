@@ -2,9 +2,9 @@
 area: reproduccion
 titulo: Reproducción y cola
 resumen: Cola, lista temporal, siguiente y anterior, repetición, volumen y estado de lo que suena, con mpv como motor en un proceso aparte.
-archivos: [src/player.rs, src/audio.rs, src/signals.cpp, qml/PlayerBar.qml, qml/QueueList.qml]
+archivos: [src/player.rs, src/audio.rs, src/tuberia.rs, src/signals.cpp, qml/PlayerBar.qml, qml/QueueList.qml]
 opciones: [barra, ecualizador, ecualizadorBandas, amplificador, clic]
-adr: [ADR-02, ADR-23]
+adr: [ADR-02, ADR-23, ADR-24]
 ---
 
 # Reproducción y cola
@@ -48,7 +48,13 @@ Del clic a que suene, y lo que pasa mientras suena. Obtener la URL es de
 - **mpv solo avisa de la pausa cuando cambia**: al empezar una pista se aplica la última conocida
   (`mpv_paused`) ([TRAMPAS](../TRAMPAS.md#youtube-yt-dlp-y-mpv)).
 - **Apps gráficas en macOS no heredan el `PATH`**: `search_path` añade `/opt/homebrew/bin` y
-  `/usr/local/bin`.
+  `/usr/local/bin`. En Windows pone delante la carpeta del ejecutable (el instalador deja allí
+  mpv, yt-dlp y deno) y `which` añade `.exe`.
+- **Windows** ([ADR-24](../decisions/ADR-24-version-de-windows.md)): mpv escucha en la tubería
+  `\\.\pipe\musicplayer-mpv-<pid>`, abierta en modo «overlapped» (`tuberia.rs`) para leer
+  eventos y escribir órdenes a la vez ([TRAMPAS](../TRAMPAS.md#windows)). Todo proceso auxiliar se
+  lanza con `audio::command`, que en Windows quita la ventana de consola. Los controles del sistema
+  van atados a la ventana principal (`musicplayer_main_window`).
 - **Al empezar una pista nada espera** al historial ni a los plugins: se avisan después.
 - **La letra de una canción pulsada se pide al llegar su cola** (unas décimas después), que trae
   el artista limpio y la duración: una sola búsqueda por canción ([letra](letra.md)).
@@ -66,7 +72,9 @@ Del clic a que suene, y lo que pasa mientras suena. Obtener la URL es de
 - **mpv muere con la app**, también ante SIGTERM, SIGINT o SIGHUP (`kill <pid>`, Ctrl+C):
   `signals.cpp` convierte la señal en `QCoreApplication::quit()`, la salida normal destruye el
   `Player` y el `Drop` de `Mpv` cierra el proceso. Una segunda señal mata la app sin esperar. El
-  yt-dlp residente se cierra solo al ver su stdin cerrado. Con SIGKILL no hay remedio.
+  yt-dlp residente se cierra solo al ver su stdin cerrado. Con SIGKILL no hay remedio. En Windows
+  no hay señales: el proceso se mete al arrancar en un «job» que el sistema cierra al terminar
+  (`kill_children_on_exit`), y con él a mpv, yt-dlp y ffmpeg, aunque se cierre a la fuerza.
 
 ## Cómo funciona
 
@@ -134,7 +142,8 @@ Stderr escribe `arranque de pista: N ms` en cada una.
 |---|---|
 | `src/player.rs` | Singleton `Player`: cola, lista temporal, estado, controles del sistema, avisos |
 | `src/audio.rs` | Proceso mpv y su IPC; búsqueda de ejecutables en el `PATH` ampliado |
-| `src/signals.cpp` | SIGTERM, SIGINT y SIGHUP cierran la app de forma ordenada (y con ella, mpv) |
+| `src/tuberia.rs` | Windows: tuberías con nombre «overlapped» (mpv, Discord) y el «job» que cierra a los hijos |
+| `src/signals.cpp` | SIGTERM, SIGINT y SIGHUP cierran la app de forma ordenada (y con ella, mpv); en Windows, nada |
 | `qml/PlayerBar.qml` | Barra de reproducción en tres estilos (Islas, Clásica, Compacta) |
 | `qml/QueueList.qml` | Lista de la cola, con arrastrar para reordenar |
 
@@ -153,6 +162,9 @@ Stderr escribe `arranque de pista: N ms` en cada una.
 | Lanzar mpv | [`spawn`](../../src/audio.rs) |
 | Eventos de mpv | [`read_events`](../../src/audio.rs) |
 | `PATH` ampliado | [`search_path`](../../src/audio.rs) |
+| Lanzar un proceso auxiliar (sin consola en Windows) | [`command`](../../src/audio.rs) |
+| Tubería de mpv en Windows | [`socket_path`](../../src/audio.rs), [`Tuberia`](../../src/tuberia.rs) |
+| Cerrar a los hijos en Windows | [`kill_children_on_exit`](../../src/tuberia.rs) |
 | Cadena de filtros del ecualizador | [`effects_chain`](../../src/audio.rs), [`configure`](../../src/audio.rs) |
 | Aplicar los efectos a mpv | [`apply_effects`](../../src/player.rs), [`set_effects`](../../src/audio.rs) |
 | Interfaz del ecualizador | [`effects`](../../qml/SettingsSheet.qml) |
@@ -176,11 +188,12 @@ Stderr escribe `arranque de pista: N ms` en cada una.
 
 ## Estado actual
 
-- **Última verificación:** 2026-11-21, filas `TrackRow` en la cola, opción `clic` y medidas comunes en la barra ([historial](../history/verificacion/reproduccion.md)).
+- **Última verificación:** 2026-11-22, adaptación a Windows: solo compilada en macOS y comprobada con `cargo check` para Windows lo que no usa Qt ([historial](../history/verificacion/reproduccion.md)).
 - **Pruebas:** `mod tests` de `src/audio.rs` (cadena de filtros); nada en `player.rs`; se prueban con `--autoplay` y
   `--probe play` ([verificar-reproduccion](../runbooks/verificar-reproduccion.md)); la radio sin
   fin, con `--play ID --play-index 46` y `--probe radio ID`.
-- **Sin verificar:** el sonido real del ecualizador y el amplificador (las pruebas van con
+- **Sin verificar:** **todo en Windows** (mpv por la tubería, el «job», los controles multimedia
+  con el HWND, sin consolas); el sonido real del ecualizador y el amplificador (las pruebas van con
   `--ao=null`) y el corte al cambiarlos mientras suena; MPRIS en GNOME y KDE con Wayland; dar y quitar «Me gusta» y «Aleatorio» de
   la barra con sesión y música sonando.
 - **Historial:** [docs/history/verificacion/reproduccion.md](../history/verificacion/reproduccion.md).

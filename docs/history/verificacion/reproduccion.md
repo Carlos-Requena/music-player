@@ -5,6 +5,12 @@ son de cuando se escribieron. El estado actual está en su [ficha](../../areas/r
 
 Lo nuevo va arriba: añade una sección `## AAAA-MM-DD · qué se verificó` encima de las anteriores.
 
+## 2026-11-22 · adaptación a Windows (tubería de mpv, «job», sin consolas, controles con HWND)
+
+- **Cómo:** `cargo build --release` sin avisos y `cargo test` en verde en macOS (M4 Pro); `PATH=$HOME/.cargo/bin:$PATH cargo check --target x86_64-pc-windows-msvc` de `src/tuberia.rs`, `src/audio.rs` y `src/plugins/discord.rs` en un proyecto aparte con piezas de relleno (el reproductor entero no se puede, su `build.rs` necesita el Qt de Windows). En macOS, `--section albumes --index 5 --autoplay --autoplay-delay 6000 --then-next 15000` con `MUSICPLAYER_SILENT=1` y `HOME` aislado.
+- **Resultado:** compila sin avisos para Windows; en macOS `estado: … sonando true | error  | … calidad Opus · 157 kbps`.
+- **No verificado:** nada en Windows real: mpv por la tubería, el «job», que no se abran consolas, los controles multimedia con el HWND, `player.rs` y `signals.cpp` compilados para Windows.
+
 ## 2026-11-21 · Cola con `TrackRow`, opción `clic` y medidas comunes en la barra (en `master`)
 
 - **Cambio:** la cola (panel y «Sonando») usa `TrackRow`; un clic elige o hace sonar según la

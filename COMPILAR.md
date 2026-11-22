@@ -1,7 +1,7 @@
 # Compilar e instalar
 
-Cómo compilar el reproductor y dejarlo instalado como una aplicación más, en **macOS** y en
-**CachyOS** (o cualquier Arch Linux).
+Cómo compilar el reproductor y dejarlo instalado como una aplicación más, en **macOS**, en
+**CachyOS** (o cualquier Arch Linux) y en **Windows** 10 o 11.
 
 En resumen:
 
@@ -9,13 +9,14 @@ En resumen:
 |---|---|---|
 | macOS | `brew install rust qtbase qtdeclarative qtmultimedia qtshadertools mpv yt-dlp deno ffmpeg` | `scripts/crear-app-macos.sh` |
 | CachyOS | `scripts/instalar-linux.sh --dependencias` | `scripts/instalar-linux.sh` |
+| Windows | Rust, Visual Studio Build Tools, Qt para MSVC e Inno Setup ([abajo](#windows)) | `scripts\crear-instalador-windows.ps1` |
 
 ## Qué necesita
 
 | Pieza | Para qué | Cuándo |
 |---|---|---|
 | Rust (cargo) 1.87 o superior | compilar el núcleo | al compilar |
-| Compilador de C++ (Xcode CLT en macOS, `base-devel` en Arch) | el puente Rust–Qt | al compilar |
+| Compilador de C++ (Xcode CLT en macOS, `base-devel` en Arch, Visual Studio Build Tools en Windows) | el puente Rust–Qt | al compilar |
 | Qt 6.8 o superior: base, declarative, shadertools | la interfaz | al compilar y al usar |
 | mpv | reproducir el audio | al usar |
 | yt-dlp + deno (o Node.js) | obtener el audio de YouTube | al usar |
@@ -171,6 +172,85 @@ Las preferencias y la sesión están en `~/.config/musicplayer` y la caché en
 
 ---
 
+## Windows
+
+Se compila **en un PC con Windows** 10 (1809 o posterior) u 11, de 64 bits: desde el Mac no se
+puede (el puente con Qt necesita el Qt de Windows). El resultado es un instalador `.exe` que lleva
+dentro todo lo que hace falta para usarla: Qt, mpv, yt-dlp y deno.
+
+### 1. Herramientas para compilar
+
+En una terminal de PowerShell:
+
+```powershell
+winget install Microsoft.VisualStudio.2022.BuildTools --override "--quiet --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended"
+```
+
+```powershell
+winget install Rustlang.Rustup JRSoftware.InnoSetup
+```
+
+Y **Qt 6.8 o superior para MSVC**, con el [instalador de Qt](https://www.qt.io/download-qt-installer-oss)
+(cuenta de Qt gratuita): marca *Qt 6.x › MSVC 2022 64-bit*, *Qt Multimedia* y *Qt Shader Tools*. Sin
+cuenta, con [aqtinstall](https://github.com/miurahr/aqtinstall) (necesita Python):
+
+```powershell
+pip install aqtinstall
+```
+
+```powershell
+aqt install-qt windows desktop 6.8.3 win64_msvc2022_64 -m qtmultimedia qtshadertools -O C:\Qt
+```
+
+El script encuentra Qt solo si está en `C:\Qt\6.x\msvc2022_64`; si no, indica dónde está
+`qmake6.exe` con la variable `QMAKE`.
+
+### 2. Crear el instalador
+
+Desde la carpeta del proyecto, en PowerShell:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\crear-instalador-windows.ps1
+```
+
+El script:
+
+1. compila en modo release el reproductor y `musicplayer-login.exe` (la ventana de inicio de
+   sesión con WebView2);
+2. copia Qt junto al programa con `windeployqt` (solo los módulos que usa la interfaz);
+3. descarga mpv ([shinchiro](https://github.com/shinchiro/mpv-winbuild-cmake/releases)), yt-dlp y
+   deno de sus publicaciones oficiales en GitHub (se guardan en `target\windows\descargas` y no se
+   vuelven a bajar);
+4. crea `target\windows\Reproductor-<versión>-instalador.exe` con Inno Setup.
+
+| Opción | Efecto |
+|---|---|
+| `-Instalar` | Abre el instalador al terminar. |
+| `-ConFfmpeg` | Añade ffmpeg (~200 MB más). Solo lo usa la carátula animada de Apple Music, desactivada por defecto. |
+| `-SinDescargas -Dependencias C:\ruta` | No descarga nada: copia `mpv.exe`, `yt-dlp.exe` y `deno.exe` (y `ffmpeg.exe`, `ffprobe.exe` con `-ConFfmpeg`) de esa carpeta. |
+
+### 3. Instalar y usar
+
+Abre el instalador: se instala **para tu usuario**, sin pedir permisos de administrador, en
+`%LOCALAPPDATA%\Programs\Reproductor`, con su entrada en el menú Inicio («Reproductor de
+música»). Para actualizar, crea un instalador nuevo y ábrelo encima.
+
+Opciones › Cuenta › **Iniciar sesión** abre una ventana con WebView2 (el motor de Edge que ya trae
+Windows). Importar del navegador funciona con **Firefox**; Chrome, Edge y Brave cifran sus cookies
+de forma que yt-dlp no siempre puede leerlas.
+
+### Desinstalar
+
+Configuración › Aplicaciones › «Reproductor de música» › Desinstalar. Las preferencias y la sesión
+siguen en `%APPDATA%\musicplayer` y la caché en `%LOCALAPPDATA%\musicplayer`; bórralas si
+quieres empezar de cero.
+
+> Windows todavía no se ha probado en una máquina real. Si algo falla, compila en modo de
+> depuración (`cargo build`) y ejecuta `target\debug\musicplayer.exe` desde PowerShell: esa
+> versión deja ver los mensajes de error en la terminal (la de release no abre consola).
+
+---
+
 ## Discord
 
 La app ya incluye el Application ID de su aplicación de Discord: se conecta sola en cuanto
@@ -200,6 +280,7 @@ compila más rápido pero la app va más lenta.
 
 | Error | Solución |
 |---|---|
+| (Windows) `Could not find qmake` o `link.exe` no encontrado | Abre la terminal «Developer PowerShell for VS 2022» o indica `QMAKE=C:\Qt\6.8.3\msvc2022_64\bin\qmake6.exe`. |
 | `Could not find qmake` / Qt no encontrado | Instala Qt 6 (ver arriba). Si tienes varios, indica cuál: `QMAKE=/ruta/a/qmake6 cargo build --release` (en Arch: `/usr/bin/qmake6`; en Homebrew: `/opt/homebrew/bin/qmake6`). |
 | Falla al enlazar con `QtQuick` o `QtQml` | Falta `qtdeclarative` (macOS) o `qt6-declarative` (Arch). |
 | `error: linker cc not found` (Linux) | `sudo pacman -S base-devel`. |

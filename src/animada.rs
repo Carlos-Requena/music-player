@@ -19,7 +19,7 @@ use std::{
     fs,
     io::Read,
     path::{Path, PathBuf},
-    process::{Command, Stdio},
+    process::Stdio,
     sync::Mutex,
     thread,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
@@ -317,7 +317,7 @@ fn download(variant: &str, target: &Path) -> bool {
 /// Fotogramas y fotogramas por segundo del vídeo (con `ffprobe`).
 fn frames(file: &Path) -> Option<(u32, f64)> {
     let ffprobe = crate::audio::which("ffprobe", &crate::audio::search_path())?;
-    let output = Command::new(ffprobe)
+    let output = crate::audio::command(ffprobe)
         .args(["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=nb_frames,r_frame_rate"])
         .args(["-of", "default=noprint_wrappers=1"])
         .arg(file)
@@ -379,7 +379,7 @@ fn ffmpeg(args: &[String], output: &Path) -> bool {
         return false;
     };
     let part = output.with_extension("part.mp4");
-    let child = Command::new(ffmpeg)
+    let child = crate::audio::command(ffmpeg)
         .args(["-nostdin", "-loglevel", "error", "-y"])
         .args(args)
         .args(["-movflags", "+faststart"])

@@ -207,7 +207,7 @@ fn extract(browser: &str) -> Result<(String, String), String> {
     let scratch = target.with_file_name("cookies-import.tmp");
     write_private(&scratch, "").map_err(|error| format!("No se pudo preparar la importación: {error}"))?;
 
-    let output = Command::new(ytdlp)
+    let output = crate::audio::command(ytdlp)
         .env("PATH", &path)
         .args(["--skip-download", "--flat-playlist", "--cookies-from-browser", browser, "--cookies"])
         .arg(&scratch)
@@ -266,22 +266,23 @@ const CANCELLED: &str = "\u{0}cancelado";
 
 /// Programa de la ventana de inicio de sesión, listo para añadirle la ruta del archivo:
 /// - macOS: el propio reproductor con `--login` (WebKit del sistema, `src/login_mac.mm`).
-/// - Linux: `musicplayer-login` (Qt WebEngine, `login/`), junto al ejecutable o en el PATH,
-///   si responde que está disponible.
+/// - Linux y Windows: `musicplayer-login` (crate `login/`: Qt WebEngine en Linux, WebView2 en
+///   Windows), junto al ejecutable o en el PATH, si responde que está disponible.
 fn login_command() -> Option<Command> {
     if cfg!(target_os = "macos") {
         let mut command = Command::new(std::env::current_exe().ok()?);
         command.arg("--login");
         return Some(command);
     }
-    linux_helper().map(Command::new)
+    login_helper().map(Command::new)
 }
 
-fn linux_helper() -> Option<PathBuf> {
+fn login_helper() -> Option<PathBuf> {
     static HELPER: LazyLock<Option<PathBuf>> = LazyLock::new(|| {
-        let sibling = std::env::current_exe().ok().map(|exe| exe.with_file_name("musicplayer-login"));
+        let name = if cfg!(windows) { "musicplayer-login.exe" } else { "musicplayer-login" };
+        let sibling = std::env::current_exe().ok().map(|exe| exe.with_file_name(name));
         let helper = sibling.filter(|path| path.is_file()).or_else(|| which("musicplayer-login", &search_path()))?;
-        let available = Command::new(&helper)
+        let available = crate::audio::command(&helper)
             .arg("--check")
             .stdin(Stdio::null())
             .stdout(Stdio::null())
@@ -458,7 +459,7 @@ impl Default for AccountRust {
             browser: QString::from(&browser),
             message: QString::default(),
             needs_disk_access: false,
-            web_login: cfg!(target_os = "macos") || linux_helper().is_some(),
+            web_login: cfg!(target_os = "macos") || login_helper().is_some(),
         }
     }
 }

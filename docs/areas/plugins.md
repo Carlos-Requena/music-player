@@ -4,7 +4,7 @@ titulo: Plugins (Discord, Last.fm y ListenBrainz)
 resumen: Discord Rich Presence («Escuchando…»), scrobbling a Last.fm y escuchas en ListenBrainz, alimentados por los eventos del reproductor en un hilo propio.
 archivos: [src/plugins.rs, src/plugins/discord.rs, src/plugins/lastfm.rs, src/plugins/listenbrainz.rs]
 opciones: []
-adr: [ADR-15, ADR-19]
+adr: [ADR-15, ADR-19, ADR-24]
 ---
 
 # Plugins (Discord, Last.fm y ListenBrainz)
@@ -37,8 +37,10 @@ Opciones › Plugins. Los controles del sistema (souvlaki) se activan aquí pero
 
 ## Cómo funciona
 
-- **Discord:** socket IPC local, mensajes `[opcode u32 LE][longitud u32 LE][JSON]`; saludo
-  (`opcode 0`, `client_id`) y `SET_ACTIVITY` con `type: 2` («Escuchando»).
+- **Discord:** socket IPC local (en Windows, la tubería `\\.\pipe\discord-ipc-N` con
+  `Tuberia` de [reproduccion](reproduccion.md), [ADR-24](../decisions/ADR-24-version-de-windows.md)),
+  mensajes `[opcode u32 LE][longitud u32 LE][JSON]` con 3 s de límite por lectura o escritura;
+  saludo (`opcode 0`, `client_id`) y `SET_ACTIVITY` con `type: 2` («Escuchando»).
 - **Last.fm:** API 2.0 firmada (md5 de los parámetros ordenados + secreto). Autorización en dos
   pasos: `auth.getToken` → web → `auth.getSession`.
 - **ListenBrainz:** `POST /1/submit-listens` con `Authorization: Token …`, `listen_type`
@@ -78,12 +80,12 @@ Opciones › Plugins. Los controles del sistema (souvlaki) se activan aquí pero
 
 ## Estado actual
 
-- **Última verificación:** 2026-11-17, plugin de ListenBrainz ([historial](../history/verificacion/plugins.md)).
-- **Pruebas:** `mod tests` de `src/plugins/discord.rs` (cabecera, Discord simulado, actividad) y
+- **Última verificación:** 2026-11-22, Discord por tubería en Windows: solo `cargo check` para Windows desde macOS ([historial](../history/verificacion/plugins.md)).
+- **Pruebas:** `mod tests` de `src/plugins/discord.rs` (cabecera, Discord simulado solo en Unix, actividad) y
   `src/plugins/lastfm.rs` (firma, reglas de scrobble) y `src/plugins/listenbrainz.rs` (datos de la
   escucha). De extremo a extremo:
   [probar-plugins](../runbooks/probar-plugins.md).
-- **Sin verificar:** Discord en Flatpak (otra ruta del socket); ListenBrainz con un token real
+- **Sin verificar:** Discord en Windows; Discord en Flatpak (otra ruta del socket); ListenBrainz con un token real
   (conectar, «escuchando ahora» y la escucha).
 - **Historial:** [docs/history/verificacion/plugins.md](../history/verificacion/plugins.md).
 

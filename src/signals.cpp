@@ -7,6 +7,15 @@
 // Un manejador de señales solo puede llamar a funciones seguras en ese contexto (`write`), así
 // que escribe un byte en un par de sockets («self-pipe») y un `QSocketNotifier` lo lee en el
 // hilo de Qt. `SA_RESETHAND`: una segunda señal, si el cierre se atasca, mata la app como antes.
+//
+// Windows no tiene estas señales: allí los hijos se atan al proceso con un «job» que el sistema
+// cierra al terminar (`tuberia::kill_children_on_exit`), y esta función no hace nada.
+
+#ifdef _WIN32
+
+extern "C" void musicplayer_handle_signals() {}
+
+#else
 
 #include <QtCore/QCoreApplication>
 #include <QtCore/QSocketNotifier>
@@ -60,3 +69,5 @@ extern "C" void musicplayer_handle_signals()
             std::perror("señales: sigaction");
     }
 }
+
+#endif

@@ -6,7 +6,7 @@
 
 use std::{
     collections::{HashMap, HashSet},
-    process::{Command, Stdio},
+    process::Stdio,
     sync::{
         atomic::{AtomicBool, AtomicU64, Ordering},
         Condvar, LazyLock, Mutex,
@@ -283,7 +283,7 @@ fn fast_or_ytdlp(video_id: &str) -> Result<(String, bool), String> {
 fn run_ytdlp_process(video_id: &str) -> Result<String, String> {
     let path = search_path();
     let ytdlp = which("yt-dlp", &path).ok_or("no se encuentra yt-dlp")?;
-    let mut command = Command::new(ytdlp);
+    let mut command = crate::audio::command(ytdlp);
     command.env("PATH", &path).args(["--no-warnings", "--no-playlist", "-f", "bestaudio/best", "-g"]);
     for option in ytdlp_options(&path) {
         command.args(option.splitn(2, ' '));
