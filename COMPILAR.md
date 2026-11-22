@@ -17,7 +17,7 @@ En resumen:
 |---|---|---|
 | Rust (cargo) 1.87 o superior | compilar el núcleo | al compilar |
 | Compilador de C++ (Xcode CLT en macOS, `base-devel` en Arch, Visual Studio Build Tools en Windows) | el puente Rust–Qt | al compilar |
-| Qt 6.8 o superior: base, declarative, shadertools | la interfaz | al compilar y al usar |
+| Qt 6.9 o superior (probado con 6.12): base, declarative, shadertools | la interfaz | al compilar y al usar |
 | mpv | reproducir el audio | al usar |
 | yt-dlp + deno (o Node.js) | obtener el audio de YouTube | al usar |
 
@@ -190,7 +190,7 @@ winget install Microsoft.VisualStudio.2022.BuildTools --override "--quiet --add 
 winget install Rustlang.Rustup JRSoftware.InnoSetup
 ```
 
-Y **Qt 6.8 o superior para MSVC**, con el [instalador de Qt](https://www.qt.io/download-qt-installer-oss)
+Y **Qt 6.9 o superior para MSVC** (la interfaz usa `RectangularShadow`, que llegó en 6.9; en el Mac se usa 6.12), con el [instalador de Qt](https://www.qt.io/download-qt-installer-oss)
 (cuenta de Qt gratuita): marca *Qt 6.x › MSVC 2022 64-bit*, *Qt Multimedia* y *Qt Shader Tools*. Sin
 cuenta, con [aqtinstall](https://github.com/miurahr/aqtinstall) (necesita Python):
 
@@ -199,10 +199,12 @@ pip install aqtinstall
 ```
 
 ```powershell
-aqt install-qt windows desktop 6.8.3 win64_msvc2022_64 -m qtmultimedia qtshadertools -O C:\Qt
+aqt install-qt windows desktop 6.12.0 win64_msvc2022_64 -m qtmultimedia qtshadertools -O C:\Qt
 ```
 
-El script encuentra Qt solo si está en `C:\Qt\6.x\msvc2022_64`; si no, indica dónde está
+Si `aqt` no encuentra esa versión, `aqt list-qt windows desktop` muestra las que hay y
+`aqt list-qt windows desktop --arch 6.12.0` el nombre de la variante MSVC. El script encuentra Qt
+solo si está en `C:\Qt\6.x\msvc20xx_64` (usa la versión más nueva); si no, indica dónde está
 `qmake6.exe` con la variable `QMAKE`.
 
 ### 2. Crear el instalador
@@ -280,7 +282,7 @@ compila más rápido pero la app va más lenta.
 
 | Error | Solución |
 |---|---|
-| (Windows) `Could not find qmake` o `link.exe` no encontrado | Abre la terminal «Developer PowerShell for VS 2022» o indica `QMAKE=C:\Qt\6.8.3\msvc2022_64\bin\qmake6.exe`. |
+| (Windows) `Could not find qmake` o `link.exe` no encontrado | Abre la terminal «Developer PowerShell for VS 2022» o indica `QMAKE=C:\Qt\6.12.0\msvc2022_64\bin\qmake6.exe`. |
 | `Could not find qmake` / Qt no encontrado | Instala Qt 6 (ver arriba). Si tienes varios, indica cuál: `QMAKE=/ruta/a/qmake6 cargo build --release` (en Arch: `/usr/bin/qmake6`; en Homebrew: `/opt/homebrew/bin/qmake6`). |
 | Falla al enlazar con `QtQuick` o `QtQml` | Falta `qtdeclarative` (macOS) o `qt6-declarative` (Arch). |
 | `error: linker cc not found` (Linux) | `sudo pacman -S base-devel`. |

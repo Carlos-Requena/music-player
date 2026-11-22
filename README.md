@@ -213,7 +213,7 @@ detecta al arrancar y te avisa.
 ## Requisitos
 
 - Rust 1.80 o superior (`cargo`)
-- Qt 6.8 o superior: módulos base, declarative (QML/Quick) y shadertools
+- Qt 6.9 o superior: módulos base, declarative (QML/Quick) y shadertools
 - mpv
 - yt-dlp y un runtime de JavaScript para él: deno (recomendado) o Node.js
 

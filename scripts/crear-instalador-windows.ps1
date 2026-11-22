@@ -40,9 +40,13 @@ function Buscar($programa, $rutas) {
 if (-not (Get-Command cargo -ErrorAction SilentlyContinue)) {
     Falta "Rust (cargo)" "Instálalo con rustup: https://rustup.rs"
 }
+# Qt 6.9 o superior (RectangularShadow); si hay varios en C:\Qt, el más nuevo.
 $qmake = if ($env:QMAKE) { $env:QMAKE } else {
-    Buscar "qmake6" @("C:\Qt\6.*\msvc*_64\bin\qmake6.exe", "C:\Qt\6.*\msvc*_64\bin\qmake.exe")
+    Get-ChildItem "C:\Qt\6.*\msvc*_64\bin\qmake6.exe" -ErrorAction SilentlyContinue |
+        Sort-Object { [version]($_.FullName -replace '^C:\\Qt\\([0-9.]+)\\.*$', '$1') } -Descending |
+        Select-Object -First 1 -ExpandProperty FullName
 }
+if (-not $qmake) { $qmake = Buscar "qmake6" @() }
 if (-not $qmake) { $qmake = Buscar "qmake" @() }
 if (-not $qmake) { Falta "Qt 6 para MSVC (qmake6)" "Instálalo con el instalador de Qt o indica su ruta en la variable QMAKE." }
 $env:QMAKE = $qmake

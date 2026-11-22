@@ -147,6 +147,8 @@ que toque **antes** de cambiar algo ahí. Una trampa nueva se añade en su secci
   antes la ventana principal y, si no hay, no crea los controles.
 - **WebView2 se ve borroso** si el proceso no se declara consciente del DPI por monitor antes de
   crear la ventana (`SetProcessDpiAwarenessContext`): Windows lo dibuja a 96 ppp y lo amplía.
+- **Con Qt 6.8 la interfaz no carga** («RectangularShadow is not a type» y la ventana no sale):
+  `RectangularShadow` es de Qt 6.9. Hace falta Qt 6.9 o superior también en Windows.
 - **PowerShell 5.1 lee los `.ps1` sin BOM como ANSI:** las tildes salen mal. Guarda
   `scripts/crear-instalador-windows.ps1` en UTF-8 **con BOM**.
 - **`cargo check --target x86_64-pc-windows-msvc` desde macOS** necesita el Rust de rustup (el de
