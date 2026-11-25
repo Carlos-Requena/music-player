@@ -94,12 +94,28 @@ pub fn effects() -> String {
 
 /// Rutas donde suelen vivir mpv y yt-dlp y que una app gráfica no hereda en su PATH.
 #[cfg(not(windows))]
-const EXTRA_PATHS: &[&str] = &["/opt/homebrew/bin", "/usr/local/bin"];
-#[cfg(windows)]
-const EXTRA_PATHS: &[&str] = &[];
+fn extra_paths() -> Vec<PathBuf> {
+    ["/opt/homebrew/bin", "/usr/local/bin"].iter().map(PathBuf::from).collect()
+}
 
-/// El PATH del sistema con `EXTRA_PATHS` y, en Windows, la carpeta del ejecutable delante: el
-/// instalador deja allí mpv, yt-dlp, deno y ffmpeg.
+/// En Windows: la app instalada (su instalador lleva mpv, yt-dlp y deno; así los encuentra
+/// también `target\debug\musicplayer.exe`) y las carpetas de winget, Scoop y Chocolatey.
+#[cfg(windows)]
+fn extra_paths() -> Vec<PathBuf> {
+    let var = |name: &str| env::var_os(name).map(PathBuf::from);
+    [
+        var("LOCALAPPDATA").map(|dir| dir.join(r"Programs\Reproductor")),
+        var("LOCALAPPDATA").map(|dir| dir.join(r"Microsoft\WinGet\Links")),
+        var("USERPROFILE").map(|dir| dir.join(r"scoop\shims")),
+        var("ProgramData").map(|dir| dir.join(r"chocolatey\bin")),
+    ]
+    .into_iter()
+    .flatten()
+    .collect()
+}
+
+/// El PATH del sistema con `extra_paths` detrás y, en Windows, la carpeta del ejecutable delante:
+/// el instalador deja allí mpv, yt-dlp, deno y ffmpeg.
 pub fn search_path() -> String {
     let mut dirs: Vec<PathBuf> = env::var_os("PATH").map(|path| env::split_paths(&path).collect()).unwrap_or_default();
     if cfg!(windows) {
@@ -108,7 +124,7 @@ pub fn search_path() -> String {
             dirs.insert(0, dir);
         }
     }
-    for extra in EXTRA_PATHS.iter().map(PathBuf::from) {
+    for extra in extra_paths() {
         if !dirs.contains(&extra) {
             dirs.push(extra);
         }
@@ -140,6 +156,12 @@ pub fn command(program: impl AsRef<OsStr>) -> Command {
     command
 }
 
+/// Motivo que se muestra si no hay mpv en ninguna carpeta de `search_path`.
+#[cfg(not(windows))]
+const NO_MPV: &str = "no se encuentra mpv";
+#[cfg(windows)]
+const NO_MPV: &str = "no se encuentra mpv.exe (instala la app o ponlo junto al programa o en el PATH)";
+
 pub struct Mpv {
     child: Child,
     socket: Ipc,
@@ -151,7 +173,7 @@ impl Mpv {
     pub fn spawn(on_event: impl Fn(Event) + Send + 'static) -> io::Result<Self> {
         let path = search_path();
         let mpv = which("mpv", &path)
-            .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "no se encuentra mpv"))?;
+            .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, NO_MPV))?;
         let socket_path = socket_path();
         remove_socket(&socket_path);
 

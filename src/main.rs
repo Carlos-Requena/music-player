@@ -116,10 +116,11 @@ fn probe(args: &[String]) -> bool {
             println!("intérprete: {:?}", daemon::interpreter_path());
             for id in argument.split(',') {
                 let start = std::time::Instant::now();
-                let result = resolver::resolve(id);
-                match result {
-                    Ok(_) => println!("{id}: {} ms ok", start.elapsed().as_millis()),
-                    Err(error) => println!("{id}: {} ms ERROR {}", start.elapsed().as_millis(), error.trim_start_matches('\u{0}')),
+                // Directo al residente, sin la vía rápida (que respondería antes).
+                match daemon::resolve(id) {
+                    Some(Ok(_)) => println!("{id}: {} ms ok", start.elapsed().as_millis()),
+                    Some(Err(error)) => println!("{id}: {} ms ERROR {error}", start.elapsed().as_millis()),
+                    None => println!("{id}: {} ms sin residente", start.elapsed().as_millis()),
                 }
             }
             return true;

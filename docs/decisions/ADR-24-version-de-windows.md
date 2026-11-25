@@ -1,14 +1,14 @@
 ---
 adr: ADR-24
 titulo: Windows con el mismo código, WebView2 para iniciar sesión y un instalador por usuario con mpv, yt-dlp y deno dentro
-estado: aceptada
+estado: ampliada por ADR-25
 fecha: 2026-11-22
 areas: [sesion, reproduccion, plugins, resolucion]
 ---
 
 # ADR-24 · Windows con el mismo código, WebView2 para iniciar sesión y un instalador por usuario con mpv, yt-dlp y deno dentro
 
-- **Estado:** Aceptada.
+- **Estado:** Ampliada por [ADR-25](ADR-25-yt-dlp-residente-en-windows.md) (yt-dlp residente con un Python embebido).
 - **Registrada:** 2026-11-22
 - **Ámbito:** [sesion](../areas/sesion.md), [reproduccion](../areas/reproduccion.md), [plugins](../areas/plugins.md), [resolucion](../areas/resolucion.md)
 

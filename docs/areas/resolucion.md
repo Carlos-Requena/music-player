@@ -4,7 +4,7 @@ titulo: Resolución del audio y arranque instantáneo
 resumen: Obtiene la URL de audio de cada pista (vía rápida, yt-dlp residente o yt-dlp) con caché y precarga, para que suene en décimas de segundo.
 archivos: [src/stream.rs, src/resolver.rs, src/daemon.rs, src/ytdlp_daemon.py]
 opciones: [calidad, ytdlp]
-adr: [ADR-03, ADR-05, ADR-08, ADR-24]
+adr: [ADR-03, ADR-05, ADR-08, ADR-24, ADR-25]
 ---
 
 # Resolución del audio y arranque instantáneo
@@ -59,8 +59,9 @@ hasta 10 min antes de su `expire=`.
 
 El residente (`ytdlp_daemon.py`) se lanza con el intérprete de la línea `#!` del `yt-dlp`
 instalado; si yt-dlp es un binario autónomo, `daemon::resolve` devuelve `None` y se usa un proceso
-por petición. Se cierra solo tras un minuto sin uso. En Windows no se intenta: el `yt-dlp.exe` del
-instalador es autónomo ([ADR-24](../decisions/ADR-24-version-de-windows.md)).
+por petición. Se cierra solo tras un minuto sin uso. En Windows, el `yt-dlp.exe` es autónomo y el
+residente usa el Python embebido del instalador: el primer `python\python.exe` con `yt-dlp.zip` al
+lado en las carpetas de `search_path` ([ADR-25](../decisions/ADR-25-yt-dlp-residente-en-windows.md)).
 
 ## Medidas
 
@@ -72,6 +73,9 @@ instalador es autónomo ([ADR-24](../decisions/ADR-24-version-de-windows.md)).
 | yt-dlp residente / en un proceso | 2,2–2,5 s / 3,5–4,2 s | 2026-11-13, M4 Pro, release |
 | yt-dlp con sesión (`web_music`) | ~1,7–2,9 s | 2026-11-14, M4 Pro, release |
 | Memoria del residente | ~120 MB mientras vive | 2026-11-13, M4 Pro |
+| Windows: vía rápida | ~0,1 s (la primera, 0,3–0,7 s) | 2026-11-22, PC del propietario, Windows 11, release |
+| Windows: residente / `yt-dlp.exe` en un proceso (sin sesión) | 2,4–2,5 s (la primera, 4,8 s) / 7,2–7,8 s | 2026-11-22, PC del propietario, Windows 11, release |
+| Windows: memoria del residente | ~77 MB en uso, 60 MB privados | 2026-11-22, PC del propietario |
 
 La vía rápida sirve unas 9 de cada 10 pistas.
 
@@ -109,9 +113,9 @@ La vía rápida sirve unas 9 de cada 10 pistas.
 
 ## Estado actual
 
-- **Última verificación:** 2026-11-22, sin yt-dlp residente en Windows: solo compilado en macOS ([historial](../history/verificacion/resolucion.md)).
+- **Última verificación:** 2026-11-22, residente en Windows 11 con Python embebido: `--probe resolve` sin sesión ([historial](../history/verificacion/resolucion.md)).
 - **Pruebas:** `mod tests` de `src/stream.rs` (elección del mejor audio). El resto, con
-  `--probe fast`, `--probe resolve` y `--probe playable` ([verificar-reproduccion](../runbooks/verificar-reproduccion.md)).
-- **Sin verificar:** Premium 256 kbps con una cuenta Premium real en Linux; los tiempos de la vía
-  rápida y de yt-dlp en Windows.
+  `--probe fast`, `--probe resolve` (solo el residente) y `--probe playable` ([verificar-reproduccion](../runbooks/verificar-reproduccion.md)).
+- **Sin verificar:** Premium 256 kbps con una cuenta Premium real en Linux; en Windows, el
+  residente con sesión (`web_music` y cookies), desde la app instalada y con la ventana abierta.
 - **Historial:** [docs/history/verificacion/resolucion.md](../history/verificacion/resolucion.md).

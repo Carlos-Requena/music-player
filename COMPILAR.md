@@ -221,15 +221,16 @@ El script:
    sesión con WebView2);
 2. copia Qt junto al programa con `windeployqt` (solo los módulos que usa la interfaz);
 3. descarga mpv ([shinchiro](https://github.com/shinchiro/mpv-winbuild-cmake/releases)), yt-dlp y
-   deno de sus publicaciones oficiales en GitHub (se guardan en `target\windows\descargas` y no se
-   vuelven a bajar);
+   deno de sus publicaciones oficiales en GitHub, y el Python embebido de python.org con el yt-dlp
+   en script para el yt-dlp residente ([ADR-25](docs/decisions/ADR-25-yt-dlp-residente-en-windows.md))
+   (se guardan en `target\windows\descargas` y no se vuelven a bajar);
 4. crea `target\windows\Reproductor-<versión>-instalador.exe` con Inno Setup.
 
 | Opción | Efecto |
 |---|---|
 | `-Instalar` | Abre el instalador al terminar. |
 | `-ConFfmpeg` | Añade ffmpeg (~200 MB más). Solo lo usa la carátula animada de Apple Music, desactivada por defecto. |
-| `-SinDescargas -Dependencias C:\ruta` | No descarga nada: copia `mpv.exe`, `yt-dlp.exe` y `deno.exe` (y `ffmpeg.exe`, `ffprobe.exe` con `-ConFfmpeg`) de esa carpeta. |
+| `-SinDescargas -Dependencias C:\ruta` | No descarga nada: copia `mpv.exe`, `yt-dlp.exe` y `deno.exe` (y `ffmpeg.exe`, `ffprobe.exe` con `-ConFfmpeg`) de esa carpeta; si además trae `python-*-embed-amd64.zip` y `yt-dlp` (en script), prepara el yt-dlp residente. |
 
 ### 3. Instalar y usar
 
@@ -286,6 +287,6 @@ compila más rápido pero la app va más lenta.
 | `Could not find qmake` / Qt no encontrado | Instala Qt 6 (ver arriba). Si tienes varios, indica cuál: `QMAKE=/ruta/a/qmake6 cargo build --release` (en Arch: `/usr/bin/qmake6`; en Homebrew: `/opt/homebrew/bin/qmake6`). |
 | Falla al enlazar con `QtQuick` o `QtQml` | Falta `qtdeclarative` (macOS) o `qt6-declarative` (Arch). |
 | `error: linker cc not found` (Linux) | `sudo pacman -S base-devel`. |
-| La app arranca pero dice «No se pudo iniciar el motor de audio (mpv)» | Instala `mpv`. |
+| La app arranca pero dice «No se pudo iniciar el motor de audio (mpv)» | Instala `mpv`. En Windows, `cargo build` usa el mpv de la app instalada (`%LOCALAPPDATA%\Programs\Reproductor`); si no la tienes, deja `mpv.exe` junto a `target\debug\musicplayer.exe` o en el `PATH`. |
 | Ninguna canción suena | Instala o actualiza `yt-dlp` y `deno`. YouTube cambia a menudo: `brew upgrade yt-dlp` o `sudo pacman -Syu yt-dlp`. |
 | (Linux, Wayland) la ventana sale sin desenfoque o borrosa | Instala `qt6-wayland`. |

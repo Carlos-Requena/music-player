@@ -128,7 +128,12 @@ que toque **antes** de cambiar algo ahí. Una trampa nueva se añade en su secci
 - **Proxy del sistema:** Qt ignora el proxy de macOS (`window.cpp`); con WPAD roto cada descarga
   fallaba con «NSURLErrorDomain -1003». Se respeta `HTTPS_PROXY`/`HTTP_PROXY`.
 - **Inicio de sesión en WebKit:** la prevención de rastreo pierde las cookies en las redirecciones
-  de Google y YouTube acaba en `/oops`; se desactiva ([sesion](areas/sesion.md#macos)).
+  de Google y YouTube acaba en `/oops`; se desactiva ([sesion](areas/sesion.md#macos)). En
+  WebView2 (Windows) pasa lo mismo: `EnableTrackingPrevention` a falso
+  ([sesion](areas/sesion.md#windows)).
+- **WebView2: opciones distintas en la misma carpeta de datos:** si otra ventana ya la usa con
+  otras opciones, falla al crear el controlador con `0x8007139F` (`ERROR_INVALID_STATE`), y un
+  segundo intento en el mismo proceso también; se usa otra carpeta.
 - **Disfrazar el agente de usuario** de Chrome en Qt WebEngine: Google lo bloquea («este navegador
   puede no ser seguro») porque contradice `Sec-CH-UA`.
 - **Sockets Unix** admiten ~104 bytes de ruta: en pruebas de Discord usa una ruta relativa corta.

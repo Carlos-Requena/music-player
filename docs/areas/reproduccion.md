@@ -49,7 +49,9 @@ Del clic a que suene, y lo que pasa mientras suena. Obtener la URL es de
   (`mpv_paused`) ([TRAMPAS](../TRAMPAS.md#youtube-yt-dlp-y-mpv)).
 - **Apps gráficas en macOS no heredan el `PATH`**: `search_path` añade `/opt/homebrew/bin` y
   `/usr/local/bin`. En Windows pone delante la carpeta del ejecutable (el instalador deja allí
-  mpv, yt-dlp y deno) y `which` añade `.exe`.
+  mpv, yt-dlp y deno), añade detrás la app instalada (`%LOCALAPPDATA%\Programs\Reproductor`, para
+  que `target\debug\musicplayer.exe` encuentre su mpv) y las carpetas de winget, Scoop y
+  Chocolatey, y `which` añade `.exe`.
 - **Windows** ([ADR-24](../decisions/ADR-24-version-de-windows.md)): mpv escucha en la tubería
   `\\.\pipe\musicplayer-mpv-<pid>`, abierta en modo «overlapped» (`tuberia.rs`) para leer
   eventos y escribir órdenes a la vez ([TRAMPAS](../TRAMPAS.md#windows)). Todo proceso auxiliar se
@@ -188,12 +190,12 @@ Stderr escribe `arranque de pista: N ms` en cada una.
 
 ## Estado actual
 
-- **Última verificación:** 2026-11-22, adaptación a Windows: solo compilada en macOS y comprobada con `cargo check` para Windows lo que no usa Qt ([historial](../history/verificacion/reproduccion.md)).
+- **Última verificación:** 2026-11-22, en Windows 11: mpv por la tubería con `--probe play` desde la app instalada y desde `target\release` sin mpv al lado ([historial](../history/verificacion/reproduccion.md)).
 - **Pruebas:** `mod tests` de `src/audio.rs` (cadena de filtros); nada en `player.rs`; se prueban con `--autoplay` y
   `--probe play` ([verificar-reproduccion](../runbooks/verificar-reproduccion.md)); la radio sin
   fin, con `--play ID --play-index 46` y `--probe radio ID`.
-- **Sin verificar:** **todo en Windows** (mpv por la tubería, el «job», los controles multimedia
-  con el HWND, sin consolas); el sonido real del ecualizador y el amplificador (las pruebas van con
+- **Sin verificar:** en Windows, la reproducción con la ventana (`--autoplay`), el «job», los
+  controles multimedia con el HWND y que no se abran consolas; el sonido real del ecualizador y el amplificador (las pruebas van con
   `--ao=null`) y el corte al cambiarlos mientras suena; MPRIS en GNOME y KDE con Wayland; dar y quitar «Me gusta» y «Aleatorio» de
   la barra con sesión y música sonando.
 - **Historial:** [docs/history/verificacion/reproduccion.md](../history/verificacion/reproduccion.md).
