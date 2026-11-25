@@ -88,7 +88,9 @@ function Ultima($repositorio, $patron) {
 }
 
 function Descargar($recurso) {
-    $destino = Join-Path $descargas $recurso.name
+    # Con el identificador del archivo en GitHub delante: cada publicación nueva se descarga (si
+    # no, `yt-dlp.exe` se quedaría para siempre en la primera versión bajada) y la misma no se repite.
+    $destino = Join-Path $descargas "$($recurso.id)-$($recurso.name)"
     if (-not (Test-Path $destino)) {
         Write-Host "  descargando $($recurso.name)…"
         Invoke-WebRequest $recurso.browser_download_url -OutFile $destino

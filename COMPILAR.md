@@ -223,7 +223,7 @@ El script:
 3. descarga mpv ([shinchiro](https://github.com/shinchiro/mpv-winbuild-cmake/releases)), yt-dlp y
    deno de sus publicaciones oficiales en GitHub, y el Python embebido de python.org con el yt-dlp
    en script para el yt-dlp residente ([ADR-25](docs/decisions/ADR-25-yt-dlp-residente-en-windows.md))
-   (se guardan en `target\windows\descargas` y no se vuelven a bajar);
+   (se guardan en `target\windows\descargas`; solo se vuelven a bajar si hay una versión nueva);
 4. crea `target\windows\Reproductor-<versión>-instalador.exe` con Inno Setup.
 
 | Opción | Efecto |
