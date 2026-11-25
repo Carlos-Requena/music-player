@@ -5,6 +5,14 @@ son de cuando se escribieron. El estado actual está en su [ficha](../../areas/r
 
 Lo nuevo va arriba: añade una sección `## AAAA-MM-DD · qué se verificó` encima de las anteriores.
 
+## 2026-11-22 · mpv no se encontraba con `cargo build` en Windows
+
+- **Fallo:** `target\debug\musicplayer.exe` decía «No se pudo iniciar el motor de audio (mpv)»: en Windows solo se buscaba mpv en el `PATH` y junto al ejecutable, y fuera del instalador no hay ninguno.
+- **Cambio:** `search_path` añade en Windows `%LOCALAPPDATA%\Programs\Reproductor` y las carpetas de winget, Scoop y Chocolatey; el mensaje de error dice dónde poner `mpv.exe`.
+- **Cómo:** Windows 11, Qt 6.12.0 MSVC; `cargo build --release` sin avisos, `cargo test --release` en verde; `MUSICPLAYER_SILENT=1 target\release\musicplayer.exe --probe play dQw4w9WgXcQ` (sin mpv al lado) y lo mismo con la app instalada.
+- **Resultado:** «resuelta en 301 ms · sonando a los 425 ms» y la posición avanza; no queda ningún mpv vivo al terminar.
+- **No verificado:** la reproducción con la ventana abierta (`--autoplay`), porque había instancias del propietario abiertas; el sonido real.
+
 ## 2026-11-22 · adaptación a Windows (tubería de mpv, «job», sin consolas, controles con HWND)
 
 - **Cómo:** `cargo build --release` sin avisos y `cargo test` en verde en macOS (M4 Pro); `PATH=$HOME/.cargo/bin:$PATH cargo check --target x86_64-pc-windows-msvc` de `src/tuberia.rs`, `src/audio.rs` y `src/plugins/discord.rs` en un proyecto aparte con piezas de relleno (el reproductor entero no se puede, su `build.rs` necesita el Qt de Windows). En macOS, `--section albumes --index 5 --autoplay --autoplay-delay 6000 --then-next 15000` con `MUSICPLAYER_SILENT=1` y `HOME` aislado.

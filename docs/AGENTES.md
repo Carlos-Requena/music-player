@@ -312,7 +312,8 @@ añadas más casos, y actualiza la lista.
   de usuario ([sesion](areas/sesion.md)).
 - **Windows con instalador `.exe`** (Inno Setup, por usuario, con mpv, yt-dlp y deno dentro), del
   mismo código que macOS y Linux ([ADR-24](decisions/ADR-24-version-de-windows.md),
-  [COMPILAR](../COMPILAR.md#windows)).
+  [COMPILAR](../COMPILAR.md#windows)), y con **yt-dlp residente** gracias a un Python embebido, para
+  que Premium cargue tan rápido como en el Mac ([ADR-25](decisions/ADR-25-yt-dlp-residente-en-windows.md)).
 
 ---
 

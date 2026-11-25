@@ -12,15 +12,20 @@
 //!   caché del motor.
 //! - **Agente de usuario sin tocar:** el de WebView2 es el de Edge, con sus `Sec-CH-UA`
 //!   coherentes (ver la ficha de sesión).
+//! - **Sesión que no llega a YouTube:** la prevención de rastreo de WebView2 pierde las cookies
+//!   de la cadena de redirecciones de Google (YouTube acaba en `/oops`), así que se desactiva. Si
+//!   aun así YouTube no tiene sesión y Google sí, se copian a `.youtube.com` las cookies de la
+//!   cuenta de `.google.com` y se vuelve a abrir YouTube Music, una vez (como en macOS).
 
 use std::{cell::RefCell, fs, path::PathBuf, sync::mpsc};
 
 use webview2_com::{
-    CoTaskMemPWSTR, CreateCoreWebView2ControllerCompletedHandler, CreateCoreWebView2EnvironmentCompletedHandler,
-    ExecuteScriptCompletedHandler, GetCookiesCompletedHandler,
+    CoTaskMemPWSTR, CoreWebView2EnvironmentOptions, CreateCoreWebView2ControllerCompletedHandler,
+    CreateCoreWebView2EnvironmentCompletedHandler, ExecuteScriptCompletedHandler, GetCookiesCompletedHandler,
     Microsoft::Web::WebView2::Win32::{
         CreateCoreWebView2EnvironmentWithOptions, ICoreWebView2, ICoreWebView2Controller, ICoreWebView2CookieList,
-        ICoreWebView2Environment, ICoreWebView2Environment10, ICoreWebView2_2,
+        ICoreWebView2CookieManager, ICoreWebView2Environment, ICoreWebView2Environment10,
+        ICoreWebView2EnvironmentOptions, ICoreWebView2_2,
     },
     NavigationCompletedEventHandler,
 };
@@ -55,8 +60,25 @@ struct State {
     webview: Option<ICoreWebView2>,
     /// Ya se guardó la sesión (o se está guardando): no se vuelve a comprobar.
     finished: bool,
+    /// Ya se copiaron (o se están copiando) las cookies de Google a youtube.com: solo una vez.
+    copied: bool,
     result: i32,
 }
+
+/// Cookies de la cuenta de Google que YouTube necesita para reconocer la sesión.
+const ACCOUNT_COOKIES: &[&str] = &[
+    "SID",
+    "HSID",
+    "SSID",
+    "APISID",
+    "SAPISID",
+    "__Secure-1PSID",
+    "__Secure-3PSID",
+    "__Secure-1PAPISID",
+    "__Secure-3PAPISID",
+    "__Secure-1PSIDTS",
+    "__Secure-3PSIDTS",
+];
 
 thread_local! {
     static STATE: RefCell<Option<State>> = const { RefCell::new(None) };
@@ -88,6 +110,7 @@ pub fn run(out_path: &str) -> i32 {
             controller: None,
             webview: None,
             finished: false,
+            copied: false,
             result: 1,
         })
     });
@@ -188,32 +211,58 @@ fn resize(window: HWND) {
     }
 }
 
-fn data_folder() -> Option<HSTRING> {
+fn data_folder(name: &str) -> Option<HSTRING> {
     let base = std::env::var_os("LOCALAPPDATA").map(PathBuf::from).or_else(|| Some(std::env::temp_dir()))?;
-    let folder = base.join("musicplayer").join("webview2");
+    let folder = base.join("musicplayer").join(name);
     let _ = fs::create_dir_all(&folder);
     Some(HSTRING::from(folder.as_os_str()))
 }
 
-fn open_webview(window: HWND) -> webview2_com::Result<()> {
-    let folder = data_folder().unwrap_or_default();
-    let environment = {
-        let (tx, rx) = mpsc::channel();
-        CreateCoreWebView2EnvironmentCompletedHandler::wait_for_async_operation(
-            Box::new(move |handler| unsafe {
-                CreateCoreWebView2EnvironmentWithOptions(PCWSTR::null(), &folder, None, &handler)
-                    .map_err(webview2_com::Error::WindowsError)
-            }),
-            Box::new(move |error, environment: Option<ICoreWebView2Environment>| {
-                error?;
-                let _ = tx.send(environment.ok_or_else(|| windows::core::Error::from(E_POINTER)));
-                Ok(())
-            }),
-        )?;
-        rx.recv().map_err(|_| webview2_com::Error::SendError)??
-    };
+/// Entorno de WebView2 con `options` (o las de por defecto) y la carpeta de datos propia.
+fn create_environment(
+    folder: HSTRING,
+    options: Option<ICoreWebView2EnvironmentOptions>,
+) -> webview2_com::Result<ICoreWebView2Environment> {
+    let (tx, rx) = mpsc::channel();
+    CreateCoreWebView2EnvironmentCompletedHandler::wait_for_async_operation(
+        Box::new(move |handler| unsafe {
+            CreateCoreWebView2EnvironmentWithOptions(PCWSTR::null(), &folder, options.as_ref(), &handler)
+                .map_err(webview2_com::Error::WindowsError)
+        }),
+        Box::new(move |error, environment: Option<ICoreWebView2Environment>| {
+            error?;
+            let _ = tx.send(environment.ok_or_else(|| windows::core::Error::from(E_POINTER)));
+            Ok(())
+        }),
+    )?;
+    Ok(rx.recv().map_err(|_| webview2_com::Error::SendError)??)
+}
 
-    let controller = {
+fn open_webview(window: HWND) -> webview2_com::Result<()> {
+    // Sin prevención de rastreo: pierde las cookies que Google pasa a youtube.com.
+    let options = CoreWebView2EnvironmentOptions::default();
+    // SAFETY: objeto recién creado, aún sin compartir con WebView2.
+    unsafe { options.set_enable_tracking_prevention(false) };
+    let options: ICoreWebView2EnvironmentOptions = options.into();
+    let open = |folder: &str| {
+        let folder = data_folder(folder).unwrap_or_default();
+        create_environment(folder, Some(options.clone())).and_then(|environment| create_controller(window, environment))
+    };
+    // Si otra ventana (de una versión anterior, aún abierta) usa la carpeta con otras opciones,
+    // WebView2 lo rechaza al crear el controlador: se usa una segunda carpeta.
+    let controller = match open("webview2") {
+        Ok(controller) => controller,
+        Err(error) => {
+            eprintln!("inicio de sesión: carpeta de WebView2 ocupada ({error}); se usa otra");
+            open("webview2-2")?
+        }
+    };
+    show_webview(window, controller)
+}
+
+/// Navegador InPrivate dentro de `window`.
+fn create_controller(window: HWND, environment: ICoreWebView2Environment) -> webview2_com::Result<ICoreWebView2Controller> {
+    Ok({
         let (tx, rx) = mpsc::channel();
         CreateCoreWebView2ControllerCompletedHandler::wait_for_async_operation(
             Box::new(move |handler| unsafe {
@@ -236,8 +285,11 @@ fn open_webview(window: HWND) -> webview2_com::Result<()> {
             }),
         )?;
         rx.recv().map_err(|_| webview2_com::Error::SendError)??
-    };
+    })
+}
 
+/// Muestra el navegador y abre la página de inicio de sesión.
+fn show_webview(window: HWND, controller: ICoreWebView2Controller) -> webview2_com::Result<()> {
     // SAFETY: controlador recién creado en este hilo.
     let webview = unsafe {
         controller.SetIsVisible(true)?;
@@ -281,18 +333,23 @@ fn host(url: &str) -> &str {
     rest.split(['/', '?', '#']).next().unwrap_or_default()
 }
 
-/// Al terminar de cargar cada página (nunca a mitad de las redirecciones de Google): en
-/// music.youtube.com se pregunta a la propia página si hay sesión y, si la hay, se guarda.
+/// Al terminar de cargar cada página (nunca a mitad de las redirecciones de Google):
+/// - en music.youtube.com se pregunta a la propia página si hay sesión y, si la hay, se guarda;
+/// - si YouTube no la tiene (acabó en `/oops`, la página de las teles, o YouTube Music sin
+///   sesión), se intenta pasarle la de Google (`copy_google_session`).
 fn check() {
     let Some(Some(webview)) = with_state(|state| if state.finished { None } else { state.webview.clone() }) else {
         return;
     };
     let url = current_url(&webview);
     let host = host(&url);
+    if !is_youtube(host) {
+        return;
+    }
     if host != "music.youtube.com" {
-        if host.ends_with("youtube.com") {
-            eprintln!("inicio de sesión: página {host}");
-        }
+        let path = url.split_once(host).map_or("", |(_, rest)| rest.split(['?', '#']).next().unwrap_or_default());
+        eprintln!("inicio de sesión: página {host}{path}");
+        copy_google_session();
         return;
     }
     let handler = ExecuteScriptCompletedHandler::create(Box::new(|error, value: String| {
@@ -301,12 +358,103 @@ fn check() {
         eprintln!("inicio de sesión: YouTube Music {}", if logged { "con sesión" } else { "sin sesión" });
         if logged {
             save();
+        } else {
+            copy_google_session();
         }
         Ok(())
     }));
     // SAFETY: el manejador vive durante la llamada; WebView2 se queda su propia referencia.
     unsafe {
         let _ = webview.ExecuteScript(w!("!!(window.ytcfg && ytcfg.get('LOGGED_IN'))"), &handler);
+    }
+}
+
+fn cookie_manager(webview: &ICoreWebView2) -> windows::core::Result<ICoreWebView2CookieManager> {
+    // SAFETY: webview válido de este hilo.
+    webview.cast::<ICoreWebView2_2>().and_then(|webview| unsafe { webview.CookieManager() })
+}
+
+/// Copia a `.youtube.com` las cookies de la cuenta de `.google.com` (con sus mismas propiedades)
+/// y vuelve a abrir YouTube Music. Solo una vez, y solo si Google tiene sesión (`SAPISID`).
+fn copy_google_session() {
+    let Some(Some(webview)) = with_state(|state| {
+        if state.finished || state.copied {
+            return None;
+        }
+        state.copied = true;
+        state.webview.clone()
+    }) else {
+        return;
+    };
+    let manager = match cookie_manager(&webview) {
+        Ok(manager) => manager,
+        Err(error) => {
+            eprintln!("inicio de sesión: WebView2 sin gestor de cookies: {error}");
+            return;
+        }
+    };
+    let reader = manager.clone();
+    let handler = GetCookiesCompletedHandler::create(Box::new(move |error, list: Option<ICoreWebView2CookieList>| {
+        error?;
+        let list = list.ok_or_else(|| windows::core::Error::from(E_POINTER))?;
+        let mut account = Vec::new();
+        let mut count = 0u32;
+        // SAFETY: lista válida que entrega WebView2; cada cadena se libera con `take`.
+        unsafe {
+            list.Count(&mut count)?;
+            for index in 0..count {
+                let cookie = list.GetValueAtIndex(index)?;
+                let domain = take(|out| cookie.Domain(out));
+                let name = take(|out| cookie.Name(out));
+                if domain == ".google.com" && ACCOUNT_COOKIES.contains(&name.as_str()) {
+                    account.push((name, cookie));
+                }
+            }
+        }
+        if !account.iter().any(|(name, _)| name == "SAPISID") {
+            // Google aún no tiene sesión (la ventana sigue en la pantalla de la cuenta): se
+            // podrá intentar en la próxima página.
+            with_state(|state| state.copied = false);
+            return Ok(());
+        }
+        eprintln!("inicio de sesión: copiando {} cookies de la cuenta de Google a youtube.com", account.len());
+        for (name, cookie) in &account {
+            // SAFETY: cookie y gestor válidos; las cadenas viven durante cada llamada.
+            unsafe {
+                let value = take(|out| cookie.Value(out));
+                let path = take(|out| cookie.Path(out));
+                let path = if path.is_empty() { "/".to_owned() } else { path };
+                let copy = reader.CreateCookie(
+                    &HSTRING::from(name.as_str()),
+                    &HSTRING::from(value),
+                    w!(".youtube.com"),
+                    &HSTRING::from(path),
+                )?;
+                let mut expires = 0f64;
+                if cookie.Expires(&mut expires).is_ok() && expires > 0.0 {
+                    copy.SetExpires(expires)?;
+                }
+                let mut flag = Default::default();
+                copy.SetIsSecure(cookie.IsSecure(&mut flag).is_ok() && flag.as_bool())?;
+                copy.SetIsHttpOnly(cookie.IsHttpOnly(&mut flag).is_ok() && flag.as_bool())?;
+                let mut same_site = Default::default();
+                if cookie.SameSite(&mut same_site).is_ok() {
+                    copy.SetSameSite(same_site)?;
+                }
+                if let Err(error) = reader.AddOrUpdateCookie(&copy) {
+                    eprintln!("inicio de sesión: no se pudo copiar la cookie {name}: {error}");
+                }
+            }
+        }
+        if let Some(Some(webview)) = with_state(|state| state.webview.clone()) {
+            // SAFETY: webview válido de este hilo.
+            unsafe { webview.Navigate(w!("https://music.youtube.com/"))? };
+        }
+        Ok(())
+    }));
+    // SAFETY: el manejador vive durante la llamada; WebView2 se queda su propia referencia.
+    unsafe {
+        let _ = manager.GetCookies(w!("https://accounts.google.com"), &handler);
     }
 }
 
@@ -371,8 +519,7 @@ fn save() {
     }) else {
         return;
     };
-    let manager = webview.cast::<ICoreWebView2_2>().and_then(|webview| unsafe { webview.CookieManager() });
-    let manager = match manager {
+    let manager = match cookie_manager(&webview) {
         Ok(manager) => manager,
         Err(error) => {
             eprintln!("inicio de sesión: WebView2 sin gestor de cookies: {error}");

@@ -1,14 +1,13 @@
 //! yt-dlp residente (`ytdlp_daemon.py`): resuelve sin pagar el arranque de Python y
 //! reutilizando el código del reproductor de YouTube ya descargado.
 //!
-//! Se lanza con el mismo intérprete que usa el `yt-dlp` instalado (su línea `#!`). Si yt-dlp
-//! no es un script de Python (binario autónomo), `resolve` devuelve `None` y el resolver
-//! usa un proceso por petición. El servidor se cierra solo tras un minuto sin uso y se puede
+//! Se lanza con el mismo intérprete que usa el `yt-dlp` instalado (su línea `#!`; en Windows,
+//! el Python embebido del instalador). Si no lo hay (binario autónomo), `resolve` devuelve
+//! `None` y el resolver usa un proceso por petición. El servidor se cierra solo tras un minuto sin uso y se puede
 //! desactivar en Opciones (ocupa ~120 MB mientras vive).
 
 use std::{
     collections::HashMap,
-    fs,
     io::{BufRead, BufReader, Write},
     path::PathBuf,
     process::{Child, ChildStdin, Stdio},
@@ -49,15 +48,22 @@ pub fn set_enabled(enabled: bool) {
 static DAEMON: LazyLock<Mutex<Option<Daemon>>> = LazyLock::new(Default::default);
 static WAITERS: LazyLock<Mutex<HashMap<String, Vec<mpsc::Sender<Reply>>>>> = LazyLock::new(Default::default);
 
-/// Intérprete de Python del yt-dlp instalado, leído de su línea `#!`.
+/// En Windows, el `yt-dlp.exe` lleva Python encerrado: el instalador añade un Python embebido
+/// en `python\` con el yt-dlp en script (`yt-dlp.zip`, en su `._pth`). Se busca en las carpetas
+/// de `search_path` (la del programa y la de la app instalada, que sirve a `cargo build`).
+#[cfg(windows)]
 fn interpreter(path: &str) -> Option<Vec<String>> {
-    // En Windows yt-dlp es un `.exe` empaquetado, sin Python a la vista: no hay residente y
-    // cada pista que no resuelve la vía rápida lanza yt-dlp entero.
-    if cfg!(windows) {
-        return None;
-    }
-    let script = fs::canonicalize(which("yt-dlp", path)?).ok()?;
-    let head = fs::read(&script).ok()?;
+    std::env::split_paths(path)
+        .map(|dir| dir.join("python"))
+        .find(|dir| dir.join("python.exe").is_file() && dir.join("yt-dlp.zip").is_file())
+        .map(|dir| vec![dir.join("python.exe").to_string_lossy().into_owned()])
+}
+
+/// Intérprete de Python del yt-dlp instalado, leído de su línea `#!`.
+#[cfg(not(windows))]
+fn interpreter(path: &str) -> Option<Vec<String>> {
+    let script = std::fs::canonicalize(which("yt-dlp", path)?).ok()?;
+    let head = std::fs::read(&script).ok()?;
     let first = head.split(|&byte| byte == b'\n').next()?;
     let line = std::str::from_utf8(first).ok()?.strip_prefix("#!")?.trim();
     let parts: Vec<String> = line.split_whitespace().map(str::to_owned).collect();

@@ -7,7 +7,8 @@
 #
 # Necesita (ver COMPILAR.md): Rust con el destino MSVC, Visual Studio Build Tools (C++), Qt 6.8+
 # para MSVC con Qt Multimedia e Inno Setup 6. mpv, yt-dlp y deno se descargan de sus
-# publicaciones oficiales en GitHub y van dentro del instalador.
+# publicaciones oficiales en GitHub, y el Python embebido de python.org (para el yt-dlp
+# residente); todo va dentro del instalador.
 param(
     [switch]$SinDescargas,
     [string]$Dependencias = "",
@@ -87,7 +88,9 @@ function Ultima($repositorio, $patron) {
 }
 
 function Descargar($recurso) {
-    $destino = Join-Path $descargas $recurso.name
+    # Con el identificador del archivo en GitHub delante: cada publicación nueva se descarga (si
+    # no, `yt-dlp.exe` se quedaría para siempre en la primera versión bajada) y la misma no se repite.
+    $destino = Join-Path $descargas "$($recurso.id)-$($recurso.name)"
     if (-not (Test-Path $destino)) {
         Write-Host "  descargando $($recurso.name)…"
         Invoke-WebRequest $recurso.browser_download_url -OutFile $destino
@@ -108,6 +111,18 @@ function Extraer7z($archivo, $carpeta) {
     & $sieteZip x -y "-o$carpeta" $archivo | Out-Null
 }
 
+# Python embebido con el yt-dlp en script (`yt-dlp.zip`, en el `._pth`): el yt-dlp residente
+# (src/daemon.rs). Sin él, cada pista que no da la vía rápida lanza yt-dlp.exe entero (~7 s).
+function PrepararPython($zip, $ytdlp) {
+    $carpeta = Join-Path $origen "python"
+    Expand-Archive $zip -DestinationPath $carpeta -Force
+    Copy-Item $ytdlp (Join-Path $carpeta "yt-dlp.zip")
+    $pth = Get-ChildItem $carpeta -Filter "python*._pth" | Select-Object -First 1
+    if (-not $pth) { throw "El Python embebido no trae su archivo ._pth." }
+    $biblioteca = ($pth.BaseName) + ".zip"
+    Set-Content $pth.FullName "$biblioteca`r`n.`r`nyt-dlp.zip" -Encoding ascii
+}
+
 if ($SinDescargas) {
     if (-not $Dependencias) { Falta "-Dependencias <carpeta>" "Con -SinDescargas, indica la carpeta con mpv.exe, yt-dlp.exe y deno.exe." }
     foreach ($programa in @("mpv.exe", "yt-dlp.exe", "deno.exe")) {
@@ -115,12 +130,20 @@ if ($SinDescargas) {
         if (-not (Test-Path $ruta)) { Falta $programa "No está en $Dependencias." }
         Copy-Item $ruta $origen
     }
+    # Opcionales: el zip del Python embebido y el yt-dlp en script (sin ellos, no hay residente).
+    $pythonZip = Get-ChildItem $Dependencias -Filter "python-*-embed-amd64.zip" -ErrorAction SilentlyContinue | Select-Object -First 1
+    $ytdlpScript = Join-Path $Dependencias "yt-dlp"
+    if ($pythonZip -and (Test-Path $ytdlpScript)) {
+        PrepararPython $pythonZip.FullName $ytdlpScript
+    } else {
+        Write-Host "  sin python-*-embed-amd64.zip y yt-dlp en ${Dependencias}: no habrá yt-dlp residente" -ForegroundColor Yellow
+    }
     foreach ($opcional in @("ffmpeg.exe", "ffprobe.exe")) {
         $ruta = Join-Path $Dependencias $opcional
         if ($ConFfmpeg -and (Test-Path $ruta)) { Copy-Item $ruta $origen }
     }
 } else {
-    Write-Host "› Descargando mpv, yt-dlp y deno…"
+    Write-Host "› Descargando mpv, yt-dlp, deno y Python…"
     # mpv: compilación de shinchiro (la que enlaza mpv.io); la versión x86_64 normal, que va en
     # cualquier procesador de 64 bits (la «v3» exige AVX2).
     $mpv = Descargar (Ultima "shinchiro/mpv-winbuild-cmake" '^mpv-x86_64-\d{8}-git-[0-9a-f]+\.7z$')
@@ -130,6 +153,28 @@ if ($SinDescargas) {
 
     $ytdlp = Descargar (Ultima "yt-dlp/yt-dlp" '^yt-dlp\.exe$')
     Copy-Item $ytdlp $origen
+
+    # El Python embebido más reciente de python.org (la carpeta de una versión aparece antes que
+    # sus archivos: se usa la primera que ya tiene el zip) y el yt-dlp en script.
+    $indice = (Invoke-WebRequest "https://www.python.org/ftp/python/" -UseBasicParsing).Content
+    $versiones = [regex]::Matches($indice, 'href="(3\.\d+\.\d+)/"') | ForEach-Object { [version]$_.Groups[1].Value } |
+        Where-Object { $_ -ge [version]"3.10" } | Sort-Object -Descending
+    $pythonZip = $null
+    foreach ($v in $versiones | Select-Object -First 6) {
+        $nombre = "python-$v-embed-amd64.zip"
+        $destino = Join-Path $descargas $nombre
+        if (-not (Test-Path $destino)) {
+            try {
+                Write-Host "  descargando $nombre…"
+                Invoke-WebRequest "https://www.python.org/ftp/python/$v/$nombre" -OutFile $destino
+            } catch { Remove-Item $destino -ErrorAction SilentlyContinue; continue }
+        }
+        $pythonZip = $destino
+        break
+    }
+    if (-not $pythonZip) { throw "No se encontró el Python embebido en python.org." }
+    $ytdlpScript = Descargar (Ultima "yt-dlp/yt-dlp" '^yt-dlp$')
+    PrepararPython $pythonZip $ytdlpScript
 
     $deno = Descargar (Ultima "denoland/deno" '^deno-x86_64-pc-windows-msvc\.zip$')
     Expand-Archive $deno -DestinationPath (Join-Path $descargas "deno") -Force

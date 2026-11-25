@@ -77,8 +77,12 @@ WebView2 en modo InPrivate (las cookies no tocan el disco; `%LOCALAPPDATA%\music
 solo guarda la caché del motor). Al terminar de cargar `music.youtube.com`, pregunta a la página
 por `ytcfg LOGGED_IN` y, si hay sesión, pide al gestor de cookies las de
 `https://music.youtube.com`, se queda con las de youtube.com y sale con 0; cerrar la ventana, 1;
-sin WebView2, 2. No copia las cookies de `.google.com` como macOS: Chromium no pierde las de la
-cadena de redirecciones. `MUSICPLAYER_LOGIN_URL` cambia la página inicial.
+sin WebView2, 2. Como en macOS, la prevención de rastreo perdía las cookies de la cadena de
+redirecciones de Google (YouTube acababa en `/oops`): el entorno se crea con
+`EnableTrackingPrevention` a falso y, si YouTube sigue sin sesión y Google la tiene (`SAPISID`),
+se copian a `.youtube.com` las cookies de la cuenta de `.google.com` y se vuelve a abrir YouTube
+Music, una vez. Si otra ventana usa la carpeta de datos con otras opciones, se usa
+`%LOCALAPPDATA%\musicplayer\webview2-2`. `MUSICPLAYER_LOGIN_URL` cambia la página inicial.
 
 ## Archivos
 
@@ -113,9 +117,10 @@ cadena de redirecciones. `MUSICPLAYER_LOGIN_URL` cambia la página inicial.
 
 ## Estado actual
 
-- **Última verificación:** 2026-11-22, ventana de Windows: solo `cargo check` y `clippy` para Windows desde macOS ([historial](../history/verificacion/sesion.md)).
+- **Última verificación:** 2026-11-22, ventana de Windows en Windows 11: abre la pantalla de Google con las opciones nuevas y con la carpeta ocupada; el propietario vio acabar el inicio de sesión en `/oops` antes del arreglo ([historial](../history/verificacion/sesion.md)).
 - **Pruebas:** `mod tests` de `src/account.rs` (solo cookies de youtube.com, bloqueo de Safari,
   sin `SAPISID` no hay sesión, formato de la firma).
-- **Sin verificar:** la ventana de Linux con Wayland; **la de Windows entera** (que Google acepte
-  WebView2, la nitidez a 125–150 %, las cookies guardadas); importar del navegador en Windows.
+- **Sin verificar:** la ventana de Linux con Wayland; en Windows, **el inicio de sesión completo**
+  (que la sesión llegue a YouTube Music sin prevención de rastreo o con la copia de cookies, y las
+  cookies guardadas) y la nitidez a 125–150 %; importar del navegador en Windows.
 - **Historial:** [docs/history/verificacion/sesion.md](../history/verificacion/sesion.md).
