@@ -23,6 +23,7 @@ static PREMIUM: AtomicBool = AtomicBool::new(false);
 /// Cambia la calidad pedida; las URLs ya resueltas se descartan.
 pub fn set_premium(premium: bool) {
     if PREMIUM.swap(premium, Ordering::SeqCst) != premium {
+        PREMIUM_FAILED_AT.store(0, Ordering::Relaxed);
         clear();
     }
 }
@@ -30,6 +31,24 @@ pub fn set_premium(premium: bool) {
 /// Calidad Premium (256 kbps): pedida por el usuario y con sesión iniciada.
 pub fn premium_mode() -> bool {
     PREMIUM.load(Ordering::SeqCst) && crate::account::cookies_file().is_some()
+}
+
+/// Momento (segundos UNIX) en que la vía Premium falló con una pista que la vía rápida sí dio.
+static PREMIUM_FAILED_AT: AtomicU64 = AtomicU64::new(0);
+/// Tiempo que se usa la vía rápida tras ese fallo antes de volver a probar Premium.
+const PREMIUM_PAUSE: u64 = 10 * 60;
+
+/// yt-dlp no está dando Premium (p. ej. una versión que ya no resuelve los retos de YouTube):
+/// mientras dure la pausa, la calidad normal de la vía rápida, en décimas en vez de ~5 s.
+fn premium_paused() -> bool {
+    now().saturating_sub(PREMIUM_FAILED_AT.load(Ordering::Relaxed)) < PREMIUM_PAUSE
+}
+
+fn pause_premium() {
+    if !premium_paused() {
+        eprintln!("calidad Premium: yt-dlp no la da; vía rápida durante {} min", PREMIUM_PAUSE / 60);
+    }
+    PREMIUM_FAILED_AT.store(now(), Ordering::Relaxed);
 }
 
 /// Numera las copias de cookies de cada yt-dlp para que no se pisen.
@@ -157,7 +176,7 @@ fn resolve_with(video_id: &str, urgent: bool) -> Result<String, String> {
     // salir sin formatos y, un momento después, con ellos. Un segundo intento suele bastar.
     // Si la pista necesita sesión, repetir no cambia nada.
     let result = run_ytdlp(video_id).or_else(|error| {
-        if error == NEEDS_SESSION || !urgent {
+        if error == NEEDS_SESSION || !urgent || unavailable(&error) {
             return Err(error);
         }
         thread::sleep(Duration::from_millis(400));
@@ -176,6 +195,84 @@ fn resolve_with(video_id: &str, urgent: bool) -> Result<String, String> {
     }
     signal.notify_all();
     result
+}
+
+/// YouTube dice que el vídeo no existe aquí (bloqueado en esta región o retirado): repetir no
+/// cambia nada.
+fn unavailable(error: &str) -> bool {
+    // «Requested format is not available» no cuenta: es yt-dlp sin formatos, no la pista.
+    ["no está disponible", "Video unavailable", "video is not available"].iter().any(|text| error.contains(text))
+}
+
+/// Edición equivalente de cada pista que no se pudo resolver (`videoId` original → otro).
+static ALTERNATIVES: LazyLock<Mutex<HashMap<String, String>>> = LazyLock::new(Default::default);
+
+/// Otra edición ya encontrada para `video_id`, si se buscó antes.
+pub fn known_alternative(video_id: &str) -> Option<String> {
+    ALTERNATIVES.lock().ok().and_then(|map| map.get(video_id).cloned())
+}
+
+/// Otra edición de la misma canción que sí suena, para una pista que no se pudo resolver.
+///
+/// Con la sesión, YouTube Music puede dar la edición de otra región (la japonesa de un single
+/// de HOYO-MiX, por ejemplo), que solo suena con yt-dlp y las cookies: en calidad normal, o si
+/// yt-dlp falla, no suena. Se busca la canción sin la cuenta y se toma el primer resultado que
+/// sea la misma canción (`same_song`) y que sí se resuelva. Devuelve `(videoId, URL)`.
+/// Bloquea (una búsqueda y una o varias resoluciones): desde un hilo de trabajo.
+pub fn alternative(video_id: &str, title: &str, artist: &str, duration: f64) -> Option<(String, String)> {
+    if let Some(other) = known_alternative(video_id) {
+        return resolve(&other).ok().map(|url| (other, url));
+    }
+    let first_artist = main_artist(artist);
+    let found = crate::ytm::search_songs_anonymous(&format!("{title} {first_artist}"))
+        .map_err(|error| eprintln!("otra edición de {video_id}: {error}"))
+        .ok()?;
+    for candidate in found.iter().filter(|track| track.video_id != video_id && same_song(title, artist, duration, track)).take(3) {
+        if let Ok(url) = resolve(&candidate.video_id) {
+            eprintln!("{video_id} no está disponible: suena otra edición, {}", candidate.video_id);
+            if let Ok(mut map) = ALTERNATIVES.lock() {
+                map.insert(video_id.to_owned(), candidate.video_id.clone());
+            }
+            return Some((candidate.video_id.clone(), url));
+        }
+    }
+    eprintln!("{video_id} no está disponible y no se encontró otra edición");
+    None
+}
+
+/// Palabras de un título o artista, en minúsculas y sin signos (los kanji y kana cuentan).
+fn words(text: &str) -> Vec<String> {
+    text.to_lowercase().split(|c: char| !c.is_alphanumeric()).filter(|word| !word.is_empty()).map(str::to_owned).collect()
+}
+
+/// Primer artista de «A y B», «A & B», «A, B» o «A feat. B».
+fn main_artist(artist: &str) -> &str {
+    [" y ", " & ", ", ", " feat", " ft.", " x "]
+        .iter()
+        .filter_map(|separator| artist.find(separator))
+        .min()
+        .map_or(artist, |end| &artist[..end])
+        .trim()
+}
+
+/// Si `candidate` es la misma canción: las palabras de un título dentro de las del otro
+/// («さざ波 La vaguelette» y «La vaguelette»), sin que una sea otra versión (instrumental, remix,
+/// en directo…), y además el mismo artista principal con la duración a ±3 s (si se conocen las
+/// dos) o, si el artista viene traducido («物語シリーズ» y «MONOGATARI Series»), la duración a ±1 s.
+fn same_song(title: &str, artist: &str, duration: f64, candidate: &crate::ytm::Track) -> bool {
+    let difference = (duration > 0.0 && candidate.duration > 0.0).then(|| (duration - candidate.duration).abs());
+    let same_artist = words(main_artist(artist)) == words(main_artist(&candidate.artist));
+    let close = if same_artist { difference.is_none_or(|d| d <= 3.0) } else { difference.is_some_and(|d| d <= 1.0) };
+    if !close {
+        return false;
+    }
+    let (ours, theirs) = (words(title), words(&candidate.title));
+    let variants = ["instrumental", "inst", "remix", "live", "karaoke", "acoustic", "cover", "sped", "slowed"];
+    if variants.iter().any(|variant| ours.iter().any(|w| w == variant) != theirs.iter().any(|w| w == variant)) {
+        return false;
+    }
+    let (short, long) = if ours.len() <= theirs.len() { (&ours, &theirs) } else { (&theirs, &ours) };
+    !short.is_empty() && short.iter().all(|word| long.contains(word))
 }
 
 /// Última pista que la interfaz pidió precargar y si hay un hilo atendiéndolas.
@@ -237,15 +334,35 @@ pub const NEEDS_SESSION: &str = "\u{0}necesita-sesion";
 /// Pistas que la vía rápida rechazó y solo llegan con la sesión: no se vuelve a probar con ellas.
 static NEEDS_ACCOUNT: LazyLock<Mutex<HashSet<String>>> = LazyLock::new(Default::default);
 
+/// Pistas que YouTube da por no disponibles por todas las vías (la vía rápida y yt-dlp con la
+/// sesión): no se vuelven a pedir, y `alternative` busca otra edición al momento.
+static UNAVAILABLE: LazyLock<Mutex<HashSet<String>>> = LazyLock::new(Default::default);
+
+/// Pistas que yt-dlp con la sesión da por no disponibles y la vía rápida sí da (la cuenta ve otra
+/// región): en Premium van directas a la vía rápida, sin esperar a otro yt-dlp.
+static FAST_ONLY: LazyLock<Mutex<HashSet<String>>> = LazyLock::new(Default::default);
+
 fn fast_or_ytdlp(video_id: &str) -> Result<(String, bool), String> {
+    if UNAVAILABLE.lock().is_ok_and(|set| set.contains(video_id)) {
+        return Err("no está disponible (ya comprobado)".to_owned());
+    }
     let known = NEEDS_ACCOUNT.lock().is_ok_and(|set| set.contains(video_id));
-    // Directo a yt-dlp con la sesión: en modo Premium (los 256 kbps solo llegan así) y con
-    // las pistas que ya se sabe que la vía rápida rechaza.
-    let session_first = premium_mode() || (known && crate::account::cookies_file().is_some());
+    // Directo a yt-dlp con la sesión: en modo Premium (los 256 kbps solo llegan así; salvo si
+    // acaba de fallar, `premium_paused`) y con las pistas que ya se sabe que la vía rápida rechaza.
+    let fast_only = FAST_ONLY.lock().is_ok_and(|set| set.contains(video_id));
+    let premium = premium_mode() && !premium_paused() && !fast_only;
+    let session_first = premium || (known && crate::account::cookies_file().is_some());
+    let mark_unavailable = |fast: &str, ytdlp: &str| {
+        if unavailable(fast) && unavailable(ytdlp) {
+            if let Ok(mut set) = UNAVAILABLE.lock() {
+                set.insert(video_id.to_owned());
+            }
+        }
+    };
     // Calidad normal: 1) la API del reproductor (~0,3 s, Opus ~160 kbps, lo máximo sin
     // Premium). Premium: los formatos de 256 kbps solo llegan con la sesión, vía yt-dlp.
     if !session_first {
-        match crate::stream::resolve(video_id) {
+        let fast_error = match crate::stream::resolve(video_id) {
             Ok(url) => return Ok((url, false)),
             // Algunas pistas (muchas «Art Tracks» de sellos japoneses, por ejemplo) YouTube
             // solo las da con sesión: ni la web de YouTube Music las reproduce sin ella. Sin
@@ -261,23 +378,41 @@ fn fast_or_ytdlp(video_id: &str) -> Result<(String, bool), String> {
                     }
                 }
                 eprintln!("vía rápida no disponible para {video_id}: {error}; se usa yt-dlp con la sesión");
+                error
+            }
+        };
+        return ytdlp(video_id, false).map(|url| (url, true)).inspect_err(|error| mark_unavailable(&fast_error, error));
+    }
+    let ytdlp_error = match ytdlp(video_id, true) {
+        Ok(url) => return Ok((url, true)),
+        Err(error) => error,
+    };
+    // Si la vía Premium falla, mejor sonar en calidad normal que no sonar. Si la vía rápida sí
+    // da la pista: con «no disponible», la cuenta no la ve (esa pista irá por la vía rápida);
+    // con otro error, el fallo es de yt-dlp y Premium se aparca un rato para que las siguientes
+    // no esperen a otro yt-dlp fallido.
+    let fast = crate::stream::resolve(video_id).map(|url| (url, false));
+    match &fast {
+        Ok(_) if premium && unavailable(&ytdlp_error) => {
+            if let Ok(mut set) = FAST_ONLY.lock() {
+                set.insert(video_id.to_owned());
             }
         }
+        Ok(_) if premium => pause_premium(),
+        Err(error) => mark_unavailable(error, &ytdlp_error),
+        Ok(_) => {}
     }
-    // 2) El yt-dlp residente; 3) si no está disponible, un proceso nuevo.
-    if let Some(reply) = crate::daemon::resolve(video_id) {
-        if reply.is_ok() || !session_first {
-            return reply.map(|url| (url, true));
-        }
+    fast
+}
+
+/// 2) El yt-dlp residente; 3) si no está disponible (o, con `process`, si falla), un proceso
+/// nuevo. Si el residente dice que el vídeo no está disponible, otro yt-dlp diría lo mismo.
+fn ytdlp(video_id: &str, process: bool) -> Result<String, String> {
+    match crate::daemon::resolve(video_id) {
+        Some(Ok(url)) => Ok(url),
+        Some(Err(error)) if !process || unavailable(&error) => Err(error),
+        _ => run_ytdlp_process(video_id),
     }
-    if session_first {
-        if let Ok(url) = run_ytdlp_process(video_id) {
-            return Ok((url, true));
-        }
-        // Si la vía Premium falla, mejor sonar en calidad normal que no sonar.
-        return crate::stream::resolve(video_id).map(|url| (url, false));
-    }
-    run_ytdlp_process(video_id).map(|url| (url, true))
 }
 
 fn run_ytdlp_process(video_id: &str) -> Result<String, String> {
@@ -314,4 +449,46 @@ fn run_ytdlp_process(video_id: &str) -> Result<String, String> {
         .filter(|url| url.starts_with("http"))
         .map(str::to_owned)
         .ok_or_else(|| "yt-dlp no devolvió ninguna URL".to_owned())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ytm::Track;
+
+    fn track(title: &str, artist: &str, duration: f64) -> Track {
+        Track { title: title.into(), artist: artist.into(), duration, ..Default::default() }
+    }
+
+    #[test]
+    fn reconoce_otra_edicion_de_la_misma_cancion() {
+        let original = ("さざ波 La vaguelette", "HOYO-MiX y Cécilia Cara", 150.0);
+        let same = |candidate: &Track| same_song(original.0, original.1, original.2, candidate);
+        assert!(same(&track("La vaguelette", "HOYO-MiX y Cécilia Cara", 150.0)));
+        assert!(same(&track("La vaguelette", "HOYO-MiX", 151.0)));
+        // Otra canción, otra duración, otro artista u otra versión: no.
+        assert!(!same(&track("Comme il vous plaira", "HOYO-MiX", 115.0)));
+        assert!(!same(&track("La vaguelette", "HOYO-MiX", 180.0)));
+        assert!(!same(&track("La vaguelette", "Otro", 155.0)));
+        assert!(!same(&track("La vaguelette (Instrumental)", "HOYO-MiX", 150.0)));
+        // Artista traducido: vale con la misma duración, no con otra.
+        assert!(same_song("リスキーな真似", "物語シリーズ", 160.0, &track("リスキーな真似 - Risukina Mane", "MONOGATARI Series", 160.0)));
+        assert!(!same_song("リスキーな真似", "物語シリーズ", 160.0, &track("リスキーな真似", "MONOGATARI Series", 175.0)));
+        assert!(!same_song("Intro", "Uno", 0.0, &track("Intro", "Otro", 90.0)));
+    }
+
+    #[test]
+    fn artista_principal() {
+        assert_eq!(main_artist("HOYO-MiX y Cécilia Cara"), "HOYO-MiX");
+        assert_eq!(main_artist("Yu-Peng Chen & HOYO-MiX"), "Yu-Peng Chen");
+        assert_eq!(main_artist("HOYO-MiX"), "HOYO-MiX");
+    }
+
+    #[test]
+    fn no_disponible() {
+        assert!(unavailable("player (UNPLAYABLE): Este vídeo no está disponible"));
+        assert!(unavailable("yt-dlp: ERROR: [youtube] x: Video unavailable. This video is not available"));
+        assert!(!unavailable("yt-dlp: ERROR: HTTP Error 403"));
+        assert!(!unavailable("yt-dlp: ERROR: [youtube] x: Requested format is not available. Use --list-formats"));
+    }
 }
