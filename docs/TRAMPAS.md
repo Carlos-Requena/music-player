@@ -109,6 +109,11 @@ que toque **antes** de cambiar algo ahí. Una trampa nueva se añade en su secci
   página de un álbum encuentra antes el carrusel lateral («otras versiones») que la cabecera, y en
   la cabecera `straplineThumbnail` (la foto del artista) antes que `thumbnail`. Busca dentro del
   nodo que toca (`header_thumb`, la cabecera de `album_info`), no en toda la página.
+- **La sesión cambia el `videoId` de una canción:** con la cuenta, YouTube Music puede dar la
+  edición de otra región (p. ej. la japonesa de un single), que solo suena con yt-dlp y las
+  cookies; la vía rápida (sin cuenta) responde `UNPLAYABLE`. Sin sesión, la misma fila trae la
+  edición local. Si yt-dlp falla, «no suenan las canciones de anime/juegos»: se busca otra
+  edición sin la cuenta (`resolver::alternative`) y se comprueba yt-dlp (`yt-dlp --version`).
 - **Los videoclips no traen álbum** en la ficha de `next`, solo el artista: busca la versión de
   audio de la misma canción (`song_links`).
 

@@ -1016,6 +1016,15 @@ impl qobject::Player {
         self.as_mut().set_error(QString::from(message));
     }
 
+    /// La pista `index` suena con otra edición (`resolver::alternative`): la cola la apunta para
+    /// que «Me gusta», el historial y los plugins vayan a la que suena.
+    fn replace_video_id(mut self: Pin<&mut Self>, index: usize, video_id: &str) {
+        let mut tracks = self.tracks.clone();
+        let Some(track) = tracks.get_mut(index) else { return };
+        track.video_id = video_id.to_owned();
+        self.as_mut().set_tracks(tracks);
+    }
+
     fn set_tracks(mut self: Pin<&mut Self>, tracks: Vec<Track>) {
         let json = serde_json::to_string(&tracks).unwrap_or_default();
         self.as_mut().rust_mut().tracks = tracks;
@@ -1147,9 +1156,24 @@ impl qobject::Player {
             None => {
                 let qt = self.qt_thread();
                 let video_id = track.video_id.clone();
+                let (title, artist, duration) = (track.title.clone(), track.artist.clone(), track.duration);
                 thread::spawn(move || {
-                    let result = resolver::resolve(&video_id);
-                    let _ = qt.queue(move |player| {
+                    // Si ya se sabe que esta edición no está disponible, directa a la otra.
+                    let (mut result, mut replacement) = match resolver::known_alternative(&video_id) {
+                        Some(other) => (resolver::resolve(&other), Some(other)),
+                        None => (resolver::resolve(&video_id), None),
+                    };
+                    // No suena por ninguna vía (p. ej. la edición de otra región que da la
+                    // cuenta): otra edición de la misma canción.
+                    if result.is_err() {
+                        if let Some((other, url)) =
+                            resolver::alternative(&video_id, &title, &artist, duration)
+                        {
+                            result = Ok(url);
+                            replacement = Some(other);
+                        }
+                    }
+                    let _ = qt.queue(move |mut player| {
                         if player.load_token != token {
                             return;
                         }
@@ -1163,7 +1187,14 @@ impl qobject::Player {
                             Err(error) => eprintln!("{error}; se usa el gancho de yt-dlp de mpv"),
                             Ok(_) => {}
                         }
-                        player.start_stream(result.ok().as_deref(), &video_id);
+                        let playing = match replacement {
+                            Some(other) => {
+                                player.as_mut().replace_video_id(index, &other);
+                                other
+                            }
+                            None => video_id,
+                        };
+                        player.start_stream(result.ok().as_deref(), &playing);
                     });
                 });
             }

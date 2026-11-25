@@ -29,6 +29,21 @@ La pieza que hace que una pista suene al hacer clic. Lo que pasa después (mpv, 
 - **Pistas reservadas a cuentas** (`UNPLAYABLE`, muchas «Art Tracks»): sin sesión se avisa al
   momento (`NEEDS_SESSION`, ~0,3 s) en vez de probar yt-dlp. Con sesión van directas a yt-dlp con
   el cliente `web_music` y las cookies, y se recuerdan.
+- **Ediciones de otra región:** con la sesión, YouTube Music puede dar la edición de otro país
+  de una canción (la japonesa de un single de HOYO-MiX, por ejemplo). Solo la da yt-dlp con las
+  cookies (Premium); la vía rápida, sin la cuenta, la ve no disponible. Si una pista no se resuelve
+  (calidad normal, o yt-dlp roto), `alternative` busca la canción **sin
+  la cuenta** (`ytm::search_songs_anonymous`) y suena el primer resultado con un título
+  compatible y, o el mismo artista principal y la duración a ±3 s, o (artista traducido,
+  «物語シリーズ» y «MONOGATARI Series») la duración a ±1 s. La cola apunta a esa edición
+  (`Player::replace_video_id`) y se recuerda. Lo que la vía rápida y yt-dlp dan por no
+  disponible se apunta (`UNAVAILABLE`): no se reintenta ni se vuelve a pedir, y como la precarga
+  ya lo averigua, el clic va directo a la otra edición.
+- **Premium se aparca si yt-dlp falla:** si la vía Premium falla con una pista que la vía rápida
+  sí da y yt-dlp no dice «no disponible», el fallo es de yt-dlp (p. ej. una versión que ya no
+  resuelve los retos de YouTube): durante 10 min (`PREMIUM_PAUSE`) se usa la vía rápida y después
+  se vuelve a probar sola. Cambiar la calidad en Opciones anula la pausa. Si yt-dlp dice «no
+  disponible» (la cuenta no ve esa pista), solo esa pista pasa a la vía rápida (`FAST_ONLY`).
 - **Clientes de yt-dlp:** sin sesión, `web_embedded,mweb` (los de por defecto piden verificación
   anti-bot); con sesión, `web_music` con `player_skip=webpage,configs`. Se pueden forzar con
   `MUSICPLAYER_YTDLP_CLIENTS`.
@@ -99,6 +114,8 @@ La vía rápida sirve unas 9 de cada 10 pistas.
 | Clientes de yt-dlp | [`ytdlp_clients`](../../src/resolver.rs) |
 | Prefijo `lavf://` | [`run_ytdlp`](../../src/resolver.rs) |
 | Pistas que exigen cuenta | [`NEEDS_SESSION`](../../src/resolver.rs) |
+| Otra edición de una pista no disponible | [`alternative`](../../src/resolver.rs), [`same_song`](../../src/resolver.rs) |
+| Premium aparcado tras un fallo de yt-dlp | [`premium_paused`](../../src/resolver.rs) |
 | Mejor formato de audio | [`best_audio`](../../src/stream.rs) |
 | Visitor data | [`visitor_data`](../../src/stream.rs) |
 
@@ -113,9 +130,11 @@ La vía rápida sirve unas 9 de cada 10 pistas.
 
 ## Estado actual
 
-- **Última verificación:** 2026-11-22, residente en Windows 11 con Python embebido: `--probe resolve` sin sesión ([historial](../history/verificacion/resolucion.md)).
-- **Pruebas:** `mod tests` de `src/stream.rs` (elección del mejor audio). El resto, con
+- **Última verificación:** 2026-11-24, otra edición para las pistas de otra región, con la sesión del propietario (macOS); 2026-11-22, residente en Windows 11 con Python embebido, `--probe resolve` sin sesión ([historial](../history/verificacion/resolucion.md)).
+- **Pruebas:** `mod tests` de `src/stream.rs` (elección del mejor audio) y de `src/resolver.rs`
+  (misma canción en otra edición, artista principal, «no disponible»). El resto, con
   `--probe fast`, `--probe resolve` (solo el residente) y `--probe playable` ([verificar-reproduccion](../runbooks/verificar-reproduccion.md)).
 - **Sin verificar:** Premium 256 kbps con una cuenta Premium real en Linux; en Windows, el
-  residente con sesión (`web_music` y cookies), desde la app instalada y con la ventana abierta.
+  residente con sesión (`web_music` y cookies), desde la app instalada y con la ventana abierta, y
+  las ediciones de otra región y la pausa de Premium.
 - **Historial:** [docs/history/verificacion/resolucion.md](../history/verificacion/resolucion.md).

@@ -62,7 +62,12 @@ pub struct Track {
     pub duration: f64,
 }
 
-fn post(endpoint: &str, mut body: Value) -> Result<Value> {
+fn post(endpoint: &str, body: Value) -> Result<Value> {
+    post_as(endpoint, body, true)
+}
+
+/// Como `post`; con `session` falso, la petición va sin la cuenta aunque haya sesión.
+fn post_as(endpoint: &str, mut body: Value, session: bool) -> Result<Value> {
     body["context"] = json!({
         "client": { "clientName": "WEB_REMIX", "clientVersion": CLIENT_VERSION, "hl": "es", "gl": "ES" }
     });
@@ -70,7 +75,8 @@ fn post(endpoint: &str, mut body: Value) -> Result<Value> {
         .header("User-Agent", USER_AGENT)
         .header("Origin", "https://music.youtube.com");
     // Con sesión, las mismas peticiones devuelven el contenido de la cuenta.
-    if let Some((cookie, authorization)) = crate::account::with_session(|session| session.headers()) {
+    let headers = if session { crate::account::with_session(|session| session.headers()) } else { None };
+    if let Some((cookie, authorization)) = headers {
         request = request
             .header("Cookie", cookie)
             .header("Authorization", authorization)
@@ -751,6 +757,14 @@ pub fn search_one_kind(query: &str, albums: bool) -> Result<Vec<Item>> {
     let params = if albums { SEARCH_ALBUMS } else { SEARCH_SONGS };
     let page = post("search", json!({ "query": query, "params": params }))?;
     Ok(zones(&page).into_iter().flat_map(|zone| zone.items).collect())
+}
+
+/// Canciones de una búsqueda hecha sin la cuenta: lo que YouTube Music da a cualquiera desde
+/// esta red. Con la sesión, la cuenta puede devolver ediciones de otra región (p. ej. la
+/// japonesa de un single) que aquí no se pueden escuchar; esta búsqueda da la que sí.
+pub fn search_songs_anonymous(query: &str) -> Result<Vec<Track>> {
+    let page = post_as("search", json!({ "query": query, "params": SEARCH_SONGS }), false)?;
+    Ok(zones(&page).into_iter().flat_map(|zone| zone.items).filter(|item| !item.video_id.is_empty()).map(item_track).collect())
 }
 
 fn seconds(clock: &str) -> f64 {
