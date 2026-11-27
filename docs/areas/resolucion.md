@@ -33,9 +33,12 @@ La pieza que hace que una pista suene al hacer clic. Lo que pasa después (mpv, 
   de una canción (la japonesa de un single de HOYO-MiX, por ejemplo). Solo la da yt-dlp con las
   cookies (Premium); la vía rápida, sin la cuenta, la ve no disponible. Si una pista no se resuelve
   (calidad normal, o yt-dlp roto), `alternative` busca la canción **sin
-  la cuenta** (`ytm::search_songs_anonymous`) y suena el primer resultado con un título
-  compatible y, o el mismo artista principal y la duración a ±3 s, o (artista traducido,
-  «物語シリーズ» y «MONOGATARI Series») la duración a ±1 s. La cola apunta a esa edición
+  la cuenta** (`ytm::search_songs_anonymous`, título y artista principal) y suena el primer
+  resultado que sea la misma canción (`same_song`): un título compatible y, o el mismo artista
+  principal y la duración a ±3 s, o (artista traducido, «物語シリーズ» y «MONOGATARI Series») la
+  duración a ±1 s; o, con el título traducido («終焉のフィナーレ» y «Caelestinum Finale
+  Termini»), el mismo artista principal y la duración a ±1 s entre los cinco primeros resultados.
+  Nunca una versión distinta (instrumental, remix, en directo…). La cola apunta a esa edición
   (`Player::replace_video_id`) y se recuerda. Lo que la vía rápida y yt-dlp dan por no
   disponible se apunta (`UNAVAILABLE`): no se reintenta ni se vuelve a pedir, y como la precarga
   ya lo averigua, el clic va directo a la otra edición.

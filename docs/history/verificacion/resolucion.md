@@ -5,6 +5,18 @@ son de cuando se escribieron. El estado actual está en su [ficha](../../areas/r
 
 Lo nuevo va arriba: añade una sección `## AAAA-MM-DD · qué se verificó` encima de las anteriores.
 
+## 2026-11-27 · otra edición con el título traducido
+
+- **Fallo:** «終焉のフィナーレ» (`Ui7L0VZqAT0`, edición japonesa de Yu-Peng Chen) no está
+  disponible por ninguna vía, ni con la sesión y yt-dlp 2026.11.23; su edición internacional se
+  llama «Caelestinum Finale Termini» (`VqtScyk2C5A`) y `same_song` la descartaba por el título.
+- **Cambio:** `same_song` acepta un título distinto con el mismo artista principal y la duración
+  a ±1 s, solo entre los cinco primeros resultados de la búsqueda.
+- **Cómo:** `cargo build --release` sin avisos, `cargo test` (casos nuevos); `--play
+  Ui7L0VZqAT0` con una copia de la configuración y la sesión del propietario: suena
+  `VqtScyk2C5A` a 239 kbps, arranque 2,6 s.
+- **No verificado:** la app empaquetada; Linux y Windows.
+
 ## 2026-11-24 · yt-dlp 2026.11.23: Premium y las ediciones japonesas vuelven a sonar
 
 - **Causa de «las canciones de Genshin han dejado de sonar»:** la cuenta da ediciones japonesas
