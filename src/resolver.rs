@@ -227,7 +227,14 @@ pub fn alternative(video_id: &str, title: &str, artist: &str, duration: f64) -> 
     let found = crate::ytm::search_songs_anonymous(&format!("{title} {first_artist}"))
         .map_err(|error| eprintln!("otra edición de {video_id}: {error}"))
         .ok()?;
-    for candidate in found.iter().filter(|track| track.video_id != video_id && same_song(title, artist, duration, track)).take(3) {
+    // Con el título traducido solo cuentan los primeros resultados: más abajo, la misma
+    // duración y el mismo artista pueden ser otra canción del mismo disco.
+    let matches = found
+        .iter()
+        .enumerate()
+        .filter(|(index, track)| track.video_id != video_id && same_song(title, artist, duration, track, *index < 5))
+        .map(|(_, track)| track);
+    for candidate in matches.take(3) {
         if let Ok(url) = resolve(&candidate.video_id) {
             eprintln!("{video_id} no está disponible: suena otra edición, {}", candidate.video_id);
             if let Ok(mut map) = ALTERNATIVES.lock() {
@@ -255,24 +262,28 @@ fn main_artist(artist: &str) -> &str {
         .trim()
 }
 
-/// Si `candidate` es la misma canción: las palabras de un título dentro de las del otro
-/// («さざ波 La vaguelette» y «La vaguelette»), sin que una sea otra versión (instrumental, remix,
-/// en directo…), y además el mismo artista principal con la duración a ±3 s (si se conocen las
-/// dos) o, si el artista viene traducido («物語シリーズ» y «MONOGATARI Series»), la duración a ±1 s.
-fn same_song(title: &str, artist: &str, duration: f64, candidate: &crate::ytm::Track) -> bool {
-    let difference = (duration > 0.0 && candidate.duration > 0.0).then(|| (duration - candidate.duration).abs());
-    let same_artist = words(main_artist(artist)) == words(main_artist(&candidate.artist));
-    let close = if same_artist { difference.is_none_or(|d| d <= 3.0) } else { difference.is_some_and(|d| d <= 1.0) };
-    if !close {
-        return false;
-    }
+/// Si `candidate` es la misma canción, sin que una sea otra versión (instrumental, remix…):
+/// - las palabras de un título dentro de las del otro («さざ波 La vaguelette» y «La vaguelette»)
+///   y, o el mismo artista principal con la duración a ±3 s, o, si el artista viene traducido
+///   («物語シリーズ» y «MONOGATARI Series»), la duración a ±1 s;
+/// - o, con el título traducido («終焉のフィナーレ» y «Caelestinum Finale Termini»), el mismo
+///   artista principal y la duración a ±1 s, solo entre los primeros resultados (`top`).
+fn same_song(title: &str, artist: &str, duration: f64, candidate: &crate::ytm::Track, top: bool) -> bool {
     let (ours, theirs) = (words(title), words(&candidate.title));
     let variants = ["instrumental", "inst", "remix", "live", "karaoke", "acoustic", "cover", "sped", "slowed"];
     if variants.iter().any(|variant| ours.iter().any(|w| w == variant) != theirs.iter().any(|w| w == variant)) {
         return false;
     }
+    let difference = (duration > 0.0 && candidate.duration > 0.0).then(|| (duration - candidate.duration).abs());
+    let exact = difference.is_some_and(|d| d <= 1.0);
+    let same_artist = words(main_artist(artist)) == words(main_artist(&candidate.artist));
     let (short, long) = if ours.len() <= theirs.len() { (&ours, &theirs) } else { (&theirs, &ours) };
-    !short.is_empty() && short.iter().all(|word| long.contains(word))
+    let same_title = !short.is_empty() && short.iter().all(|word| long.contains(word));
+    if same_title {
+        exact || (same_artist && difference.is_none_or(|d| d <= 3.0))
+    } else {
+        top && same_artist && exact
+    }
 }
 
 /// Última pista que la interfaz pidió precargar y si hay un hilo atendiéndolas.
@@ -463,7 +474,7 @@ mod tests {
     #[test]
     fn reconoce_otra_edicion_de_la_misma_cancion() {
         let original = ("さざ波 La vaguelette", "HOYO-MiX y Cécilia Cara", 150.0);
-        let same = |candidate: &Track| same_song(original.0, original.1, original.2, candidate);
+        let same = |candidate: &Track| same_song(original.0, original.1, original.2, candidate, true);
         assert!(same(&track("La vaguelette", "HOYO-MiX y Cécilia Cara", 150.0)));
         assert!(same(&track("La vaguelette", "HOYO-MiX", 151.0)));
         // Otra canción, otra duración, otro artista u otra versión: no.
@@ -472,9 +483,15 @@ mod tests {
         assert!(!same(&track("La vaguelette", "Otro", 155.0)));
         assert!(!same(&track("La vaguelette (Instrumental)", "HOYO-MiX", 150.0)));
         // Artista traducido: vale con la misma duración, no con otra.
-        assert!(same_song("リスキーな真似", "物語シリーズ", 160.0, &track("リスキーな真似 - Risukina Mane", "MONOGATARI Series", 160.0)));
-        assert!(!same_song("リスキーな真似", "物語シリーズ", 160.0, &track("リスキーな真似", "MONOGATARI Series", 175.0)));
-        assert!(!same_song("Intro", "Uno", 0.0, &track("Intro", "Otro", 90.0)));
+        assert!(same_song("リスキーな真似", "物語シリーズ", 160.0, &track("リスキーな真似 - Risukina Mane", "MONOGATARI Series", 160.0), false));
+        assert!(!same_song("リスキーな真似", "物語シリーズ", 160.0, &track("リスキーな真似", "MONOGATARI Series", 175.0), true));
+        assert!(!same_song("Intro", "Uno", 0.0, &track("Intro", "Otro", 90.0), true));
+        // Título traducido: mismo artista y duración, y solo entre los primeros resultados.
+        let finale = track("Caelestinum Finale Termini", "Yu-Peng Chen y HOYO-MiX", 208.0);
+        assert!(same_song("終焉のフィナーレ", "Yu-Peng Chen", 208.0, &finale, true));
+        assert!(!same_song("終焉のフィナーレ", "Yu-Peng Chen", 208.0, &finale, false));
+        assert!(!same_song("終焉のフィナーレ", "Yu-Peng Chen", 215.0, &finale, true));
+        assert!(!same_song("終焉のフィナーレ", "HOYO-MiX", 208.0, &finale, true));
     }
 
     #[test]
